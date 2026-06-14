@@ -58,8 +58,6 @@ function WallMesh({ fromX, fromZ, toX, toZ, height, sharedBy, activeRoomId }: Wa
         gradientMap={TOON_GRADIENT}
         transparent
         opacity={targetOp}
-        depthWrite={false}
-        side={THREE.DoubleSide}
       />
     </mesh>
   );
@@ -92,7 +90,6 @@ function CornerPost({ x, z, height, activeRoomId, adjacentRooms }: PostProps) {
         gradientMap={TOON_GRADIENT}
         transparent
         opacity={targetOp}
-        depthWrite={false}
       />
     </mesh>
   );

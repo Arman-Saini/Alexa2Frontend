@@ -96,12 +96,6 @@ export function RoomMesh({ room, isActive, isHovered }: RoomMeshProps) {
         />
       </mesh>
 
-      {/* Floor tile grid lines (subtle) */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.003, 0]}>
-        <planeGeometry args={[room.width, room.depth]} />
-        <meshBasicMaterial color="#000000" transparent opacity={0.05} wireframe={false} />
-      </mesh>
-
       {/* Active glow ring */}
       {isActive && (
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.005, 0]}>

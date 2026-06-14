@@ -6,14 +6,12 @@ import { House } from './House';
 import { CameraController } from './CameraController';
 import { MiniMap } from './MiniMap';
 
-// Single strong directional sun + very dim ambient = clean toon shadow steps.
-// No fill lights — they muddy the gradient bands.
 function SceneLighting() {
   return (
     <>
       <directionalLight
         position={[18, 28, 12]}
-        intensity={2.4}
+        intensity={2.0}
         castShadow
         color="#FFF8E0"
         shadow-mapSize-width={2048}
@@ -26,7 +24,8 @@ function SceneLighting() {
         shadow-camera-bottom={-30}
         shadow-bias={-0.001}
       />
-      <ambientLight intensity={0.22} color="#B8D4F0" />
+      {/* Warm neutral ambient — avoids blue tinting on toon materials */}
+      <ambientLight intensity={0.28} color="#F0E8D8" />
     </>
   );
 }
@@ -53,12 +52,14 @@ export function DigitalTwinCanvas() {
       <Canvas
         orthographic
         shadows
-        camera={{ position: [22, 20, 22], zoom: 32, near: -500, far: 500 }}
+        camera={{ position: [22, 20, 22], zoom: 22, near: -500, far: 500 }}
         gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
-        // Bright sky gradient — Sims daytime aesthetic
-        style={{ background: 'linear-gradient(175deg, #5BB8E8 0%, #90CEEE 35%, #C8E8F8 70%, #E8F4FF 100%)' }}
+        style={{ background: '#A8D8EA' }}
       >
         <Suspense fallback={null}>
+          {/* Three.js scene background — transparent objects blend against this, not the CSS */}
+          <color attach="background" args={['#A8D8EA']} />
+
           <SceneLighting />
 
           <CameraController />
@@ -66,7 +67,7 @@ export function DigitalTwinCanvas() {
           <OrbitControls
             makeDefault
             enabled={!ui.isPlacementMode}
-            minZoom={14}
+            minZoom={8}
             maxZoom={160}
             maxPolarAngle={Math.PI / 2.15}
             minPolarAngle={Math.PI / 5}
