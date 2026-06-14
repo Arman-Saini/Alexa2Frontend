@@ -1,12 +1,14 @@
-import { TOON_GRADIENT } from './ToonMaterial';
+import { useRef } from 'react';
+import { useFrame } from '@react-three/fiber';
+import * as THREE from 'three';
 
-// Shared toon material helper — roughness/metalness params kept for call-site
-// compatibility but ignored (MeshToonMaterial uses gradient steps instead).
-function mat(color: string, _r = 0.85, _m = 0.05, emissive?: string, emissiveIntensity = 0) {
+// PBR material — realistic look without cel-shading bands.
+function mat(color: string, roughness = 0.75, metalness = 0.05, emissive?: string, emissiveIntensity = 0) {
   return (
-    <meshToonMaterial
+    <meshStandardMaterial
       color={color}
-      gradientMap={TOON_GRADIENT}
+      roughness={roughness}
+      metalness={metalness}
       emissive={emissive ?? '#000000'}
       emissiveIntensity={emissiveIntensity}
     />
@@ -444,23 +446,36 @@ export function EchoShowGeometry({ isOn }: { isOn: boolean }) {
 }
 
 export function SmartBulbGeometry({ isOn, color }: { isOn: boolean; color: string }) {
+  // Hanging pendant: cord at top (y=0 = ceiling attach), globe hangs below
   return (
     <group>
-      {/* Socket */}
-      <mesh position={[0,0.06,0]} castShadow>
-        <cylinderGeometry args={[0.04,0.055,0.1,12]}/>
-        {mat('#888888',0.3,0.5)}
+      {/* Cord from ceiling */}
+      <mesh position={[0, -0.18, 0]}>
+        <cylinderGeometry args={[0.006, 0.006, 0.36, 6]} />
+        {mat('#444444', 0.9, 0.1)}
+      </mesh>
+      {/* Socket at bottom of cord */}
+      <mesh position={[0, -0.38, 0]} castShadow>
+        <cylinderGeometry args={[0.04, 0.055, 0.1, 12]} />
+        {mat('#888888', 0.3, 0.5)}
       </mesh>
       {/* Neck */}
-      <mesh position={[0,0.14,0]}>
-        <cylinderGeometry args={[0.04,0.04,0.06,12]}/>
-        {mat('#666666',0.3,0.3)}
+      <mesh position={[0, -0.48, 0]}>
+        <cylinderGeometry args={[0.035, 0.04, 0.06, 12]} />
+        {mat('#666666', 0.3, 0.3)}
       </mesh>
       {/* Bulb globe */}
-      <mesh position={[0,0.26,0]} castShadow>
-        <sphereGeometry args={[0.1,14,12]}/>
-        {mat(isOn ? color : '#e0e0e0', 0.1, 0.1, isOn ? color : '#000', isOn ? 1.5 : 0)}
+      <mesh position={[0, -0.59, 0]} castShadow>
+        <sphereGeometry args={[0.1, 14, 12]} />
+        {mat(isOn ? color : '#e0e0e0', 0.1, 0.05, isOn ? color : '#000', isOn ? 2.2 : 0)}
       </mesh>
+      {/* Warm glow disc below bulb when on */}
+      {isOn && (
+        <mesh position={[0, -0.72, 0]} rotation={[Math.PI / 2, 0, 0]}>
+          <circleGeometry args={[0.18, 16]} />
+          <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.6} transparent opacity={0.18} />
+        </mesh>
+      )}
     </group>
   );
 }
@@ -622,6 +637,13 @@ export function SmokeDetectorGeometry({ isOn }: { isOn: boolean }) {
 }
 
 export function SmartTVGeometry({ isOn }: { isOn: boolean }) {
+  const screenRef = useRef<THREE.MeshStandardMaterial>(null);
+  useFrame(({ clock }) => {
+    if (!screenRef.current || !isOn) return;
+    const t = clock.getElapsedTime();
+    screenRef.current.emissiveIntensity = 0.55 + Math.sin(t * 0.8) * 0.06;
+  });
+
   return (
     <group>
       {/* Screen */}
@@ -629,10 +651,17 @@ export function SmartTVGeometry({ isOn }: { isOn: boolean }) {
         <boxGeometry args={[1.4,0.82,0.06]}/>
         {mat('#111111',0.2,0.15)}
       </mesh>
-      {/* Screen face */}
+      {/* Screen face — animated when on */}
       <mesh position={[0,0.5,0.032]}>
         <boxGeometry args={[1.3,0.74,0.001]}/>
-        {mat(isOn ? '#050a18' : '#080808', 0.05, 0.1, isOn ? '#0a1a40' : '#000', isOn ? 0.3 : 0)}
+        <meshStandardMaterial
+          ref={screenRef}
+          color={isOn ? '#041230' : '#080808'}
+          emissive={isOn ? '#1040A0' : '#000000'}
+          emissiveIntensity={isOn ? 0.55 : 0}
+          roughness={0.05}
+          metalness={0.1}
+        />
       </mesh>
       {/* Bezel */}
       <mesh position={[0,0.5,0.034]}>
@@ -658,27 +687,51 @@ export function SmartTVGeometry({ isOn }: { isOn: boolean }) {
   );
 }
 
-export function CeilingFanGeometry({ isOn }: { isOn: boolean; speed?: number }) {
-  // Note: rotation animation is handled in PlacedObjectMesh
+export function CeilingFanGeometry({ isOn, speed = 1 }: { isOn: boolean; speed?: number }) {
+  const bladesRef = useRef<THREE.Group>(null);
+
+  useFrame((_, delta) => {
+    if (!bladesRef.current) return;
+    if (isOn) {
+      bladesRef.current.rotation.y += delta * speed * 4.5;
+    } else if (Math.abs(bladesRef.current.rotation.y % (Math.PI * 2)) > 0.01) {
+      // Gradual deceleration when turned off
+      bladesRef.current.rotation.y += delta * 0.5;
+    }
+  });
+
   return (
     <group>
-      {/* Motor housing */}
-      <mesh position={[0,0.02,0]}>
-        <cylinderGeometry args={[0.1,0.1,0.12,16]}/>
-        {mat('#888888',0.3,0.4)}
+      {/* Drop rod from ceiling */}
+      <mesh position={[0, 0.18, 0]}>
+        <cylinderGeometry args={[0.018, 0.018, 0.36, 8]} />
+        {mat('#999999', 0.3, 0.5)}
       </mesh>
-      {/* Blades */}
-      {[0,90,180,270].map((deg,i)=>(
-        <mesh key={i} position={[0,0.01,0]} rotation={[0,deg*Math.PI/180,0]}>
-          <boxGeometry args={[0.5,0.025,0.14]}/>
-          {mat('#8B6914',0.85)}
-          <group position={[0.25,0,0]} />
-        </mesh>
-      ))}
-      {/* Light fixture */}
-      <mesh position={[0,-0.08,0]}>
-        <cylinderGeometry args={[0.06,0.04,0.08,12]}/>
-        {mat('#dddddd',0.1,0.1, isOn ? '#fffacc' : '#000', isOn ? 0.8 : 0)}
+      {/* Motor housing */}
+      <mesh position={[0, 0.02, 0]}>
+        <cylinderGeometry args={[0.1, 0.1, 0.12, 16]} />
+        {mat('#888888', 0.3, 0.4)}
+      </mesh>
+      {/* Spinning blades */}
+      <group ref={bladesRef}>
+        {[0, 90, 180, 270].map((deg, i) => (
+          <group key={i} rotation={[0, deg * Math.PI / 180, 0]}>
+            <mesh position={[0.28, 0.01, 0]}>
+              <boxGeometry args={[0.52, 0.022, 0.13]} />
+              {mat('#8B6914', 0.8)}
+            </mesh>
+            {/* Blade tip detail */}
+            <mesh position={[0.52, 0.01, 0]}>
+              <boxGeometry args={[0.06, 0.022, 0.1]} />
+              {mat('#7A5A10', 0.8)}
+            </mesh>
+          </group>
+        ))}
+      </group>
+      {/* Light fixture hanging below motor */}
+      <mesh position={[0, -0.1, 0]}>
+        <cylinderGeometry args={[0.065, 0.045, 0.09, 12]} />
+        {mat('#E0E0E0', 0.15, 0.1, isOn ? '#FFFDE7' : '#000', isOn ? 1.2 : 0)}
       </mesh>
     </group>
   );

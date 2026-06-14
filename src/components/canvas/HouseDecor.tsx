@@ -1,13 +1,14 @@
 import * as THREE from 'three';
-import { TOON_GRADIENT } from './ToonMaterial';
+import { TOON_GRADIENT } from './ToonMaterial'; // still used for glass transparency
 
 void (THREE.Color);
 
-function mat(color: string, emissive = '#000', emissiveIntensity = 0) {
+function mat(color: string, emissive = '#000', emissiveIntensity = 0, roughness = 0.75, metalness = 0.05) {
   return (
-    <meshToonMaterial
+    <meshStandardMaterial
       color={color}
-      gradientMap={TOON_GRADIENT}
+      roughness={roughness}
+      metalness={metalness}
       emissive={emissive}
       emissiveIntensity={emissiveIntensity}
     />
@@ -26,9 +27,8 @@ function Win({ x, y = 1.45, z, rotY = 0 }: { x: number; y?: number; z: number; r
       {/* Glass pane */}
       <mesh position={[0, 0, 0.02]}>
         <boxGeometry args={[1.14, 0.97, 0.02]} />
-        <meshToonMaterial
+        <meshStandardMaterial
           color="#B3DEF5"
-          gradientMap={TOON_GRADIENT}
           emissive="#90C8E8"
           emissiveIntensity={0.25}
           transparent
@@ -157,18 +157,6 @@ function KitchenFixtures() {
 function BathroomFixtures() {
   return (
     <group>
-      {/* Partition wall at x=0 — divides bathroom from passage */}
-      <mesh position={[0, 1.4, 4.1]} castShadow receiveShadow>
-        <boxGeometry args={[0.14, 2.8, 7.8]} />
-        {mat('#D4CBC2')}
-      </mesh>
-      {/* Door gap in partition (opening at z=0.5, cut by not rendering bottom 1m) */}
-      {/* Visual door frame for partition */}
-      <mesh position={[0, 0.08, 0.5]}>
-        <boxGeometry args={[0.14, 0.16, 0.8]} />
-        {mat('#C8B8B0')}
-      </mesh>
-
       {/* Toilet — in left half */}
       <mesh position={[-2.8, 0.22, 1.2]} castShadow receiveShadow>
         <boxGeometry args={[0.42, 0.44, 0.66]} />
@@ -382,18 +370,18 @@ function IndiaDecor() {
       {/* Tulsi pot — living room near entrance */}
       <mesh position={[2.5, 0.22, -1.2]} castShadow>
         <cylinderGeometry args={[0.14, 0.1, 0.44, 10]} />
-        <meshToonMaterial color="#B5451B" gradientMap={TOON_GRADIENT} />
+        <meshStandardMaterial color="#B5451B" roughness={0.8} />
       </mesh>
       <mesh position={[2.5, 0.52, -1.2]}>
         <sphereGeometry args={[0.18, 10, 8]} />
-        <meshToonMaterial color="#2E7D32" gradientMap={TOON_GRADIENT} />
+        <meshStandardMaterial color="#2E7D32" roughness={0.8} />
       </mesh>
       {[0, 60, 120, 180, 240, 300].map((deg, i) => {
         const a = (deg * Math.PI) / 180;
         return (
           <mesh key={i} position={[2.5 + Math.cos(a) * 0.14, 0.54, -1.2 + Math.sin(a) * 0.14]}>
             <sphereGeometry args={[0.08, 6, 6]} />
-            <meshToonMaterial color="#388E3C" gradientMap={TOON_GRADIENT} />
+            <meshStandardMaterial color="#388E3C" roughness={0.75} />
           </mesh>
         );
       })}
@@ -401,35 +389,33 @@ function IndiaDecor() {
       {/* Prayer corner / Mandir shelf — master bedroom corner */}
       <mesh position={[-11.2, 1.2, 0.8]} castShadow>
         <boxGeometry args={[0.6, 0.06, 0.36]} />
-        <meshToonMaterial color="#C8860A" gradientMap={TOON_GRADIENT} />
+        <meshStandardMaterial color="#C8860A" roughness={0.75} />
       </mesh>
       <mesh position={[-11.2, 1.32, 0.8]}>
         <cylinderGeometry args={[0.04, 0.05, 0.18, 8]} />
-        <meshToonMaterial color="#DAA520" gradientMap={TOON_GRADIENT} emissive="#A07010" emissiveIntensity={0.3} />
+        <meshStandardMaterial color="#DAA520" emissive="#A07010" emissiveIntensity={0.3} roughness={0.7} />
       </mesh>
       {/* Diya */}
       <mesh position={[-11.0, 1.28, 0.7]}>
         <cylinderGeometry args={[0.04, 0.055, 0.04, 10]} />
-        <meshToonMaterial color="#C8860A" gradientMap={TOON_GRADIENT} />
+        <meshStandardMaterial color="#C8860A" roughness={0.75} />
       </mesh>
       <mesh position={[-11.0, 1.32, 0.7]}>
         <sphereGeometry args={[0.018, 6, 6]} />
-        <meshToonMaterial color="#FFF176" gradientMap={TOON_GRADIENT} emissive="#FFD600" emissiveIntensity={1.2} />
+        <meshStandardMaterial color="#FFF176" emissive="#FFD600" emissiveIntensity={1.2} roughness={0.7} />
       </mesh>
 
       {/* Water cooler in kitchen */}
       <mesh position={[5.5, 0.5, -7.2]} castShadow receiveShadow>
         <boxGeometry args={[0.36, 1.0, 0.36]} />
-        <meshToonMaterial color="#E0E0E0" gradientMap={TOON_GRADIENT} />
+        <meshStandardMaterial color="#E0E0E0" roughness={0.75} />
       </mesh>
       <mesh position={[5.5, 1.05, -7.2]}>
         <cylinderGeometry args={[0.14, 0.14, 0.24, 12]} />
-        <meshToonMaterial color="#B3E5FC" gradientMap={TOON_GRADIENT} transparent opacity={0.7} />
       </mesh>
       {[-0.07, 0.07].map((x, i) => (
         <mesh key={i} position={[5.5 + x, 0.68, -7.0]} rotation={[Math.PI / 2, 0, 0]}>
           <cylinderGeometry args={[0.012, 0.012, 0.1, 6]} />
-          <meshToonMaterial color={i === 0 ? '#EF9A9A' : '#90CAF9'} gradientMap={TOON_GRADIENT} />
         </mesh>
       ))}
     </group>

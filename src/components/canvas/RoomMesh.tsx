@@ -23,7 +23,7 @@ interface RoomMeshProps {
 
 export function RoomMesh({ room, isActive, isHovered }: RoomMeshProps) {
   const groupRef   = useRef<THREE.Group>(null);
-  const floorRef   = useRef<THREE.MeshToonMaterial>(null);
+  const floorRef   = useRef<THREE.MeshStandardMaterial>(null);
 
   const { setActiveRoom, setHoveredRoom, ui, placedObjects } = useAppStore();
   const { activeRoomId } = ui;
@@ -87,10 +87,11 @@ export function RoomMesh({ room, isActive, isHovered }: RoomMeshProps) {
         onPointerOut={handleOut}
       >
         <planeGeometry args={[room.width, room.depth]} />
-        <meshToonMaterial
+        <meshStandardMaterial
           ref={floorRef}
           color={floorColor}
-          gradientMap={TOON_GRADIENT}
+          roughness={0.72}
+          metalness={0.02}
           transparent
           opacity={1}
         />

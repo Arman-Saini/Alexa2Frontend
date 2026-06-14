@@ -40,6 +40,21 @@ function AlexaRing({ onVoiceSubmit }: { onVoiceSubmit: (text: string) => void })
   const addNotification = useAppStore((s) => s.addNotification);
   const { sendAudio, sendMockText, isProcessing } = useBackendVoice();
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const speak = (text: string) => {
+    if (!window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const utt = new SpeechSynthesisUtterance(text);
+    utt.lang = 'en-IN';
+    utt.rate = 0.88;
+    utt.pitch = 1.1;
+    utt.volume = 0.92;
+    // Prefer an Indian English voice if available
+    const voices = window.speechSynthesis.getVoices();
+    const preferred = voices.find(v => v.lang === 'en-IN') ?? voices.find(v => v.lang.startsWith('en'));
+    if (preferred) utt.voice = preferred;
+    window.speechSynthesis.speak(utt);
+  };
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
@@ -119,6 +134,7 @@ function AlexaRing({ onVoiceSubmit }: { onVoiceSubmit: (text: string) => void })
           // Strip "Alexa" / "Hey Alexa" wake word prefix if present
           const cleaned = final.replace(/^(hey\s+)?alexa[,\s]*/i, '').trim() || final.trim();
           const result = executeVoiceCommand(cleaned);
+          speak(result);
           setResponse(result);
           setInterimText('');
           onVoiceSubmit(cleaned);
@@ -192,9 +208,12 @@ function AlexaRing({ onVoiceSubmit }: { onVoiceSubmit: (text: string) => void })
 
     if (backendMode) {
       const result = await sendMockText(text);
-      setResponse(result?.response ?? 'Sent to backend.');
+      const resp = result?.response ?? 'Sent to backend.';
+      speak(resp);
+      setResponse(resp);
     } else {
       const result = executeVoiceCommand(text);
+      speak(result);
       setResponse(result);
     }
     onVoiceSubmit(text);

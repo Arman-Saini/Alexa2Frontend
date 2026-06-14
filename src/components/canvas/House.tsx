@@ -15,7 +15,7 @@ function GroundPlane() {
       {/* Grass base */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.04, 0]} receiveShadow>
         <planeGeometry args={[80, 80]} />
-        <meshToonMaterial color="#5A8040" gradientMap={TOON_GRADIENT} />
+        <meshStandardMaterial color="#4E7A35" roughness={0.9} metalness={0.0} />
       </mesh>
 
       {/* Subtle garden grid — shows outside the house */}

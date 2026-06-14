@@ -1,6 +1,6 @@
 import { Suspense, useEffect, useState, useCallback, useRef } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls } from '@react-three/drei';
+import { OrbitControls, Environment, ContactShadows } from '@react-three/drei';
 import * as THREE from 'three';
 import { useAppStore } from '../../store/store';
 import { House } from './House';
@@ -15,13 +15,23 @@ import { sharedCameraRef, cameraTransitionRef } from './cameraRef';
 import type { AssetType } from '../../types';
 
 function SceneLighting() {
+  const hour = new Date().getHours();
+  // Dynamic colour + intensity based on real time of day
+  const sunColor   = hour >= 6  && hour < 9  ? '#FFB060'  // golden sunrise
+                   : hour >= 9  && hour < 17 ? '#FFF5D0'  // neutral daylight
+                   : hour >= 17 && hour < 20 ? '#FF9040'  // warm sunset
+                   : '#6070A0';                            // cool night
+  const sunInt     = hour >= 6 && hour < 20 ? 2.6 : 0.7;
+  const ambColor   = hour >= 6 && hour < 20 ? '#F0E8D8' : '#1A2040';
+  const ambInt     = hour >= 6 && hour < 20 ? 0.32 : 0.14;
+
   return (
     <>
       <directionalLight
         position={[18, 28, 12]}
-        intensity={2.4}
+        intensity={sunInt}
         castShadow
-        color="#FFF5D0"
+        color={sunColor}
         shadow-mapSize-width={2048}
         shadow-mapSize-height={2048}
         shadow-camera-near={0.1}
@@ -32,7 +42,7 @@ function SceneLighting() {
         shadow-camera-bottom={-30}
         shadow-bias={-0.001}
       />
-      <ambientLight intensity={0.28} color="#F0E8D8" />
+      <ambientLight intensity={ambInt} color={ambColor} />
     </>
   );
 }
@@ -145,6 +155,8 @@ export function DigitalTwinCanvas() {
           <color attach="background" args={['#D5EAF7']} />
           <fog attach="fog" args={['#D5EAF7', 60, 160]} />
           <SceneLighting />
+          <Environment preset="apartment" background={false} />
+          <ContactShadows position={[0, 0.01, 0]} opacity={0.45} scale={50} blur={1.8} far={6} />
           <SmartLights />
           <GhostPreview />
           <CameraController />

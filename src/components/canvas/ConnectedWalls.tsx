@@ -3,11 +3,9 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { LAYOUT_NODES, WALL_SEGMENTS } from '../../constants/layout';
 import { useAppStore } from '../../store/store';
-import { TOON_GRADIENT } from './ToonMaterial';
-
-const WALL_T = 0.14;           // wall thickness (world units)
-const WALL_COLOR = '#EDE4CC';  // warm cream — Sims default wall
-const POST_COLOR = '#D8CCAA';  // corner post slightly darker
+const WALL_T = 0.14;
+const WALL_COLOR = '#EDE8DC';  // warm off-white plaster
+const POST_COLOR = '#D8D0C0';  // corner post, slightly darker
 
 // ── Single animated wall segment ─────────────────────────────────────────────
 
@@ -20,7 +18,7 @@ interface WallMeshProps {
 }
 
 function WallMesh({ fromX, fromZ, toX, toZ, height, sharedBy, activeRoomId }: WallMeshProps) {
-  const matRef = useRef<THREE.MeshToonMaterial>(null);
+  const matRef = useRef<THREE.MeshStandardMaterial>(null);
 
   const dx = toX - fromX;
   const dz = toZ - fromZ;
@@ -52,10 +50,11 @@ function WallMesh({ fromX, fromZ, toX, toZ, height, sharedBy, activeRoomId }: Wa
     >
       {/* +WALL_T on length so segments overlap at corners, no gaps */}
       <boxGeometry args={[length + WALL_T, height, WALL_T]} />
-      <meshToonMaterial
+      <meshStandardMaterial
         ref={matRef}
         color={WALL_COLOR}
-        gradientMap={TOON_GRADIENT}
+        roughness={0.85}
+        metalness={0.0}
         transparent
         opacity={targetOp}
       />
@@ -71,7 +70,7 @@ interface PostProps {
 }
 
 function CornerPost({ x, z, height, activeRoomId, adjacentRooms }: PostProps) {
-  const matRef = useRef<THREE.MeshToonMaterial>(null);
+  const matRef = useRef<THREE.MeshStandardMaterial>(null);
   const isRelevant = !activeRoomId || adjacentRooms.includes(activeRoomId);
   const targetOp   = !activeRoomId ? 0.95 : isRelevant ? 0.95 : 0.05;
 
@@ -84,10 +83,11 @@ function CornerPost({ x, z, height, activeRoomId, adjacentRooms }: PostProps) {
   return (
     <mesh position={[x, height / 2, z]} castShadow>
       <boxGeometry args={[WALL_T * 1.6, height, WALL_T * 1.6]} />
-      <meshToonMaterial
+      <meshStandardMaterial
         ref={matRef}
         color={POST_COLOR}
-        gradientMap={TOON_GRADIENT}
+        roughness={0.85}
+        metalness={0.0}
         transparent
         opacity={targetOp}
       />
