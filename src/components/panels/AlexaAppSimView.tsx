@@ -33,27 +33,133 @@ function AlexaRing({ onVoiceSubmit }: { onVoiceSubmit: (text: string) => void })
   const [inputText, setInputText] = useState('');
   const [response, setResponse] = useState('');
   const [backendMode, setBackendMode] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [micError, setMicError] = useState<string | null>(null);
   const executeVoiceCommand = useAppStore((s) => s.executeVoiceCommand);
-  const { sendMockText, isProcessing } = useBackendVoice();
+  const addNotification = useAppStore((s) => s.addNotification);
+  const { sendAudio, sendMockText, isProcessing } = useBackendVoice();
   const inputRef = useRef<HTMLInputElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
   const isListening = ui.isListeningVoice;
 
-  const handleRingClick = () => {
-    if (isListening) {
-      setListeningVoice(false);
-      return;
-    }
-    setListeningVoice(true);
+  // Kick off real mic capture
+  const startListening = async () => {
+    setMicError(null);
     setResponse('');
-    setTimeout(() => inputRef.current?.focus(), 100);
+    setListeningVoice(true);
+
+    if (backendMode) {
+      // Backend mode: MediaRecorder → blob → POST /api/voice/transcribe
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const recorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+        mediaRecorderRef.current = recorder;
+        chunksRef.current = [];
+
+        recorder.ondataavailable = (e) => {
+          if (e.data.size > 0) chunksRef.current.push(e.data);
+        };
+
+        recorder.onstop = async () => {
+          stream.getTracks().forEach((t) => t.stop());
+          const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
+          const result = await sendAudio(blob);
+          if (result) {
+            setResponse(result.response);
+            onVoiceSubmit(result.transcript);
+          }
+          setIsRecording(false);
+          setListeningVoice(false);
+        };
+
+        recorder.start();
+        setIsRecording(true);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Microphone access denied';
+        setMicError(msg);
+        setListeningVoice(false);
+        addNotification('🎤 ' + msg, 'alert');
+      }
+    } else {
+      // Local mode: Web Speech API (Chrome/Edge built-in STT, no backend needed)
+      const SpeechRecognitionClass =
+        (window as unknown as { SpeechRecognition?: typeof SpeechRecognition; webkitSpeechRecognition?: typeof SpeechRecognition })
+          .SpeechRecognition ??
+        (window as unknown as { webkitSpeechRecognition?: typeof SpeechRecognition }).webkitSpeechRecognition;
+
+      if (!SpeechRecognitionClass) {
+        // Fallback: show text input if browser doesn't support Web Speech API
+        setIsRecording(false);
+        setTimeout(() => inputRef.current?.focus(), 100);
+        return;
+      }
+
+      const recognition = new SpeechRecognitionClass();
+      recognitionRef.current = recognition;
+      recognition.lang = 'en-IN';
+      recognition.continuous = false;
+      recognition.interimResults = false;
+
+      recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        const result = executeVoiceCommand(transcript);
+        setResponse(result);
+        onVoiceSubmit(transcript);
+        setListeningVoice(false);
+        setIsRecording(false);
+      };
+
+      recognition.onerror = (event) => {
+        const msg = event.error === 'not-allowed'
+          ? 'Microphone access denied — grant permission in browser'
+          : `Voice error: ${event.error}`;
+        setMicError(msg);
+        setIsRecording(false);
+        setListeningVoice(false);
+        addNotification('🎤 ' + msg, 'alert');
+      };
+
+      recognition.onend = () => {
+        setIsRecording(false);
+        if (ui.isListeningVoice) setListeningVoice(false);
+      };
+
+      try {
+        recognition.start();
+        setIsRecording(true);
+      } catch {
+        setTimeout(() => inputRef.current?.focus(), 100);
+      }
+    }
   };
 
+  const stopListening = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+    }
+    setIsRecording(false);
+    setListeningVoice(false);
+  };
+
+  const handleRingClick = () => {
+    if (isRecording || isListening) {
+      stopListening();
+    } else {
+      startListening();
+    }
+  };
+
+  // Text input fallback submit
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputText.trim()) return;
-    const text = inputText;
+    const text = inputText.trim();
     setInputText('');
-    setListeningVoice(false);
 
     if (backendMode) {
       const result = await sendMockText(text);
@@ -63,37 +169,55 @@ function AlexaRing({ onVoiceSubmit }: { onVoiceSubmit: (text: string) => void })
       setResponse(result);
     }
     onVoiceSubmit(text);
+    setListeningVoice(false);
   };
+
+  const active = isRecording || isListening || isProcessing;
 
   return (
     <div className="flex flex-col items-center py-3 bg-alexa-dark shrink-0">
-      {/* Ring — compact size so it doesn't dominate the panel */}
+      {/* Alexa ring button */}
       <button
         onClick={handleRingClick}
-        className={`relative w-11 h-11 rounded-full flex items-center justify-center transition-all duration-300 ${
-          isListening ? 'alexa-ring-listen' : 'alexa-ring-glow'
+        disabled={isProcessing}
+        className={`relative w-14 h-14 rounded-full flex items-center justify-center transition-all duration-300 disabled:opacity-50 ${
+          active ? 'alexa-ring-listen scale-110' : 'alexa-ring-glow hover:scale-105'
         }`}
         style={{
-          background: isListening
+          background: active
             ? 'conic-gradient(from 0deg, #00A8E0, #00CAFF, #00D4FF, #0080B0, #005580, #00A8E0)'
             : 'conic-gradient(from 0deg, #005580, #0080B0, #00A8E0, #00CAFF, #0080B0, #005580)',
+          boxShadow: active ? '0 0 20px rgba(0,168,224,0.6)' : '0 0 8px rgba(0,168,224,0.2)',
         }}
       >
-        <div className="w-8 h-8 rounded-full bg-alexa-dark flex items-center justify-center">
-          <svg className={`w-4 h-4 ${isListening ? 'text-alexa-ring' : 'text-alexa-muted'}`} fill="currentColor" viewBox="0 0 24 24">
-            <path d="M12 1a4 4 0 014 4v7a4 4 0 01-8 0V5a4 4 0 014-4zm0 2a2 2 0 00-2 2v7a2 2 0 004 0V5a2 2 0 00-2-2zm-7 9a7 7 0 0014 0h2a9 9 0 01-18 0h2z" />
-          </svg>
+        <div className="w-10 h-10 rounded-full bg-alexa-dark flex items-center justify-center">
+          {isProcessing ? (
+            <div className="w-5 h-5 rounded-full border-2 border-alexa-blue border-t-transparent animate-spin" />
+          ) : isRecording ? (
+            <svg className="w-5 h-5 text-alexa-ring" fill="currentColor" viewBox="0 0 24 24">
+              <rect x="6" y="6" width="12" height="12" rx="2" />
+            </svg>
+          ) : (
+            <svg className="w-5 h-5 text-alexa-blue" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 1a4 4 0 014 4v7a4 4 0 01-8 0V5a4 4 0 014-4zm0 2a2 2 0 00-2 2v7a2 2 0 004 0V5a2 2 0 00-2-2zm-7 9a7 7 0 0014 0h2a9 9 0 01-18 0h2z" />
+            </svg>
+          )}
         </div>
+        {/* Pulse rings while recording */}
+        {isRecording && (
+          <>
+            <span className="absolute inset-0 rounded-full animate-ping opacity-30" style={{ background: '#00A8E0' }} />
+          </>
+        )}
       </button>
 
-      <div className="flex items-center gap-2 mt-1.5 mb-1">
+      {/* Status + backend toggle row */}
+      <div className="flex items-center gap-2 mt-2 mb-1">
         <p className="text-[10px] text-alexa-muted">
-          {isProcessing ? 'Processing...' : isListening ? 'Listening...' : 'Tap to speak'}
+          {isProcessing ? 'Processing...' : isRecording ? 'Recording — tap to stop' : 'Tap to speak'}
         </p>
-        {/* Toggle: local NLU vs backend cascade */}
         <button
           onClick={() => setBackendMode((v) => !v)}
-          title={backendMode ? 'Using backend T1/T3 cascade' : 'Using local NLU only'}
           className="flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[8px] font-bold transition-all"
           style={{
             background: backendMode ? '#0A2A14' : '#1A1A1A',
@@ -106,8 +230,31 @@ function AlexaRing({ onVoiceSubmit }: { onVoiceSubmit: (text: string) => void })
         </button>
       </div>
 
-      {/* Voice input bar */}
-      {isListening && (
+      {/* Mic error */}
+      {micError && (
+        <p className="text-[10px] text-red-400 mx-4 text-center mb-1">{micError}</p>
+      )}
+
+      {/* Waveform animation while recording */}
+      {isRecording && (
+        <div className="flex items-center gap-0.5 h-5 mb-1">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div
+              key={i}
+              className="w-0.5 rounded-full"
+              style={{
+                background: '#00A8E0',
+                height: `${8 + Math.abs(Math.sin(i * 0.9)) * 12}px`,
+                animation: `pulse ${0.4 + i * 0.08}s ease-in-out infinite alternate`,
+                animationDelay: `${i * 0.06}s`,
+              }}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Text input fallback (shown when not recording and listening) */}
+      {isListening && !isRecording && (
         <form onSubmit={handleSubmit} className="w-full px-4 panel-slide-in">
           <div className="flex gap-2 items-center bg-alexa-card border border-alexa-blue rounded-full px-3 py-1.5">
             <div className="w-1.5 h-1.5 rounded-full bg-alexa-blue glow-pulse" />
@@ -115,21 +262,18 @@ function AlexaRing({ onVoiceSubmit }: { onVoiceSubmit: (text: string) => void })
               ref={inputRef}
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
-              placeholder="Try: 'Good morning' or 'Turn on lights'"
+              placeholder="Or type a command..."
               className="flex-1 bg-transparent text-xs text-alexa-text placeholder-alexa-muted focus:outline-none"
+              autoFocus
             />
             <button
               type="submit"
               disabled={isProcessing}
               className="text-alexa-blue hover:text-alexa-ring transition-colors disabled:opacity-40"
             >
-              {isProcessing ? (
-                <div className="w-4 h-4 rounded-full border-2 border-alexa-blue border-t-transparent animate-spin" />
-              ) : (
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-8.707l-3-3a1 1 0 00-1.414 1.414L10.586 9H7a1 1 0 100 2h3.586l-1.293 1.293a1 1 0 101.414 1.414l3-3a1 1 0 000-1.414z" clipRule="evenodd" />
-                </svg>
-              )}
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-8.707l-3-3a1 1 0 00-1.414 1.414L10.586 9H7a1 1 0 100 2h3.586l-1.293 1.293a1 1 0 101.414 1.414l3-3a1 1 0 000-1.414z" clipRule="evenodd" />
+              </svg>
             </button>
           </div>
         </form>

@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useThree, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useAppStore } from '../../store/store';
-import { sharedCameraRef } from './cameraRef';
+import { sharedCameraRef, cameraTransitionRef } from './cameraRef';
 
 const ISO_DIST = 26;
 const ISO_POS  = new THREE.Vector3(ISO_DIST, ISO_DIST * 0.88, ISO_DIST);
@@ -10,7 +10,7 @@ const ISO_POS  = new THREE.Vector3(ISO_DIST, ISO_DIST * 0.88, ISO_DIST);
 const HOUSE_VIEW = {
   position: ISO_POS.clone(),
   target:   new THREE.Vector3(0, 0, 0),
-  zoom:     22,   // Less zoomed-in default so the full house is clearly visible
+  zoom:     22,
 };
 
 function getRoomView(room: { position: { x: number; y: number; z: number }; width: number; depth: number }) {
@@ -36,13 +36,12 @@ export function CameraController() {
   const currentLook  = useRef(HOUSE_VIEW.target.clone());
   const targetZoom   = useRef(HOUSE_VIEW.zoom);
 
-  // Only animate when a room change triggers a transition.
-  // When idle, OrbitControls owns the camera — the controller must not fight it.
-  const transitioning  = useRef(false);
-  const prevRoomId     = useRef<string | null | undefined>(undefined);
+  // Remember the user's zoom level before entering a room so we can restore it.
+  const savedUserZoom = useRef<number | null>(null);
+
+  const prevRoomId = useRef<string | null | undefined>(undefined);
 
   useEffect(() => {
-    // Skip on mount (prevRoomId starts undefined)
     if (prevRoomId.current === undefined) {
       prevRoomId.current = activeRoomId;
       return;
@@ -50,13 +49,21 @@ export function CameraController() {
     if (activeRoomId === prevRoomId.current) return;
     prevRoomId.current = activeRoomId;
 
-    transitioning.current = true;
+    const ortho = camera as THREE.OrthographicCamera;
 
     if (!activeRoomId) {
+      // Returning to house view — restore position/look but keep user's zoom
       targetPos.current.copy(HOUSE_VIEW.position);
       targetLook.current.copy(HOUSE_VIEW.target);
-      targetZoom.current = HOUSE_VIEW.zoom;
+      // If the user had a custom zoom before entering a room, bring it back.
+      // Otherwise fall back to the default house zoom.
+      targetZoom.current = savedUserZoom.current ?? HOUSE_VIEW.zoom;
+      savedUserZoom.current = null;
     } else {
+      // Entering a room — save current zoom so we can restore it on exit
+      if (ortho.isOrthographicCamera) {
+        savedUserZoom.current = ortho.zoom;
+      }
       const room = rooms.find(r => r.id === activeRoomId);
       if (room) {
         const v = getRoomView(room);
@@ -65,13 +72,16 @@ export function CameraController() {
         targetZoom.current = v.zoom;
       }
     }
-  }, [activeRoomId, rooms]);
+
+    cameraTransitionRef.current = true;
+  }, [activeRoomId, rooms, camera]);
 
   // Expose camera for drag-drop raycasting outside Canvas
   useEffect(() => { sharedCameraRef.current = camera; }, [camera]);
 
   useFrame((_, delta) => {
-    if (!transitioning.current) return;   // yield to OrbitControls when idle
+    // cameraTransitionRef is cleared by OrbitControls onStart — user interaction wins
+    if (!cameraTransitionRef.current) return;
 
     const t = 1 - Math.exp(-0.014 * 60 * delta);
 
@@ -86,11 +96,10 @@ export function CameraController() {
       ortho.updateProjectionMatrix();
     }
 
-    // Mark transition done once close enough — hand control back to OrbitControls
     const posClose  = camera.position.distanceTo(targetPos.current) < 0.08;
     const zoomClose = Math.abs((camera as THREE.OrthographicCamera).zoom - targetZoom.current) < 0.4;
     if (posClose && zoomClose) {
-      transitioning.current = false;
+      cameraTransitionRef.current = false;
     }
   });
 

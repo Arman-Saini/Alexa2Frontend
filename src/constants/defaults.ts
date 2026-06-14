@@ -77,7 +77,7 @@ export const DEFAULT_PLACED_OBJECTS: PlacedObject[] = [
   obj('kt-plant',    'plant',          5.2,  -1.2,  0,    'kitchen'),
 
   // ── Master Bedroom ────────────────────────────────────────────────────────────
-  obj('mb-bed',      'bed',           -8.0,   3.8,  0,    'master-bedroom'),
+  obj('mb-bed',      'bed',           -8.0,   6.5,  Math.PI, 'master-bedroom'),
   obj('mb-wardrobe', 'wardrobe',     -11.2,   6.2,  HPI,  'master-bedroom'),
   obj('mb-show',     'echo-show',    -10.8,   0.6,  0,    'master-bedroom', { isOn: true, brightness: 60, volume: 30 }),
   obj('mb-bulb',     'smart-bulb',    -8.0,   1.0,  0,    'master-bedroom', { isOn: false, brightness: 40, colorTemp: 2700 }),
@@ -99,4 +99,11 @@ export const DEFAULT_PLACED_OBJECTS: PlacedObject[] = [
   obj('of-plug',     'smart-plug',    11.5,   1.0,  0,    'office', { isOn: false }),
   obj('of-plant',    'plant',         11.5,   7.2,  0,    'office'),
   obj('of-bulb',     'smart-bulb',     8.0,   4.0,  0,    'office', { isOn: true, brightness: 70, colorTemp: 4000 }),
+
+  // ── Ceiling fans (one per room) ───────────────────────────────────────────
+  obj('lr-fan',   'ceiling-fan', -4.0, -4.0, 0, 'living-room',     { isOn: true, speed: 2 }),
+  obj('kt-fan',   'ceiling-fan',  8.0, -4.0, 0, 'kitchen',         { isOn: false, speed: 1 }),
+  obj('mb-fan',   'ceiling-fan', -8.0,  4.0, 0, 'master-bedroom',  { isOn: false, speed: 1 }),
+  obj('ba-fan',   'ceiling-fan',  0.0,  4.0, 0, 'bathroom',        { isOn: false, speed: 1 }),
+  obj('of-fan',   'ceiling-fan',  8.0,  4.0, 0, 'office',          { isOn: true, speed: 3 }),
 ];

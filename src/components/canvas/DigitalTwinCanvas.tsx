@@ -4,12 +4,14 @@ import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { useAppStore } from '../../store/store';
 import { House } from './House';
+import { Doors } from './Doors';
+import { HouseDecor } from './HouseDecor';
 import { CameraController } from './CameraController';
 import { MiniMap } from './MiniMap';
 import { SensorTooltip } from './SensorTooltip';
 import { SmartLights } from './SmartLights';
 import { GhostPreview } from './GhostPreview';
-import { sharedCameraRef } from './cameraRef';
+import { sharedCameraRef, cameraTransitionRef } from './cameraRef';
 import type { AssetType } from '../../types';
 
 function SceneLighting() {
@@ -137,10 +139,10 @@ export function DigitalTwinCanvas() {
         shadows
         camera={{ position: [22, 20, 22], zoom: 22, near: -500, far: 500 }}
         gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
-        style={{ background: '#A8D8EA' }}
+        style={{ background: '#1a1a2e' }}
       >
         <Suspense fallback={null}>
-          <color attach="background" args={['#A8D8EA']} />
+          <color attach="background" args={['#87CEEB']} />
           <SceneLighting />
           <SmartLights />
           <GhostPreview />
@@ -156,8 +158,12 @@ export function DigitalTwinCanvas() {
             panSpeed={0.6}
             rotateSpeed={0.4}
             zoomSpeed={0.9}
+            onStart={() => { cameraTransitionRef.current = false; }}
           />
           <House />
+          <Doors />
+          <HouseDecor />
+          <hemisphereLight args={['#B8D4FF', '#4A7A20', 0.35]} />
         </Suspense>
       </Canvas>
 
