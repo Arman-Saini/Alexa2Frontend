@@ -13,6 +13,7 @@ import type {
   AlexaTab,
 } from '../types';
 import { DEFAULT_ROOMS, ASSET_MAP, DEFAULT_ROUTINES, DEFAULT_SCENES } from '../constants/assets';
+import { DEFAULT_PLACED_OBJECTS } from '../constants/defaults';
 
 function generateId(): string {
   return crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
@@ -77,11 +78,11 @@ export const useAppStore = create<AppState>()(
   devtools(
     (set, get) => ({
       rooms: DEFAULT_ROOMS,
-      placedObjects: [],
+      placedObjects: DEFAULT_PLACED_OBJECTS,
       notifications: [
         {
           id: notifId(),
-          message: 'Welcome to Alexa Digital Twin! Place devices to get started.',
+          message: 'Your home is ready! Click a room to zoom in, or hover a device for live sensor data.',
           type: 'info',
           timestamp: Date.now(),
         },

@@ -399,7 +399,7 @@ export function EchoDotGeometry({ isOn }: { isOn: boolean }) {
       {/* LED ring */}
       <mesh position={[0,0.1,0]}>
         <torusGeometry args={[0.115,0.012,8,32]}/>
-        {mat(isOn ? '#00A8E0' : '#1a1a1a', 0.1, 0.3, isOn ? '#00A8E0' : '#000', isOn ? 2 : 0)}
+        {mat(isOn ? '#00A8E0' : '#1a1a1a', 0.1, 0.3, isOn ? '#00A8E0' : '#000', isOn ? 1.0 : 0)}
       </mesh>
       {/* Mic dots */}
       {[0,90,180,270].map((deg,i)=>{

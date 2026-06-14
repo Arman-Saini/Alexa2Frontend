@@ -32,7 +32,7 @@ function SceneLighting() {
 }
 
 export function DigitalTwinCanvas() {
-  const { ui, setActiveRoom, setSelectedObject, exitPlacementMode, toggleMiniMap } = useAppStore();
+  const { ui, setActiveRoom, setSelectedObject, exitPlacementMode, toggleMiniMap, setAlexaTab, setListeningVoice, setActivePanel } = useAppStore();
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -91,17 +91,38 @@ export function DigitalTwinCanvas() {
         </button>
       )}
 
-      {/* Room view back button */}
+      {/* Room view controls — back button + Ask Alexa voice button */}
       {ui.activeRoomId && !ui.isPlacementMode && (
-        <button
-          onClick={() => setActiveRoom(null)}
-          className="absolute top-3 left-3 z-20 flex items-center gap-1.5 bg-white bg-opacity-80 border border-gray-200 rounded-full px-3 py-1.5 text-xs text-gray-700 hover:border-blue-400 hover:text-blue-600 transition-all shadow-md"
-        >
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-          </svg>
-          House View
-        </button>
+        <div className="absolute top-3 left-3 z-20 flex items-center gap-2">
+          <button
+            onClick={() => setActiveRoom(null)}
+            className="flex items-center gap-1.5 bg-white bg-opacity-85 border border-gray-200 rounded-full px-3 py-1.5 text-xs text-gray-700 hover:border-blue-400 hover:text-blue-600 transition-all shadow-md backdrop-blur-sm"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            House View
+          </button>
+
+          {/* Voice button — pulsing Alexa ring icon */}
+          <button
+            onClick={() => {
+              setActivePanel('alexa');
+              setAlexaTab('home');
+              setListeningVoice(true);
+            }}
+            className="flex items-center gap-2 bg-[#00A8E0] hover:bg-[#0090C8] text-white rounded-full px-3 py-1.5 text-xs font-semibold shadow-lg transition-all"
+            style={{ boxShadow: '0 0 12px rgba(0,168,224,0.5)' }}
+          >
+            {/* Alexa ring SVG */}
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="10" stroke="white" strokeWidth="2" opacity="0.4" />
+              <circle cx="12" cy="12" r="6"  stroke="white" strokeWidth="2.5" />
+              <circle cx="12" cy="12" r="2.5" fill="white" />
+            </svg>
+            Ask Alexa
+          </button>
+        </div>
       )}
 
       {/* Placement mode banner */}

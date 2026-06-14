@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { useAppStore } from '../../store/store';
 import type { PlacedObject } from '../../types';
 import { SensorTooltip } from './SensorTooltip';
+import { TOON_GRADIENT } from './ToonMaterial';
 import {
   SofaGeometry, BedGeometry, TableGeometry, ChairGeometry,
   TVStandGeometry, BookshelfGeometry, BathtubGeometry, DeskGeometry,
@@ -17,10 +18,20 @@ import {
 
 // Heights for each type (y offset so objects sit on the floor)
 const HEIGHTS: Record<string, number> = {
-  'smart-bulb': 0, 'echo-dot': 0, 'echo-show': 0, 'smart-plug': 0,
-  'motion-sensor': 0, 'thermostat': 0, 'smart-lock': 0, camera: 0,
-  'smoke-detector': 0.8, 'smart-tv': 0, 'ceiling-fan': 2.6,
-  doorbell: 0, 'air-purifier': 0,
+  // Ceiling-mounted — appear near top of the 3-unit wall
+  'smart-bulb':    1.8,
+  'smoke-detector': 2.4,
+  'ceiling-fan':   2.6,
+  camera:          1.8,
+  // Wall-mounted at mid height
+  thermostat:      0.9,
+  'smart-lock':    0.9,
+  doorbell:        1.1,
+  'motion-sensor': 0.8,
+  // Floor-level devices
+  'echo-dot': 0, 'echo-show': 0, 'smart-plug': 0, 'smart-tv': 0,
+  'air-purifier': 0,
+  // Furniture
   sofa: 0, bed: 0, table: 0, chair: 0, 'tv-stand': 0,
   bookshelf: 0, bathtub: 0, desk: 0, plant: 0, wardrobe: 0,
 };
@@ -68,7 +79,7 @@ function DeviceGeometry({ obj }: { obj: PlacedObject }) {
       return (
         <mesh position={[0, 0.25, 0]} castShadow>
           <boxGeometry args={[0.4, 0.5, 0.4]} />
-          <meshStandardMaterial color={col} roughness={0.7} />
+          <meshToonMaterial color={col} gradientMap={TOON_GRADIENT} />
         </mesh>
       );
   }
@@ -118,15 +129,15 @@ export function PlacedObjectMesh({ obj }: { obj: PlacedObject }) {
       {/* The actual device/furniture geometry */}
       <DeviceGeometry obj={obj} />
 
-      {/* Selection outline box (bounding-box style) */}
+      {/* Selection ring — gold floor ring so it doesn't look like a blue spot */}
       {isSelected && (
-        <mesh position={[0, topH / 2, 0]}>
-          <boxGeometry args={[
-            Math.max(0.3, topH * 0.8) + 0.08,
-            topH + 0.1,
-            Math.max(0.3, topH * 0.8) + 0.08,
+        <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[
+            Math.max(0.22, topH * 0.38),
+            Math.max(0.28, topH * 0.46),
+            36,
           ]} />
-          <meshBasicMaterial color="#00A8E0" wireframe transparent opacity={0.7} />
+          <meshBasicMaterial color="#FFD700" transparent opacity={0.92} depthWrite={false} />
         </mesh>
       )}
 
@@ -143,25 +154,12 @@ export function PlacedObjectMesh({ obj }: { obj: PlacedObject }) {
         </Html>
       )}
 
-      {/* Glow light for active bulbs */}
-      {obj.type === 'smart-bulb' && isOn && (
-        <pointLight
-          position={[0, 0.3, 0]}
-          intensity={1.2}
-          distance={3.5}
-          color={obj.color ?? '#FFD700'}
-          castShadow={false}
-        />
-      )}
-
-      {/* Ambient glow for Echo devices */}
-      {(obj.type === 'echo-dot' || obj.type === 'echo-show') && isOn && (
-        <pointLight position={[0, 0.15, 0]} intensity={0.25} distance={1.5} color="#00A8E0" />
-      )}
-
-      {/* Air purifier "clean air" glow */}
-      {obj.type === 'air-purifier' && isOn && (
-        <pointLight position={[0, 0.8, 0]} intensity={0.2} distance={2} color="#00e5ff" />
+      {/* Active device pulse ring (non-blue; per-device color) */}
+      {obj.isAlexaDevice && isOn && obj.type !== 'smart-bulb' && (
+        <mesh position={[0, 0.015, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[0.16, 0.22, 28]} />
+          <meshBasicMaterial color={obj.color ?? '#00A8E0'} transparent opacity={0.45} depthWrite={false} />
+        </mesh>
       )}
     </group>
   );

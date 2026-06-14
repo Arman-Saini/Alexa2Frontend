@@ -71,16 +71,16 @@ export function House() {
 
   return (
     <group>
-      {/* Invisible floor for placement clicks */}
+      {/* Fully transparent floor for placement clicks.
+          Must NOT use visible={false} — Three.js skips invisible meshes in raycasting. */}
       <mesh
         ref={groundRef}
         rotation={[-Math.PI / 2, 0, 0]}
         position={[0, -0.01, 0]}
         onClick={handleFloorClick}
-        visible={false}
       >
         <planeGeometry args={[80, 80]} />
-        <meshBasicMaterial />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
 
       <GroundPlane />

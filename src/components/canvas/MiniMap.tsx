@@ -39,11 +39,11 @@ export function MiniMap() {
   });
 
   const ROOM_COLORS: Record<string, string> = {
-    'living-room':     '#c8a882',
-    kitchen:           '#7ab0c8',
-    'master-bedroom':  '#a882c8',
-    bathroom:          '#78c8a8',
-    office:            '#c8c878',
+    'living-room':    '#C8894A',
+    kitchen:          '#5AAAC0',
+    'master-bedroom': '#A060C0',
+    bathroom:         '#48B888',
+    office:           '#A8A830',
   };
 
   return (
