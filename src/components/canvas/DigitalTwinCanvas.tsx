@@ -1,10 +1,14 @@
-import { Suspense, useEffect } from 'react';
+import { Suspense, useEffect, useState, useCallback, useRef } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
+import * as THREE from 'three';
 import { useAppStore } from '../../store/store';
 import { House } from './House';
 import { CameraController } from './CameraController';
 import { MiniMap } from './MiniMap';
+import { SensorTooltip } from './SensorTooltip';
+import { sharedCameraRef } from './cameraRef';
+import type { AssetType } from '../../types';
 
 function SceneLighting() {
   return (
@@ -24,14 +28,25 @@ function SceneLighting() {
         shadow-camera-bottom={-30}
         shadow-bias={-0.001}
       />
-      {/* Warm neutral ambient — avoids blue tinting on toon materials */}
       <ambientLight intensity={0.28} color="#F0E8D8" />
     </>
   );
 }
 
 export function DigitalTwinCanvas() {
-  const { ui, setActiveRoom, setSelectedObject, exitPlacementMode, toggleMiniMap, setAlexaTab, setListeningVoice, setActivePanel } = useAppStore();
+  const {
+    ui, rooms, placedObjects,
+    setActiveRoom, setSelectedObject, exitPlacementMode,
+    toggleMiniMap, setAlexaTab, setListeningVoice, setActivePanel,
+    addPlacedObject, enterPlacementMode, setDraggedAsset,
+  } = useAppStore();
+
+  const [mousePos, setMousePos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const canvasWrapperRef = useRef<HTMLDivElement>(null);
+
+  const hoveredObj = ui.hoveredObjectId
+    ? placedObjects.find((o) => o.id === ui.hoveredObjectId) ?? null
+    : null;
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -45,10 +60,76 @@ export function DigitalTwinCanvas() {
     return () => window.removeEventListener('keydown', handler);
   }, [ui, setActiveRoom, setSelectedObject, exitPlacementMode]);
 
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    setMousePos({ x: e.clientX, y: e.clientY });
+  }, []);
+
+  // Drag-and-drop from the asset library panel
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    const type = e.dataTransfer.getData('assetType') || e.dataTransfer.types.includes('assettype') ? e.dataTransfer.getData('assetType') || e.dataTransfer.getData('assettype') : null;
+    if (type || ui.draggedAssetType) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+    }
+  }, [ui.draggedAssetType]);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    const type = (e.dataTransfer.getData('assetType') || e.dataTransfer.getData('assettype')) as AssetType | '';
+    if (!type) return;
+
+    const camera = sharedCameraRef.current;
+    const wrapper = canvasWrapperRef.current;
+    if (!camera || !wrapper) {
+      // Fallback: enter placement mode and let user click to place
+      enterPlacementMode(type as AssetType);
+      return;
+    }
+
+    // Project drop position to 3D floor (y=0 plane) via raycasting
+    const rect = wrapper.getBoundingClientRect();
+    const xNdc = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    const yNdc = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(new THREE.Vector2(xNdc, yNdc), camera);
+    const floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+    const hitPoint = new THREE.Vector3();
+    const hit = raycaster.ray.intersectPlane(floorPlane, hitPoint);
+
+    if (!hit) {
+      enterPlacementMode(type as AssetType);
+      return;
+    }
+
+    // Find which room the drop falls in
+    let roomId: string | null = null;
+    for (const room of rooms) {
+      const hw = room.width / 2;
+      const hd = room.depth / 2;
+      if (
+        hitPoint.x >= room.position.x - hw && hitPoint.x <= room.position.x + hw &&
+        hitPoint.z >= room.position.z - hd && hitPoint.z <= room.position.z + hd
+      ) {
+        roomId = room.id;
+        break;
+      }
+    }
+
+    addPlacedObject(type as AssetType, { x: hitPoint.x, y: 0, z: hitPoint.z }, roomId);
+    setDraggedAsset(null);
+  }, [rooms, addPlacedObject, enterPlacementMode, setDraggedAsset]);
+
   const cursorClass = ui.isPlacementMode ? 'cursor-crosshair' : '';
 
   return (
-    <div className={`w-full h-full relative ${cursorClass}`}>
+    <div
+      ref={canvasWrapperRef}
+      className={`w-full h-full relative ${cursorClass}`}
+      onMouseMove={handleMouseMove}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
       <Canvas
         orthographic
         shadows
@@ -57,13 +138,9 @@ export function DigitalTwinCanvas() {
         style={{ background: '#A8D8EA' }}
       >
         <Suspense fallback={null}>
-          {/* Three.js scene background — transparent objects blend against this, not the CSS */}
           <color attach="background" args={['#A8D8EA']} />
-
           <SceneLighting />
-
           <CameraController />
-
           <OrbitControls
             makeDefault
             enabled={!ui.isPlacementMode}
@@ -76,10 +153,25 @@ export function DigitalTwinCanvas() {
             rotateSpeed={0.4}
             zoomSpeed={0.9}
           />
-
           <House />
         </Suspense>
       </Canvas>
+
+      {/* ── DOM tooltip overlay — renders OUTSIDE Canvas, no WebGL interference ── */}
+      {hoveredObj && !ui.isPlacementMode && (
+        <div
+          className="pointer-events-none"
+          style={{
+            position: 'fixed',
+            left: mousePos.x + 14,
+            top: mousePos.y - 14,
+            zIndex: 9999,
+            transform: 'translateY(-100%)',
+          }}
+        >
+          <SensorTooltip obj={hoveredObj} />
+        </div>
+      )}
 
       {/* Minimap */}
       {ui.showMiniMap && !ui.isPlacementMode && <MiniMap />}
@@ -92,7 +184,7 @@ export function DigitalTwinCanvas() {
         </button>
       )}
 
-      {/* Room view controls — back button + Ask Alexa voice button */}
+      {/* Room view controls */}
       {ui.activeRoomId && !ui.isPlacementMode && (
         <div className="absolute top-3 left-3 z-20 flex items-center gap-2">
           <button
@@ -105,17 +197,11 @@ export function DigitalTwinCanvas() {
             House View
           </button>
 
-          {/* Voice button — pulsing Alexa ring icon */}
           <button
-            onClick={() => {
-              setActivePanel('alexa');
-              setAlexaTab('home');
-              setListeningVoice(true);
-            }}
+            onClick={() => { setActivePanel('alexa'); setAlexaTab('home'); setListeningVoice(true); }}
             className="flex items-center gap-2 bg-[#00A8E0] hover:bg-[#0090C8] text-white rounded-full px-3 py-1.5 text-xs font-semibold shadow-lg transition-all"
             style={{ boxShadow: '0 0 12px rgba(0,168,224,0.5)' }}
           >
-            {/* Alexa ring SVG */}
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
               <circle cx="12" cy="12" r="10" stroke="white" strokeWidth="2" opacity="0.4" />
               <circle cx="12" cy="12" r="6"  stroke="white" strokeWidth="2.5" />
@@ -132,7 +218,9 @@ export function DigitalTwinCanvas() {
           <div className="absolute inset-0 pointer-events-none border-2 border-[#00A8E0] border-dashed opacity-50 rounded" />
           <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 bg-white bg-opacity-90 border border-blue-300 rounded-full px-4 py-1.5 shadow-lg">
             <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-            <span className="text-xs font-semibold text-blue-700">Click on the floor to place</span>
+            <span className="text-xs font-semibold text-blue-700">
+              Click the floor to place {ui.placementAssetType?.replace(/-/g, ' ')}
+            </span>
             <button
               onClick={exitPlacementMode}
               className="ml-2 text-[10px] text-gray-500 hover:text-gray-800 border border-gray-300 rounded-full px-2 py-0.5"
@@ -146,7 +234,7 @@ export function DigitalTwinCanvas() {
       {/* Bottom hint */}
       {!ui.activeRoomId && !ui.isPlacementMode && (
         <div className="absolute bottom-3 left-1/2 -translate-x-1/2 text-[10px] text-white bg-black bg-opacity-30 px-3 py-1.5 rounded-full pointer-events-none backdrop-blur-sm">
-          Click a room to zoom in · Scroll to zoom · Drag to orbit · Hover a device for sensor data
+          Click room to zoom · Scroll to zoom · Drag to orbit · Drag asset from library to drop here
         </div>
       )}
     </div>

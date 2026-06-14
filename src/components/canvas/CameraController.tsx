@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useThree, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useAppStore } from '../../store/store';
+import { sharedCameraRef } from './cameraRef';
 
 const ISO_DIST = 26;
 const ISO_POS  = new THREE.Vector3(ISO_DIST, ISO_DIST * 0.88, ISO_DIST);
@@ -65,6 +66,9 @@ export function CameraController() {
       }
     }
   }, [activeRoomId, rooms]);
+
+  // Expose camera for drag-drop raycasting outside Canvas
+  useEffect(() => { sharedCameraRef.current = camera; }, [camera]);
 
   useFrame((_, delta) => {
     if (!transitioning.current) return;   // yield to OrbitControls when idle

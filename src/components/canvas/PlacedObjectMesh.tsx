@@ -1,10 +1,8 @@
-import { useRef, useState } from 'react';
+import { useRef } from 'react';
 import { type ThreeEvent, useFrame } from '@react-three/fiber';
-import { Html } from '@react-three/drei';
 import * as THREE from 'three';
 import { useAppStore } from '../../store/store';
 import type { PlacedObject } from '../../types';
-import { SensorTooltip } from './SensorTooltip';
 import { TOON_GRADIENT } from './ToonMaterial';
 import {
   SofaGeometry, BedGeometry, TableGeometry, ChairGeometry,
@@ -16,27 +14,26 @@ import {
   AirPurifierGeometry,
 } from './FurnitureGeometry';
 
-// Heights for each type (y offset so objects sit on the floor)
+// Y offset so each object type sits at the correct height in the 3-unit wall space
 const HEIGHTS: Record<string, number> = {
-  // Ceiling-mounted — appear near top of the 3-unit wall
-  'smart-bulb':    1.8,
-  'smoke-detector': 2.4,
-  'ceiling-fan':   2.6,
-  camera:          1.8,
+  // Ceiling-mounted — hang from the 3-unit ceiling
+  'smart-bulb':     2.7,
+  'smoke-detector': 2.85,
+  'ceiling-fan':    2.7,
+  camera:           2.5,
   // Wall-mounted at mid height
-  thermostat:      0.9,
-  'smart-lock':    0.9,
-  doorbell:        1.1,
-  'motion-sensor': 0.8,
-  // Floor-level devices
+  thermostat:       0.9,
+  'smart-lock':     0.9,
+  doorbell:         1.1,
+  'motion-sensor':  1.2,
+  // Floor-level
   'echo-dot': 0, 'echo-show': 0, 'smart-plug': 0, 'smart-tv': 0,
   'air-purifier': 0,
-  // Furniture
   sofa: 0, bed: 0, table: 0, chair: 0, 'tv-stand': 0,
   bookshelf: 0, bathtub: 0, desk: 0, plant: 0, wardrobe: 0,
 };
 
-// Approximate object heights for tooltip placement
+// Visual top-height used for the selection ring radius
 const TOP_H: Record<string, number> = {
   'smart-bulb': 0.36, 'echo-dot': 0.14, 'echo-show': 0.45, 'smart-plug': 0.16,
   'motion-sensor': 0.18, 'thermostat': 0.28, 'smart-lock': 0.24, camera: 0.18,
@@ -87,14 +84,12 @@ function DeviceGeometry({ obj }: { obj: PlacedObject }) {
 
 export function PlacedObjectMesh({ obj }: { obj: PlacedObject }) {
   const groupRef = useRef<THREE.Group>(null);
-  const [hovered, setHovered] = useState(false);
-  const { setSelectedObject, ui } = useAppStore();
+  const { setSelectedObject, setHoveredObject, ui } = useAppStore();
   const isSelected = ui.selectedObjectId === obj.id;
   const isOn = obj.alexaDeviceState.isOn;
   const yOffset = HEIGHTS[obj.type] ?? 0;
   const topH = TOP_H[obj.type] ?? 0.5;
 
-  // Float animation for active Alexa devices (subtle)
   useFrame(({ clock }) => {
     if (!groupRef.current) return;
     if (obj.isAlexaDevice && isOn && obj.type !== 'ceiling-fan') {
@@ -118,18 +113,17 @@ export function PlacedObjectMesh({ obj }: { obj: PlacedObject }) {
       onClick={handleClick}
       onPointerOver={(e) => {
         e.stopPropagation();
-        setHovered(true);
+        setHoveredObject(obj.id);
         document.body.style.cursor = 'pointer';
       }}
       onPointerOut={() => {
-        setHovered(false);
+        setHoveredObject(null);
         document.body.style.cursor = 'default';
       }}
     >
-      {/* The actual device/furniture geometry */}
       <DeviceGeometry obj={obj} />
 
-      {/* Selection ring — gold floor ring so it doesn't look like a blue spot */}
+      {/* Gold selection ring — no Html, no z-index issues */}
       {isSelected && (
         <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
           <ringGeometry args={[
@@ -141,20 +135,7 @@ export function PlacedObjectMesh({ obj }: { obj: PlacedObject }) {
         </mesh>
       )}
 
-      {/* Hover sensor tooltip (Html overlay) */}
-      {hovered && !isSelected && (
-        <Html
-          position={[0, topH + 0.28, 0]}
-          center
-          distanceFactor={8}
-          zIndexRange={[100, 0]}
-          style={{ pointerEvents: 'none' }}
-        >
-          <SensorTooltip obj={obj} />
-        </Html>
-      )}
-
-      {/* Active device pulse ring (non-blue; per-device color) */}
+      {/* Device active pulse ring */}
       {obj.isAlexaDevice && isOn && obj.type !== 'smart-bulb' && (
         <mesh position={[0, 0.015, 0]} rotation={[-Math.PI / 2, 0, 0]}>
           <ringGeometry args={[0.16, 0.22, 28]} />

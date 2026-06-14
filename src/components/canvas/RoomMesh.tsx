@@ -1,6 +1,6 @@
 import { useRef, useMemo } from 'react';
 import { type ThreeEvent, useFrame } from '@react-three/fiber';
-import { Text, Html } from '@react-three/drei';
+import { Text } from '@react-three/drei';
 import * as THREE from 'three';
 import { useAppStore } from '../../store/store';
 import type { Room } from '../../types';
@@ -112,48 +112,36 @@ export function RoomMesh({ room, isActive, isHovered }: RoomMeshProps) {
         </mesh>
       )}
 
-      {/* ── Room label ─────────────────────────────────────────────────── */}
+      {/* ── Room label (no emoji — troika-three-text doesn't render emoji) */}
       <Text
         position={[0, 0.05, 0]}
         rotation={[-Math.PI / 2, 0, 0]}
-        fontSize={isActive ? 0.55 : 0.45}
-        color={isActive ? '#ffffff' : isHovered ? '#ffffff' : '#ffffffaa'}
+        fontSize={isActive ? 0.52 : 0.42}
+        color={isActive ? '#ffffff' : isHovered ? '#ffffff' : '#ffffffcc'}
         anchorX="center"
         anchorY="middle"
         maxWidth={room.width - 1}
-        outlineColor="#00000066"
+        outlineColor="#00000088"
         outlineWidth={0.03}
+        letterSpacing={0.04}
       >
-        {`${room.icon}  ${room.name}`}
+        {room.name.toUpperCase()}
       </Text>
 
-      {/* ── Device activity badge ──────────────────────────────────────── */}
+      {/* ── Device activity badge — canvas-native Text, no Html ──────── */}
       {onDevices.length > 0 && !isActive && (
-        <Html
-          position={[hw - 0.7, 0.15, -hd + 0.6]}
-          center
-          distanceFactor={14}
-          style={{ pointerEvents: 'none' }}
+        <Text
+          position={[hw - 1.4, 0.06, -hd + 0.9]}
+          rotation={[-Math.PI / 2, 0, 0]}
+          fontSize={0.17}
+          color="#22DD66"
+          anchorX="center"
+          anchorY="middle"
+          outlineColor="#000000CC"
+          outlineWidth={0.018}
         >
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 4,
-            background: 'rgba(10,10,20,0.88)',
-            border: '1px solid rgba(0,200,255,0.45)',
-            borderRadius: 20,
-            padding: '2px 8px',
-            fontSize: 9,
-            fontWeight: 700,
-            color: '#00C8FF',
-            whiteSpace: 'nowrap',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.6)',
-            fontFamily: 'system-ui,sans-serif',
-          }}>
-            <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#22dd66', display: 'inline-block' }} />
-            {onDevices.length} · {totalWatts.toFixed(0)}W
-          </div>
-        </Html>
+          {`${onDevices.length} ON  ${totalWatts.toFixed(0)}W`}
+        </Text>
       )}
     </group>
   );

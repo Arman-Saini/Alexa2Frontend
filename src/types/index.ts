@@ -95,6 +95,7 @@ export type AlexaTab = 'home' | 'devices' | 'routines';
 export interface UIState {
   activeRoomId: string | null;
   selectedObjectId: string | null;
+  hoveredObjectId: string | null;        // for DOM tooltip rendered outside Canvas
   activePanel: ActivePanel;
   placementAssetType: AssetType | null;
   isPlacementMode: boolean;
@@ -102,6 +103,7 @@ export interface UIState {
   alexaTab: AlexaTab;
   showMiniMap: boolean;
   isListeningVoice: boolean;
+  draggedAssetType: AssetType | null;    // live drag from library panel
 }
 
 export interface AlexaNotification {

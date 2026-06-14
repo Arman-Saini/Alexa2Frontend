@@ -38,7 +38,7 @@ function GroundPlane() {
 }
 
 export function House() {
-  const { ui, rooms, placedObjects, addPlacedObject, exitPlacementMode } = useAppStore();
+  const { ui, rooms, placedObjects, addPlacedObject, exitPlacementMode, setActiveRoom } = useAppStore();
   const { activeRoomId, isPlacementMode, placementAssetType, hoveredRoomId } = ui;
   const groundRef = useRef<THREE.Mesh>(null);
 
@@ -48,10 +48,12 @@ export function House() {
     : placedObjects;
 
   const handleFloorClick = (e: ThreeEvent<MouseEvent>) => {
-    if (!isPlacementMode || !placementAssetType) return;
     e.stopPropagation();
     const point = e.point;
+
+    // Check if click falls inside any room
     let targetRoomId: string | null = null;
+    let insideHouse = false;
     for (const room of rooms) {
       const hw = room.width  / 2;
       const hd = room.depth  / 2;
@@ -62,11 +64,21 @@ export function House() {
         point.z <= room.position.z + hd
       ) {
         targetRoomId = room.id;
+        insideHouse = true;
         break;
       }
     }
-    addPlacedObject(placementAssetType, { x: point.x, y: 0, z: point.z }, targetRoomId);
-    exitPlacementMode();
+
+    if (isPlacementMode && placementAssetType) {
+      addPlacedObject(placementAssetType, { x: point.x, y: 0, z: point.z }, targetRoomId);
+      exitPlacementMode();
+      return;
+    }
+
+    // Clicking outside the house while a room is active → go back to house view
+    if (!insideHouse && activeRoomId) {
+      setActiveRoom(null);
+    }
   };
 
   return (

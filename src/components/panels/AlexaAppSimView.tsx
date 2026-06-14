@@ -6,10 +6,13 @@ import type { PlacedObject, AlexaNotification } from '../../types';
 // ─── Top Status Bar ───────────────────────────────────────────────────────────
 function StatusBar() {
   const now = new Date();
-  const time = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  // Force 24h "HH:MM" format so it never shows a dot-separated locale time
+  const hh = String(now.getHours()).padStart(2, '0');
+  const mm = String(now.getMinutes()).padStart(2, '0');
+  const time = `${hh}:${mm}`;
   return (
-    <div className="flex items-center justify-between px-4 pt-2 pb-1 bg-alexa-dark shrink-0">
-      <span className="text-xs font-semibold text-alexa-text">{time}</span>
+    <div className="flex items-center justify-between px-4 pt-1.5 pb-1 bg-alexa-dark shrink-0">
+      <span className="text-[11px] font-semibold text-alexa-text">{time}</span>
       <div className="flex items-center gap-1.5">
         <svg className="w-3 h-3 text-alexa-text" fill="currentColor" viewBox="0 0 20 20">
           <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" />
@@ -53,11 +56,11 @@ function AlexaRing({ onVoiceSubmit }: { onVoiceSubmit: (text: string) => void })
   };
 
   return (
-    <div className="flex flex-col items-center py-5 bg-alexa-dark shrink-0">
-      {/* Ring */}
+    <div className="flex flex-col items-center py-3 bg-alexa-dark shrink-0">
+      {/* Ring — compact size so it doesn't dominate the panel */}
       <button
         onClick={handleRingClick}
-        className={`relative w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300 ${
+        className={`relative w-11 h-11 rounded-full flex items-center justify-center transition-all duration-300 ${
           isListening ? 'alexa-ring-listen' : 'alexa-ring-glow'
         }`}
         style={{
@@ -66,14 +69,14 @@ function AlexaRing({ onVoiceSubmit }: { onVoiceSubmit: (text: string) => void })
             : 'conic-gradient(from 0deg, #005580, #0080B0, #00A8E0, #00CAFF, #0080B0, #005580)',
         }}
       >
-        <div className="w-12 h-12 rounded-full bg-alexa-dark flex items-center justify-center">
-          <svg className={`w-5 h-5 ${isListening ? 'text-alexa-ring' : 'text-alexa-muted'}`} fill="currentColor" viewBox="0 0 24 24">
+        <div className="w-8 h-8 rounded-full bg-alexa-dark flex items-center justify-center">
+          <svg className={`w-4 h-4 ${isListening ? 'text-alexa-ring' : 'text-alexa-muted'}`} fill="currentColor" viewBox="0 0 24 24">
             <path d="M12 1a4 4 0 014 4v7a4 4 0 01-8 0V5a4 4 0 014-4zm0 2a2 2 0 00-2 2v7a2 2 0 004 0V5a2 2 0 00-2-2zm-7 9a7 7 0 0014 0h2a9 9 0 01-18 0h2z" />
           </svg>
         </div>
       </button>
 
-      <p className="text-xs text-alexa-muted mt-2 mb-1">
+      <p className="text-[10px] text-alexa-muted mt-1.5 mb-1">
         {isListening ? 'Listening...' : 'Tap to speak'}
       </p>
 
