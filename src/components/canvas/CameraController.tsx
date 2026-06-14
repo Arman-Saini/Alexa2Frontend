@@ -17,11 +17,14 @@ function getRoomView(room: { position: { x: number; y: number; z: number }; widt
   const rx = room.position.x;
   const rz = room.position.z;
   const maxDim = Math.max(room.width, room.depth);
-  const d = maxDim * 1.5;
+  // Offset camera so the room stays visible in isometric view
+  const d = maxDim * 0.85;
+  // Zoom: fill ~55% of viewport. Clamped so large rooms don't zoom too far out.
+  const zoom = Math.min(92, Math.max(40, 680 / maxDim));
   return {
     position: new THREE.Vector3(rx + d, d * 0.9, rz + d),
     target: new THREE.Vector3(rx, 0, rz),
-    zoom: Math.max(55, 220 / maxDim),
+    zoom,
   };
 }
 

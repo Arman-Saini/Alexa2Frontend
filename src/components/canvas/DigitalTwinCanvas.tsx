@@ -1,34 +1,32 @@
 import { Suspense, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls, Stars, ContactShadows } from '@react-three/drei';
+import { OrbitControls } from '@react-three/drei';
 import { useAppStore } from '../../store/store';
 import { House } from './House';
 import { CameraController } from './CameraController';
 import { MiniMap } from './MiniMap';
 
+// Single strong directional sun + very dim ambient = clean toon shadow steps.
+// No fill lights — they muddy the gradient bands.
 function SceneLighting() {
   return (
     <>
-      <ambientLight intensity={0.45} color="#ccd8ee" />
-      {/* Main key light — warm sun from upper-right */}
       <directionalLight
-        position={[18, 28, 16]}
-        intensity={1.6}
+        position={[18, 28, 12]}
+        intensity={2.4}
         castShadow
+        color="#FFF8E0"
         shadow-mapSize-width={2048}
         shadow-mapSize-height={2048}
         shadow-camera-near={0.1}
-        shadow-camera-far={150}
-        shadow-camera-left={-25}
-        shadow-camera-right={25}
-        shadow-camera-top={25}
-        shadow-camera-bottom={-25}
-        color="#fff8e8"
+        shadow-camera-far={120}
+        shadow-camera-left={-30}
+        shadow-camera-right={30}
+        shadow-camera-top={30}
+        shadow-camera-bottom={-30}
+        shadow-bias={-0.001}
       />
-      {/* Cool fill from left */}
-      <directionalLight position={[-12, 10, -8]} intensity={0.3} color="#d0e8ff" />
-      {/* Soft hemisphere */}
-      <hemisphereLight args={['#8ab4f8', '#0d0d1a', 0.25]} />
+      <ambientLight intensity={0.22} color="#B8D4F0" />
     </>
   );
 }
@@ -55,46 +53,27 @@ export function DigitalTwinCanvas() {
       <Canvas
         orthographic
         shadows
-        camera={{
-          position: [22, 20, 22],
-          zoom: 32,
-          near: -500,
-          far: 500,
-        }}
+        camera={{ position: [22, 20, 22], zoom: 32, near: -500, far: 500 }}
         gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
-        style={{ background: 'linear-gradient(160deg, #0a0a18 0%, #0d1020 50%, #080c14 100%)' }}
+        // Bright sky gradient — Sims daytime aesthetic
+        style={{ background: 'linear-gradient(175deg, #5BB8E8 0%, #90CEEE 35%, #C8E8F8 70%, #E8F4FF 100%)' }}
       >
         <Suspense fallback={null}>
           <SceneLighting />
-
-          {/* Stars only in house overview */}
-          {!ui.activeRoomId && (
-            <Stars radius={120} depth={60} count={2000} factor={3} fade speed={0.3} />
-          )}
 
           <CameraController />
 
           <OrbitControls
             makeDefault
             enabled={!ui.isPlacementMode}
-            minZoom={12}
-            maxZoom={140}
-            maxPolarAngle={Math.PI / 2.2}
-            minPolarAngle={Math.PI / 6}
+            minZoom={14}
+            maxZoom={160}
+            maxPolarAngle={Math.PI / 2.15}
+            minPolarAngle={Math.PI / 5}
             enablePan
             panSpeed={0.6}
-            rotateSpeed={0.45}
+            rotateSpeed={0.4}
             zoomSpeed={0.9}
-          />
-
-          {/* Ground contact shadows */}
-          <ContactShadows
-            position={[0, -0.01, 0]}
-            opacity={0.35}
-            scale={35}
-            blur={2.5}
-            far={10}
-            color="#000820"
           />
 
           <House />
@@ -116,7 +95,7 @@ export function DigitalTwinCanvas() {
       {ui.activeRoomId && !ui.isPlacementMode && (
         <button
           onClick={() => setActiveRoom(null)}
-          className="absolute top-3 left-3 z-20 flex items-center gap-1.5 bg-[#1A1A1A] bg-opacity-90 border border-[#383838] rounded-full px-3 py-1.5 text-xs text-[#00A8E0] hover:border-[#00A8E0] transition-all"
+          className="absolute top-3 left-3 z-20 flex items-center gap-1.5 bg-white bg-opacity-80 border border-gray-200 rounded-full px-3 py-1.5 text-xs text-gray-700 hover:border-blue-400 hover:text-blue-600 transition-all shadow-md"
         >
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -125,14 +104,17 @@ export function DigitalTwinCanvas() {
         </button>
       )}
 
-      {/* Placement mode */}
+      {/* Placement mode banner */}
       {ui.isPlacementMode && (
         <>
           <div className="absolute inset-0 pointer-events-none border-2 border-[#00A8E0] border-dashed opacity-50 rounded" />
-          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 bg-[#1A1A1A] border border-[#00A8E0] rounded-full px-4 py-1.5">
-            <span className="w-2 h-2 rounded-full bg-[#00A8E0] animate-pulse" />
-            <span className="text-xs font-semibold text-[#00A8E0]">Click on the floor to place</span>
-            <button onClick={exitPlacementMode} className="ml-2 text-[10px] text-[#8A8A8A] hover:text-white border border-[#383838] rounded-full px-2 py-0.5">
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 bg-white bg-opacity-90 border border-blue-300 rounded-full px-4 py-1.5 shadow-lg">
+            <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+            <span className="text-xs font-semibold text-blue-700">Click on the floor to place</span>
+            <button
+              onClick={exitPlacementMode}
+              className="ml-2 text-[10px] text-gray-500 hover:text-gray-800 border border-gray-300 rounded-full px-2 py-0.5"
+            >
               Cancel (Esc)
             </button>
           </div>
@@ -141,7 +123,7 @@ export function DigitalTwinCanvas() {
 
       {/* Bottom hint */}
       {!ui.activeRoomId && !ui.isPlacementMode && (
-        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 text-[10px] text-[#444] bg-[#0d0d1a] bg-opacity-80 px-3 py-1.5 rounded-full pointer-events-none border border-[#1a1a2a]">
+        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 text-[10px] text-white bg-black bg-opacity-30 px-3 py-1.5 rounded-full pointer-events-none backdrop-blur-sm">
           Click a room to zoom in · Scroll to zoom · Drag to orbit · Hover a device for sensor data
         </div>
       )}

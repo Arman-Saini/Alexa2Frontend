@@ -1,11 +1,12 @@
+import { TOON_GRADIENT } from './ToonMaterial';
 
-// Shared materials helper
-function mat(color: string, roughness = 0.85, metalness = 0.05, emissive?: string, emissiveIntensity = 0) {
+// Shared toon material helper — roughness/metalness params kept for call-site
+// compatibility but ignored (MeshToonMaterial uses gradient steps instead).
+function mat(color: string, _r = 0.85, _m = 0.05, emissive?: string, emissiveIntensity = 0) {
   return (
-    <meshStandardMaterial
+    <meshToonMaterial
       color={color}
-      roughness={roughness}
-      metalness={metalness}
+      gradientMap={TOON_GRADIENT}
       emissive={emissive ?? '#000000'}
       emissiveIntensity={emissiveIntensity}
     />

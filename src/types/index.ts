@@ -4,6 +4,20 @@ export interface Vec3 {
   z: number;
 }
 
+export interface LayoutNode {
+  id: string;
+  x: number;
+  z: number;
+}
+
+export interface WallSegment {
+  id: string;
+  fromId: string;
+  toId: string;
+  height: number;
+  sharedBy: string[]; // room IDs — length 1 = exterior, 2 = interior divider
+}
+
 export type AlexaDeviceType =
   | 'smart-bulb'
   | 'echo-dot'
