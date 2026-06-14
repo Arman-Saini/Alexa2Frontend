@@ -47,36 +47,47 @@ export function House() {
     ? placedObjects.filter(o => o.parentRoomId === activeRoomId)
     : placedObjects;
 
+  const isInsideHouse = (x: number, z: number) =>
+    rooms.some((room) => {
+      const hw = room.width / 2;
+      const hd = room.depth / 2;
+      return (
+        x >= room.position.x - hw &&
+        x <= room.position.x + hw &&
+        z >= room.position.z - hd &&
+        z <= room.position.z + hd
+      );
+    });
+
   const handleFloorClick = (e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation();
-    const point = e.point;
+    const { x, z } = e.point;
 
-    // Check if click falls inside any room
     let targetRoomId: string | null = null;
-    let insideHouse = false;
     for (const room of rooms) {
-      const hw = room.width  / 2;
-      const hd = room.depth  / 2;
-      if (
-        point.x >= room.position.x - hw &&
-        point.x <= room.position.x + hw &&
-        point.z >= room.position.z - hd &&
-        point.z <= room.position.z + hd
-      ) {
+      const hw = room.width / 2;
+      const hd = room.depth / 2;
+      if (x >= room.position.x - hw && x <= room.position.x + hw &&
+          z >= room.position.z - hd && z <= room.position.z + hd) {
         targetRoomId = room.id;
-        insideHouse = true;
         break;
       }
     }
 
     if (isPlacementMode && placementAssetType) {
-      addPlacedObject(placementAssetType, { x: point.x, y: 0, z: point.z }, targetRoomId);
+      addPlacedObject(placementAssetType, { x, y: 0, z }, targetRoomId);
       exitPlacementMode();
       return;
     }
 
-    // Clicking outside the house while a room is active → go back to house view
-    if (!insideHouse && activeRoomId) {
+    if (!targetRoomId && activeRoomId) {
+      setActiveRoom(null);
+    }
+  };
+
+  const handleFloorDoubleClick = (e: ThreeEvent<MouseEvent>) => {
+    e.stopPropagation();
+    if (!isInsideHouse(e.point.x, e.point.z)) {
       setActiveRoom(null);
     }
   };
@@ -90,6 +101,7 @@ export function House() {
         rotation={[-Math.PI / 2, 0, 0]}
         position={[0, -0.01, 0]}
         onClick={handleFloorClick}
+        onDoubleClick={handleFloorDoubleClick}
       >
         <planeGeometry args={[80, 80]} />
         <meshBasicMaterial transparent opacity={0} depthWrite={false} />
