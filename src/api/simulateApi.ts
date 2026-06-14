@@ -1,5 +1,6 @@
 import { apiClient } from './client';
 import { endpoints } from './endpoints';
+import { env } from '../config/env';
 
 // ── Response types ────────────────────────────────────────────────────────────
 
@@ -12,15 +13,17 @@ export interface SimulateResult {
 
 // ── API functions ─────────────────────────────────────────────────────────────
 
+const homeBody = () => ({ home_id: env.HOME_ID });
+
 export const simulateApi = {
   studyMode: () =>
-    apiClient.post<SimulateResult>(endpoints.simulateStudyMode),
+    apiClient.post<SimulateResult>(endpoints.simulateStudyMode, homeBody()),
 
   nightSafetyCheck: () =>
-    apiClient.post<SimulateResult>(endpoints.simulateNightSafety),
+    apiClient.post<SimulateResult>(endpoints.simulateNightSafety, homeBody()),
 
   powerCut: () =>
-    apiClient.post<SimulateResult>(endpoints.simulatePowerCut),
+    apiClient.post<SimulateResult>(endpoints.simulatePowerCut, homeBody()),
 };
 
 export type SimulateEndpoint = keyof typeof simulateApi;

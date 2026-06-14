@@ -75,7 +75,7 @@ export const homeApi = {
     apiClient.get<{ devices: HomeDevice[] }>(endpoints.homeDevices(homeId)),
 
   seedHome: (homeId = env.HOME_ID) =>
-    apiClient.post<{ success: boolean; message: string }>(endpoints.home(homeId)),
+    apiClient.post<{ success: boolean; message: string }>(endpoints.seedHome(homeId)),
 
   seedLearningHistory: (homeId = env.HOME_ID) =>
     apiClient.post<{ success: boolean; days_seeded: number }>(endpoints.seedHistory(homeId)),

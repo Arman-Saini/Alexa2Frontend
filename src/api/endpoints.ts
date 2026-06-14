@@ -11,6 +11,7 @@ export const endpoints = {
 
   // ── Homes ─────────────────────────────────────────────────────────
   home: (homeId = h) => `/api/homes/${homeId}`,
+  seedHome: (homeId = h) => `/api/homes/${homeId}/seed`,
   homeDevices: (homeId = h) => `/api/homes/${homeId}/devices`,
   digitalTwin: (homeId = h) => `/api/homes/${homeId}/twin`,
   anticipations: (homeId = h) => `/api/homes/${homeId}/anticipations`,
