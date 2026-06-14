@@ -7,7 +7,10 @@ function optional(key: string, fallback: string): string {
 
 export const env = {
   // Base URL for all backend REST calls — no trailing slash
-  BACKEND_URL: optional('VITE_BACKEND_URL', 'http://localhost:3001'),
+  BACKEND_URL: optional('VITE_API_BASE_URL', 'http://localhost:3001'),
+
+  // WebSocket URL — wss:// in production, ws:// locally
+  WS_URL: optional('VITE_WS_URL', 'ws://localhost:3001'),
 
   // Home ID used in every /homes/:home_id route
   HOME_ID: optional('VITE_HOME_ID', 'home_001'),
