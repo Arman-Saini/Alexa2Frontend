@@ -3,67 +3,93 @@ import { type ThreeEvent, useFrame } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
 import * as THREE from 'three';
 import { useAppStore } from '../../store/store';
-import { ASSET_MAP } from '../../constants/assets';
 import type { PlacedObject } from '../../types';
+import { SensorTooltip } from './SensorTooltip';
+import {
+  SofaGeometry, BedGeometry, TableGeometry, ChairGeometry,
+  TVStandGeometry, BookshelfGeometry, BathtubGeometry, DeskGeometry,
+  PlantGeometry, WardrobeGeometry,
+  EchoDotGeometry, EchoShowGeometry, SmartBulbGeometry, ThermostatGeometry,
+  SmartPlugGeometry, MotionSensorGeometry, SmartLockGeometry, CameraGeometry,
+  SmokeDetectorGeometry, SmartTVGeometry, CeilingFanGeometry, DoorbellGeometry,
+  AirPurifierGeometry,
+} from './FurnitureGeometry';
 
-interface PlacedObjectMeshProps {
-  obj: PlacedObject;
-}
-
-// Geometry definitions per device type
-const GEOM: Record<string, { w: number; h: number; d: number; shape?: 'cylinder' | 'sphere' | 'box' }> = {
-  'smart-bulb':     { w: 0.18, h: 0.28, d: 0.18, shape: 'sphere' },
-  'echo-dot':       { w: 0.32, h: 0.1,  d: 0.32, shape: 'cylinder' },
-  'echo-show':      { w: 0.5,  h: 0.4,  d: 0.08 },
-  'smart-plug':     { w: 0.1,  h: 0.14, d: 0.1 },
-  'motion-sensor':  { w: 0.14, h: 0.14, d: 0.1 },
-  'thermostat':     { w: 0.24, h: 0.32, d: 0.05 },
-  'smart-lock':     { w: 0.1,  h: 0.2,  d: 0.06 },
-  camera:           { w: 0.18, h: 0.12, d: 0.18 },
-  'smoke-detector': { w: 0.24, h: 0.07, d: 0.24, shape: 'cylinder' },
-  'smart-tv':       { w: 1.4,  h: 0.8,  d: 0.06 },
-  'ceiling-fan':    { w: 0.8,  h: 0.06, d: 0.8 },
-  doorbell:         { w: 0.1,  h: 0.16, d: 0.06 },
-  'air-purifier':   { w: 0.28, h: 0.6,  d: 0.28 },
-  sofa:             { w: 1.8,  h: 0.7,  d: 0.8 },
-  bed:              { w: 1.6,  h: 0.5,  d: 2.1 },
-  table:            { w: 1.2,  h: 0.75, d: 0.8 },
-  chair:            { w: 0.6,  h: 0.85, d: 0.6 },
-  'tv-stand':       { w: 1.5,  h: 0.5,  d: 0.45 },
-  bookshelf:        { w: 0.9,  h: 1.8,  d: 0.3 },
-  bathtub:          { w: 0.75, h: 0.5,  d: 1.6 },
-  desk:             { w: 1.4,  h: 0.75, d: 0.7 },
-  plant:            { w: 0.35, h: 0.6,  d: 0.35, shape: 'sphere' },
-  wardrobe:         { w: 1.2,  h: 2.0,  d: 0.55 },
+// Heights for each type (y offset so objects sit on the floor)
+const HEIGHTS: Record<string, number> = {
+  'smart-bulb': 0, 'echo-dot': 0, 'echo-show': 0, 'smart-plug': 0,
+  'motion-sensor': 0, 'thermostat': 0, 'smart-lock': 0, camera: 0,
+  'smoke-detector': 0.8, 'smart-tv': 0, 'ceiling-fan': 2.6,
+  doorbell: 0, 'air-purifier': 0,
+  sofa: 0, bed: 0, table: 0, chair: 0, 'tv-stand': 0,
+  bookshelf: 0, bathtub: 0, desk: 0, plant: 0, wardrobe: 0,
 };
 
-export function PlacedObjectMesh({ obj }: PlacedObjectMeshProps) {
+// Approximate object heights for tooltip placement
+const TOP_H: Record<string, number> = {
+  'smart-bulb': 0.36, 'echo-dot': 0.14, 'echo-show': 0.45, 'smart-plug': 0.16,
+  'motion-sensor': 0.18, 'thermostat': 0.28, 'smart-lock': 0.24, camera: 0.18,
+  'smoke-detector': 0.1, 'smart-tv': 1.0, 'ceiling-fan': 0.12,
+  doorbell: 0.2, 'air-purifier': 0.65,
+  sofa: 0.82, bed: 0.56, table: 0.82, chair: 0.95, 'tv-stand': 0.56,
+  bookshelf: 1.85, bathtub: 0.55, desk: 0.98, plant: 0.72, wardrobe: 2.1,
+};
+
+function DeviceGeometry({ obj }: { obj: PlacedObject }) {
+  const ds = obj.alexaDeviceState;
+  const isOn = ds.isOn;
+  const col = obj.color ?? '#888';
+
+  switch (obj.type) {
+    case 'echo-dot':       return <EchoDotGeometry isOn={isOn} />;
+    case 'echo-show':      return <EchoShowGeometry isOn={isOn} />;
+    case 'smart-bulb':     return <SmartBulbGeometry isOn={isOn} color={col} />;
+    case 'thermostat':     return <ThermostatGeometry isOn={isOn} />;
+    case 'smart-plug':     return <SmartPlugGeometry isOn={isOn} />;
+    case 'motion-sensor':  return <MotionSensorGeometry isOn={isOn} motionDetected={ds.motionDetected} />;
+    case 'smart-lock':     return <SmartLockGeometry isOn={isOn} isLocked={ds.isLocked} />;
+    case 'camera':         return <CameraGeometry isOn={isOn} />;
+    case 'smoke-detector': return <SmokeDetectorGeometry isOn={isOn} />;
+    case 'smart-tv':       return <SmartTVGeometry isOn={isOn} />;
+    case 'ceiling-fan':    return <CeilingFanGeometry isOn={isOn} speed={ds.speed} />;
+    case 'doorbell':       return <DoorbellGeometry isOn={isOn} />;
+    case 'air-purifier':   return <AirPurifierGeometry isOn={isOn} />;
+    case 'sofa':      return <SofaGeometry />;
+    case 'bed':       return <BedGeometry />;
+    case 'table':     return <TableGeometry />;
+    case 'chair':     return <ChairGeometry />;
+    case 'tv-stand':  return <TVStandGeometry />;
+    case 'bookshelf': return <BookshelfGeometry />;
+    case 'bathtub':   return <BathtubGeometry />;
+    case 'desk':      return <DeskGeometry />;
+    case 'plant':     return <PlantGeometry />;
+    case 'wardrobe':  return <WardrobeGeometry />;
+    default:
+      return (
+        <mesh position={[0, 0.25, 0]} castShadow>
+          <boxGeometry args={[0.4, 0.5, 0.4]} />
+          <meshStandardMaterial color={col} roughness={0.7} />
+        </mesh>
+      );
+  }
+}
+
+export function PlacedObjectMesh({ obj }: { obj: PlacedObject }) {
   const groupRef = useRef<THREE.Group>(null);
-  const meshRef = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
   const { setSelectedObject, ui } = useAppStore();
-  const selectedObjectId = ui.selectedObjectId;
-
-  const def = ASSET_MAP.get(obj.type);
-  const geo = GEOM[obj.type] ?? { w: 0.4, h: 0.4, d: 0.4 };
-  const isSelected = selectedObjectId === obj.id;
+  const isSelected = ui.selectedObjectId === obj.id;
   const isOn = obj.alexaDeviceState.isOn;
+  const yOffset = HEIGHTS[obj.type] ?? 0;
+  const topH = TOP_H[obj.type] ?? 0.5;
 
-  const baseColor = obj.color ?? def?.color ?? '#888';
-  const emissiveColor = isOn && obj.isAlexaDevice ? baseColor : '#000000';
-  const emissiveIntensity = isOn && obj.isAlexaDevice ? 0.5 : 0;
-
-  // Float animation for active IoT devices
+  // Float animation for active Alexa devices (subtle)
   useFrame(({ clock }) => {
     if (!groupRef.current) return;
-    if (obj.isAlexaDevice && isOn) {
-      groupRef.current.position.y = Math.sin(clock.getElapsedTime() * 1.2 + obj.position.x) * 0.025;
+    if (obj.isAlexaDevice && isOn && obj.type !== 'ceiling-fan') {
+      groupRef.current.position.y = obj.position.y + yOffset + Math.sin(clock.getElapsedTime() * 1.4 + obj.position.x * 0.8) * 0.015;
     } else {
-      groupRef.current.position.y = 0;
-    }
-    // Ceiling fan rotation
-    if (obj.type === 'ceiling-fan' && isOn && meshRef.current) {
-      meshRef.current.rotation.y += 0.08 * (obj.alexaDeviceState.speed ?? 2);
+      groupRef.current.position.y = obj.position.y + yOffset;
     }
   });
 
@@ -73,148 +99,69 @@ export function PlacedObjectMesh({ obj }: PlacedObjectMeshProps) {
     setSelectedObject(isSelected ? null : obj.id);
   };
 
-  const px = obj.position.x;
-  const py = obj.position.y;
-  const pz = obj.position.z;
-
   return (
-    <group ref={groupRef} position={[px, py, pz]}>
-      {/* Main mesh */}
-      <mesh
-        ref={meshRef}
-        position={[0, geo.h / 2, 0]}
-        rotation={[obj.rotation.x, obj.rotation.y, obj.rotation.z]}
-        castShadow
-        receiveShadow
-        onClick={handleClick}
-        onPointerOver={(e) => {
-          e.stopPropagation();
-          setHovered(true);
-          document.body.style.cursor = 'pointer';
-        }}
-        onPointerOut={() => {
-          setHovered(false);
-          document.body.style.cursor = 'default';
-        }}
-      >
-        {geo.shape === 'cylinder' ? (
-          <cylinderGeometry args={[geo.w / 2, geo.w / 2 + 0.02, geo.h, 24]} />
-        ) : geo.shape === 'sphere' ? (
-          <sphereGeometry args={[geo.w / 2, 16, 12]} />
-        ) : (
-          <boxGeometry args={[geo.w, geo.h, geo.d]} />
-        )}
-        <meshStandardMaterial
-          color={baseColor}
-          emissive={emissiveColor}
-          emissiveIntensity={emissiveIntensity}
-          roughness={obj.isAlexaDevice ? 0.4 : 0.75}
-          metalness={obj.isAlexaDevice ? 0.3 : 0.05}
-          transparent={isSelected}
-          opacity={isSelected ? 0.85 : 1}
-        />
-      </mesh>
+    <group
+      ref={groupRef}
+      position={[obj.position.x, obj.position.y + yOffset, obj.position.z]}
+      rotation={[0, obj.rotation.y, 0]}
+      onClick={handleClick}
+      onPointerOver={(e) => {
+        e.stopPropagation();
+        setHovered(true);
+        document.body.style.cursor = 'pointer';
+      }}
+      onPointerOut={() => {
+        setHovered(false);
+        document.body.style.cursor = 'default';
+      }}
+    >
+      {/* The actual device/furniture geometry */}
+      <DeviceGeometry obj={obj} />
 
-      {/* Echo Dot ring accent */}
-      {obj.type === 'echo-dot' && (
-        <mesh position={[0, geo.h + 0.001, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <ringGeometry args={[geo.w / 2 - 0.04, geo.w / 2, 32]} />
-          <meshBasicMaterial
-            color={isOn ? '#00A8E0' : '#333355'}
-            transparent
-            opacity={isOn ? 0.9 : 0.4}
-          />
-        </mesh>
-      )}
-
-      {/* Smart bulb stem */}
-      {obj.type === 'smart-bulb' && (
-        <mesh position={[0, 0.04, 0]}>
-          <cylinderGeometry args={[0.02, 0.03, 0.12, 8]} />
-          <meshStandardMaterial color="#888888" roughness={0.5} metalness={0.6} />
-        </mesh>
-      )}
-
-      {/* Plant pot */}
-      {obj.type === 'plant' && (
-        <mesh position={[0, 0.1, 0]}>
-          <cylinderGeometry args={[0.12, 0.1, 0.18, 12]} />
-          <meshStandardMaterial color="#8B4513" roughness={0.85} />
-        </mesh>
-      )}
-
-      {/* Smart TV screen */}
-      {obj.type === 'smart-tv' && isOn && (
-        <mesh position={[0, geo.h / 2, geo.d / 2 + 0.001]} rotation={[obj.rotation.x, obj.rotation.y, obj.rotation.z]}>
-          <planeGeometry args={[geo.w - 0.05, geo.h - 0.06]} />
-          <meshBasicMaterial color="#0a0a2a" />
-        </mesh>
-      )}
-
-      {/* Selection outline */}
+      {/* Selection outline box (bounding-box style) */}
       {isSelected && (
-        <mesh position={[0, geo.h / 2, 0]}>
-          {geo.shape === 'cylinder' ? (
-            <cylinderGeometry args={[geo.w / 2 + 0.04, geo.w / 2 + 0.06, geo.h + 0.06, 24]} />
-          ) : (
-            <boxGeometry args={[geo.w + 0.08, geo.h + 0.08, geo.d + 0.08]} />
-          )}
-          <meshBasicMaterial color="#00A8E0" wireframe />
+        <mesh position={[0, topH / 2, 0]}>
+          <boxGeometry args={[
+            Math.max(0.3, topH * 0.8) + 0.08,
+            topH + 0.1,
+            Math.max(0.3, topH * 0.8) + 0.08,
+          ]} />
+          <meshBasicMaterial color="#00A8E0" wireframe transparent opacity={0.7} />
         </mesh>
       )}
 
-      {/* Status LED dot for Alexa devices */}
-      {obj.isAlexaDevice && (
-        <mesh position={[geo.w / 2 - 0.03, geo.h + 0.02, geo.d / 2 - 0.03]}>
-          <sphereGeometry args={[0.025, 8, 6]} />
-          <meshBasicMaterial color={isOn ? '#1DB954' : '#383838'} />
-        </mesh>
-      )}
-
-      {/* Hover tooltip */}
+      {/* Hover sensor tooltip (Html overlay) */}
       {hovered && !isSelected && (
         <Html
-          position={[0, geo.h + 0.35, 0]}
+          position={[0, topH + 0.28, 0]}
           center
+          distanceFactor={8}
+          zIndexRange={[100, 0]}
           style={{ pointerEvents: 'none' }}
         >
-          <div className="bg-[#1A1A1A] border border-[#383838] rounded-xl px-2.5 py-1.5 text-xs text-white whitespace-nowrap shadow-2xl">
-            <div className="flex items-center gap-1.5 mb-0.5">
-              <span>{def?.emoji}</span>
-              <span className="font-semibold">{obj.deviceName}</span>
-            </div>
-            {obj.isAlexaDevice && (
-              <div className={`flex items-center gap-1 ${isOn ? 'text-[#1DB954]' : 'text-[#8A8A8A]'}`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${isOn ? 'bg-[#1DB954]' : 'bg-[#383838]'}`} />
-                <span>{isOn ? 'On' : 'Off'}</span>
-                {isOn && obj.alexaDeviceState.powerConsumption !== undefined && (
-                  <span className="text-[#8A8A8A] ml-1">· {obj.alexaDeviceState.powerConsumption.toFixed(0)}W</span>
-                )}
-              </div>
-            )}
-          </div>
+          <SensorTooltip obj={obj} />
         </Html>
       )}
 
-      {/* Glowing point light for active bulbs */}
+      {/* Glow light for active bulbs */}
       {obj.type === 'smart-bulb' && isOn && (
         <pointLight
-          position={[0, geo.h + 0.1, 0]}
-          intensity={0.8}
+          position={[0, 0.3, 0]}
+          intensity={1.2}
           distance={3.5}
-          color={baseColor}
+          color={obj.color ?? '#FFD700'}
           castShadow={false}
         />
       )}
 
-      {/* Ambient glow for active echo devices */}
+      {/* Ambient glow for Echo devices */}
       {(obj.type === 'echo-dot' || obj.type === 'echo-show') && isOn && (
-        <pointLight
-          position={[0, 0.2, 0]}
-          intensity={0.3}
-          distance={1.5}
-          color="#00A8E0"
-        />
+        <pointLight position={[0, 0.15, 0]} intensity={0.25} distance={1.5} color="#00A8E0" />
+      )}
+
+      {/* Air purifier "clean air" glow */}
+      {obj.type === 'air-purifier' && isOn && (
+        <pointLight position={[0, 0.8, 0]} intensity={0.2} distance={2} color="#00e5ff" />
       )}
     </group>
   );

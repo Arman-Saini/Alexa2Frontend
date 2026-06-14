@@ -1,6 +1,6 @@
 import { Suspense, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls, Stars } from '@react-three/drei';
+import { OrbitControls, Stars, ContactShadows } from '@react-three/drei';
 import { useAppStore } from '../../store/store';
 import { House } from './House';
 import { CameraController } from './CameraController';
@@ -9,27 +9,26 @@ import { MiniMap } from './MiniMap';
 function SceneLighting() {
   return (
     <>
-      {/* Ambient fill */}
-      <ambientLight intensity={0.35} color="#b8ccff" />
-      {/* Main sun */}
+      <ambientLight intensity={0.45} color="#ccd8ee" />
+      {/* Main key light — warm sun from upper-right */}
       <directionalLight
-        position={[12, 22, 12]}
-        intensity={1.4}
+        position={[18, 28, 16]}
+        intensity={1.6}
         castShadow
         shadow-mapSize-width={2048}
         shadow-mapSize-height={2048}
         shadow-camera-near={0.1}
-        shadow-camera-far={120}
-        shadow-camera-left={-22}
-        shadow-camera-right={22}
-        shadow-camera-top={22}
-        shadow-camera-bottom={-22}
+        shadow-camera-far={150}
+        shadow-camera-left={-25}
+        shadow-camera-right={25}
+        shadow-camera-top={25}
+        shadow-camera-bottom={-25}
         color="#fff8e8"
       />
-      {/* Cool fill from opposite */}
-      <directionalLight position={[-10, 8, -8]} intensity={0.25} color="#c8deff" />
-      {/* Hemisphere sky/ground */}
-      <hemisphereLight args={['#0a1433', '#12080a', 0.35]} />
+      {/* Cool fill from left */}
+      <directionalLight position={[-12, 10, -8]} intensity={0.3} color="#d0e8ff" />
+      {/* Soft hemisphere */}
+      <hemisphereLight args={['#8ab4f8', '#0d0d1a', 0.25]} />
     </>
   );
 }
@@ -37,7 +36,6 @@ function SceneLighting() {
 export function DigitalTwinCanvas() {
   const { ui, setActiveRoom, setSelectedObject, exitPlacementMode, toggleMiniMap } = useAppStore();
 
-  // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -55,17 +53,23 @@ export function DigitalTwinCanvas() {
   return (
     <div className={`w-full h-full relative ${cursorClass}`}>
       <Canvas
+        orthographic
         shadows
-        camera={{ position: [0, 20, 16], fov: 50, near: 0.1, far: 250 }}
+        camera={{
+          position: [22, 20, 22],
+          zoom: 32,
+          near: -500,
+          far: 500,
+        }}
         gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
-        style={{ background: '#080810' }}
+        style={{ background: 'linear-gradient(160deg, #0a0a18 0%, #0d1020 50%, #080c14 100%)' }}
       >
         <Suspense fallback={null}>
           <SceneLighting />
 
-          {/* Stars only in house view */}
+          {/* Stars only in house overview */}
           {!ui.activeRoomId && (
-            <Stars radius={80} depth={50} count={2500} factor={3} fade speed={0.4} />
+            <Stars radius={120} depth={60} count={2000} factor={3} fade speed={0.3} />
           )}
 
           <CameraController />
@@ -73,23 +77,32 @@ export function DigitalTwinCanvas() {
           <OrbitControls
             makeDefault
             enabled={!ui.isPlacementMode}
-            minDistance={3}
-            maxDistance={45}
-            maxPolarAngle={Math.PI / 2.05}
+            minZoom={12}
+            maxZoom={140}
+            maxPolarAngle={Math.PI / 2.2}
+            minPolarAngle={Math.PI / 6}
             enablePan
-            panSpeed={0.7}
-            rotateSpeed={0.55}
-            zoomSpeed={0.8}
+            panSpeed={0.6}
+            rotateSpeed={0.45}
+            zoomSpeed={0.9}
+          />
+
+          {/* Ground contact shadows */}
+          <ContactShadows
+            position={[0, -0.01, 0]}
+            opacity={0.35}
+            scale={35}
+            blur={2.5}
+            far={10}
+            color="#000820"
           />
 
           <House />
         </Suspense>
       </Canvas>
 
-      {/* MiniMap overlay */}
+      {/* Minimap */}
       {ui.showMiniMap && !ui.isPlacementMode && <MiniMap />}
-
-      {/* Toggle minimap button */}
       {!ui.isPlacementMode && !ui.showMiniMap && (
         <button
           onClick={toggleMiniMap}
@@ -99,7 +112,7 @@ export function DigitalTwinCanvas() {
         </button>
       )}
 
-      {/* Room view back button overlay */}
+      {/* Room view back button */}
       {ui.activeRoomId && !ui.isPlacementMode && (
         <button
           onClick={() => setActiveRoom(null)}
@@ -112,17 +125,14 @@ export function DigitalTwinCanvas() {
         </button>
       )}
 
-      {/* Placement mode banner */}
+      {/* Placement mode */}
       {ui.isPlacementMode && (
         <>
           <div className="absolute inset-0 pointer-events-none border-2 border-[#00A8E0] border-dashed opacity-50 rounded" />
           <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 bg-[#1A1A1A] border border-[#00A8E0] rounded-full px-4 py-1.5">
             <span className="w-2 h-2 rounded-full bg-[#00A8E0] animate-pulse" />
             <span className="text-xs font-semibold text-[#00A8E0]">Click on the floor to place</span>
-            <button
-              onClick={exitPlacementMode}
-              className="ml-2 text-[10px] text-[#8A8A8A] hover:text-white border border-[#383838] rounded-full px-2 py-0.5"
-            >
+            <button onClick={exitPlacementMode} className="ml-2 text-[10px] text-[#8A8A8A] hover:text-white border border-[#383838] rounded-full px-2 py-0.5">
               Cancel (Esc)
             </button>
           </div>
@@ -131,8 +141,8 @@ export function DigitalTwinCanvas() {
 
       {/* Bottom hint */}
       {!ui.activeRoomId && !ui.isPlacementMode && (
-        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 text-[10px] text-[#444] bg-[#121212] bg-opacity-80 px-3 py-1.5 rounded-full pointer-events-none border border-[#222]">
-          Click a room to zoom in · Scroll to zoom · Drag to orbit · Esc to deselect
+        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 text-[10px] text-[#444] bg-[#0d0d1a] bg-opacity-80 px-3 py-1.5 rounded-full pointer-events-none border border-[#1a1a2a]">
+          Click a room to zoom in · Scroll to zoom · Drag to orbit · Hover a device for sensor data
         </div>
       )}
     </div>
