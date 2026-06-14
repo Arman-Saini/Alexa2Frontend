@@ -478,7 +478,7 @@ export const useAppStore = create<AppState>()(
         },
       }),
       {
-        name: 'alexa-twin-v2',
+        name: 'alexa-twin-v3',
         storage: createJSONStorage(() => localStorage),
         // Only persist the user's placed objects — UI state and defaults reset on load
         partialize: (state) => ({

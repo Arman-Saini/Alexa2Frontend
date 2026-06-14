@@ -19,9 +19,9 @@ function SceneLighting() {
     <>
       <directionalLight
         position={[18, 28, 12]}
-        intensity={2.0}
+        intensity={2.4}
         castShadow
-        color="#FFF8E0"
+        color="#FFF5D0"
         shadow-mapSize-width={2048}
         shadow-mapSize-height={2048}
         shadow-camera-near={0.1}
@@ -142,7 +142,8 @@ export function DigitalTwinCanvas() {
         style={{ background: '#1a1a2e' }}
       >
         <Suspense fallback={null}>
-          <color attach="background" args={['#87CEEB']} />
+          <color attach="background" args={['#D5EAF7']} />
+          <fog attach="fog" args={['#D5EAF7', 60, 160]} />
           <SceneLighting />
           <SmartLights />
           <GhostPreview />

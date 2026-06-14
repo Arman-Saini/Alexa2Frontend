@@ -35,6 +35,7 @@ function AlexaRing({ onVoiceSubmit }: { onVoiceSubmit: (text: string) => void })
   const [backendMode, setBackendMode] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [micError, setMicError] = useState<string | null>(null);
+  const [interimText, setInterimText] = useState('');
   const executeVoiceCommand = useAppStore((s) => s.executeVoiceCommand);
   const addNotification = useAppStore((s) => s.addNotification);
   const { sendAudio, sendMockText, isProcessing } = useBackendVoice();
@@ -98,22 +99,45 @@ function AlexaRing({ onVoiceSubmit }: { onVoiceSubmit: (text: string) => void })
 
       const recognition = new SpeechRecognitionClass();
       recognitionRef.current = recognition;
-      recognition.lang = 'en-IN';
-      recognition.continuous = false;
-      recognition.interimResults = false;
+      recognition.lang = 'en-US';
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.maxAlternatives = 1;
 
       recognition.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
-        const result = executeVoiceCommand(transcript);
-        setResponse(result);
-        onVoiceSubmit(transcript);
-        setListeningVoice(false);
-        setIsRecording(false);
+        let interim = '';
+        let final = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          if (event.results[i].isFinal) {
+            final += event.results[i][0].transcript;
+          } else {
+            interim += event.results[i][0].transcript;
+          }
+        }
+        setInterimText(interim);
+        if (final) {
+          // Strip "Alexa" / "Hey Alexa" wake word prefix if present
+          const cleaned = final.replace(/^(hey\s+)?alexa[,\s]*/i, '').trim() || final.trim();
+          const result = executeVoiceCommand(cleaned);
+          setResponse(result);
+          setInterimText('');
+          onVoiceSubmit(cleaned);
+          recognition.stop();
+          setListeningVoice(false);
+          setIsRecording(false);
+        }
       };
 
       recognition.onerror = (event) => {
+        if (event.error === 'no-speech') {
+          // Retry silently — keep listening state, just clear interim
+          setInterimText('');
+          return;
+        }
         const msg = event.error === 'not-allowed'
-          ? 'Microphone access denied — grant permission in browser'
+          ? 'Mic denied — click the lock icon in your browser address bar'
+          : event.error === 'network'
+          ? 'Network error — check internet connection'
           : `Voice error: ${event.error}`;
         setMicError(msg);
         setIsRecording(false);
@@ -122,8 +146,13 @@ function AlexaRing({ onVoiceSubmit }: { onVoiceSubmit: (text: string) => void })
       };
 
       recognition.onend = () => {
+        // With continuous=true, restart if still supposed to be listening
+        if (isRecording) {
+          try { recognition.start(); } catch { /* already stopped */ }
+          return;
+        }
         setIsRecording(false);
-        if (ui.isListeningVoice) setListeningVoice(false);
+        setListeningVoice(false);
       };
 
       try {
@@ -214,7 +243,7 @@ function AlexaRing({ onVoiceSubmit }: { onVoiceSubmit: (text: string) => void })
       {/* Status + backend toggle row */}
       <div className="flex items-center gap-2 mt-2 mb-1">
         <p className="text-[10px] text-alexa-muted">
-          {isProcessing ? 'Processing...' : isRecording ? 'Recording — tap to stop' : 'Tap to speak'}
+          {isProcessing ? 'Processing...' : isRecording ? 'Listening — tap to stop' : 'Tap to speak'}
         </p>
         <button
           onClick={() => setBackendMode((v) => !v)}
@@ -233,6 +262,20 @@ function AlexaRing({ onVoiceSubmit }: { onVoiceSubmit: (text: string) => void })
       {/* Mic error */}
       {micError && (
         <p className="text-[10px] text-red-400 mx-4 text-center mb-1">{micError}</p>
+      )}
+
+      {/* Wake word hint when listening */}
+      {isRecording && !interimText && (
+        <p className="text-[9px] text-alexa-muted mb-1 italic">
+          Say "Alexa, turn on the lights"
+        </p>
+      )}
+
+      {/* Live interim transcript */}
+      {interimText && (
+        <p className="text-[10px] text-alexa-blue mx-4 text-center mb-1 italic">
+          "{interimText}..."
+        </p>
       )}
 
       {/* Waveform animation while recording */}

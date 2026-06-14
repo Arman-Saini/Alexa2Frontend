@@ -1,10 +1,10 @@
 import * as THREE from 'three';
 
-// 4-step cel-shading gradient: deep shadow → shadow → midtone → highlight.
-// Created once at module load (no WebGL context needed for DataTexture construction).
+// Smooth 16-step gradient — keeps MeshToonMaterial's soft-body look without harsh cel bands.
 export const TOON_GRADIENT = (() => {
-  const data = new Uint8Array([0, 80, 160, 255]);
-  const t = new THREE.DataTexture(data, 4, 1, THREE.RedFormat);
+  const steps = 16;
+  const data = new Uint8Array(steps).map((_, i) => Math.round(55 + (i / (steps - 1)) * 200));
+  const t = new THREE.DataTexture(data, steps, 1, THREE.RedFormat);
   t.magFilter = THREE.NearestFilter;
   t.minFilter = THREE.NearestFilter;
   t.needsUpdate = true;
