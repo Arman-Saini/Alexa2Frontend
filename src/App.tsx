@@ -5,6 +5,7 @@ import { PanelTabs } from './components/layout/PanelTabs';
 import { AssetLibraryPanel } from './components/panels/AssetLibraryPanel';
 import { InspectorPanel } from './components/panels/InspectorPanel';
 import { AlexaAppSimView } from './components/panels/AlexaAppSimView';
+import { AnticipationsPanel } from './components/panels/AnticipationsPanel';
 import { useSimulation } from './hooks/useSimulation';
 
 const DigitalTwinCanvas = lazy(() =>
@@ -21,6 +22,7 @@ function RightPanel() {
         {activePanel === 'alexa' && <AlexaAppSimView />}
         {activePanel === 'library' && <AssetLibraryPanel />}
         {activePanel === 'inspector' && <InspectorPanel />}
+        {activePanel === 'anticipations' && <AnticipationsPanel />}
       </div>
     </div>
   );

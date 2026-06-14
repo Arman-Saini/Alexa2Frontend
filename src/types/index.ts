@@ -89,7 +89,7 @@ export interface Room {
   wallColor: string;
 }
 
-export type ActivePanel = 'alexa' | 'inspector' | 'library';
+export type ActivePanel = 'alexa' | 'inspector' | 'library' | 'anticipations';
 export type AlexaTab = 'home' | 'devices' | 'routines';
 
 export interface UIState {

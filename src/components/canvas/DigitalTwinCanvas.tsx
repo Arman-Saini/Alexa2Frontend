@@ -7,6 +7,8 @@ import { House } from './House';
 import { CameraController } from './CameraController';
 import { MiniMap } from './MiniMap';
 import { SensorTooltip } from './SensorTooltip';
+import { SmartLights } from './SmartLights';
+import { GhostPreview } from './GhostPreview';
 import { sharedCameraRef } from './cameraRef';
 import type { AssetType } from '../../types';
 
@@ -140,6 +142,8 @@ export function DigitalTwinCanvas() {
         <Suspense fallback={null}>
           <color attach="background" args={['#A8D8EA']} />
           <SceneLighting />
+          <SmartLights />
+          <GhostPreview />
           <CameraController />
           <OrbitControls
             makeDefault

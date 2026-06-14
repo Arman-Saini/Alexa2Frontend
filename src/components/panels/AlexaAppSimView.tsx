@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { useAppStore } from '../../store/store';
 import { ASSET_MAP } from '../../constants/assets';
+import { useBackendVoice } from '../../hooks/useBackendApi';
 import type { PlacedObject, AlexaNotification } from '../../types';
 
 // ─── Top Status Bar ───────────────────────────────────────────────────────────
@@ -31,7 +32,9 @@ function AlexaRing({ onVoiceSubmit }: { onVoiceSubmit: (text: string) => void })
   const { ui, setListeningVoice } = useAppStore();
   const [inputText, setInputText] = useState('');
   const [response, setResponse] = useState('');
+  const [backendMode, setBackendMode] = useState(false);
   const executeVoiceCommand = useAppStore((s) => s.executeVoiceCommand);
+  const { sendMockText, isProcessing } = useBackendVoice();
   const inputRef = useRef<HTMLInputElement>(null);
   const isListening = ui.isListeningVoice;
 
@@ -45,14 +48,21 @@ function AlexaRing({ onVoiceSubmit }: { onVoiceSubmit: (text: string) => void })
     setTimeout(() => inputRef.current?.focus(), 100);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputText.trim()) return;
-    const result = executeVoiceCommand(inputText);
-    setResponse(result);
-    onVoiceSubmit(inputText);
+    const text = inputText;
     setInputText('');
     setListeningVoice(false);
+
+    if (backendMode) {
+      const result = await sendMockText(text);
+      setResponse(result?.response ?? 'Sent to backend.');
+    } else {
+      const result = executeVoiceCommand(text);
+      setResponse(result);
+    }
+    onVoiceSubmit(text);
   };
 
   return (
@@ -76,9 +86,25 @@ function AlexaRing({ onVoiceSubmit }: { onVoiceSubmit: (text: string) => void })
         </div>
       </button>
 
-      <p className="text-[10px] text-alexa-muted mt-1.5 mb-1">
-        {isListening ? 'Listening...' : 'Tap to speak'}
-      </p>
+      <div className="flex items-center gap-2 mt-1.5 mb-1">
+        <p className="text-[10px] text-alexa-muted">
+          {isProcessing ? 'Processing...' : isListening ? 'Listening...' : 'Tap to speak'}
+        </p>
+        {/* Toggle: local NLU vs backend cascade */}
+        <button
+          onClick={() => setBackendMode((v) => !v)}
+          title={backendMode ? 'Using backend T1/T3 cascade' : 'Using local NLU only'}
+          className="flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[8px] font-bold transition-all"
+          style={{
+            background: backendMode ? '#0A2A14' : '#1A1A1A',
+            border: `1px solid ${backendMode ? '#4ADE80' : '#383838'}`,
+            color: backendMode ? '#4ADE80' : '#555',
+          }}
+        >
+          <span className="w-1 h-1 rounded-full" style={{ background: backendMode ? '#4ADE80' : '#555' }} />
+          {backendMode ? 'Backend' : 'Local'}
+        </button>
+      </div>
 
       {/* Voice input bar */}
       {isListening && (
@@ -92,10 +118,18 @@ function AlexaRing({ onVoiceSubmit }: { onVoiceSubmit: (text: string) => void })
               placeholder="Try: 'Good morning' or 'Turn on lights'"
               className="flex-1 bg-transparent text-xs text-alexa-text placeholder-alexa-muted focus:outline-none"
             />
-            <button type="submit" className="text-alexa-blue hover:text-alexa-ring transition-colors">
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-8.707l-3-3a1 1 0 00-1.414 1.414L10.586 9H7a1 1 0 100 2h3.586l-1.293 1.293a1 1 0 101.414 1.414l3-3a1 1 0 000-1.414z" clipRule="evenodd" />
-              </svg>
+            <button
+              type="submit"
+              disabled={isProcessing}
+              className="text-alexa-blue hover:text-alexa-ring transition-colors disabled:opacity-40"
+            >
+              {isProcessing ? (
+                <div className="w-4 h-4 rounded-full border-2 border-alexa-blue border-t-transparent animate-spin" />
+              ) : (
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-8.707l-3-3a1 1 0 00-1.414 1.414L10.586 9H7a1 1 0 100 2h3.586l-1.293 1.293a1 1 0 101.414 1.414l3-3a1 1 0 000-1.414z" clipRule="evenodd" />
+                </svg>
+              )}
             </button>
           </div>
         </form>
