@@ -57,7 +57,8 @@ function AlexaRing({ onVoiceSubmit }: { onVoiceSubmit: (text: string) => void })
   };
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const recognitionRef = useRef<any>(null);
   const isListening = ui.isListeningVoice;
 
   // Kick off real mic capture
@@ -100,10 +101,8 @@ function AlexaRing({ onVoiceSubmit }: { onVoiceSubmit: (text: string) => void })
       }
     } else {
       // Local mode: Web Speech API (Chrome/Edge built-in STT, no backend needed)
-      const SpeechRecognitionClass =
-        (window as unknown as { SpeechRecognition?: typeof SpeechRecognition; webkitSpeechRecognition?: typeof SpeechRecognition })
-          .SpeechRecognition ??
-        (window as unknown as { webkitSpeechRecognition?: typeof SpeechRecognition }).webkitSpeechRecognition;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const SpeechRecognitionClass = (window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition;
 
       if (!SpeechRecognitionClass) {
         // Fallback: show text input if browser doesn't support Web Speech API
@@ -119,7 +118,7 @@ function AlexaRing({ onVoiceSubmit }: { onVoiceSubmit: (text: string) => void })
       recognition.interimResults = true;
       recognition.maxAlternatives = 1;
 
-      recognition.onresult = (event) => {
+      recognition.onresult = (event: SpeechRecognitionEvent) => {
         let interim = '';
         let final = '';
         for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -144,7 +143,7 @@ function AlexaRing({ onVoiceSubmit }: { onVoiceSubmit: (text: string) => void })
         }
       };
 
-      recognition.onerror = (event) => {
+      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
         if (event.error === 'no-speech') {
           // Retry silently — keep listening state, just clear interim
           setInterimText('');

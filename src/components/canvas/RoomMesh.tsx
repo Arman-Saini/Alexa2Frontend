@@ -4,7 +4,7 @@ import { Text } from '@react-three/drei';
 import * as THREE from 'three';
 import { useAppStore } from '../../store/store';
 import type { Room } from '../../types';
-import { TOON_GRADIENT } from './ToonMaterial';
+
 
 // Sims-style vibrant floor palettes
 const FLOOR_PALETTES: Record<string, { floor: string; active: string; accent: string }> = {

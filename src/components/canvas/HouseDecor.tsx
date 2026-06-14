@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { TOON_GRADIENT } from './ToonMaterial'; // still used for glass transparency
+
 
 void (THREE.Color);
 
@@ -204,8 +204,8 @@ function BathroomFixtures() {
       </mesh>
 
       {/* Shower area — left half, against south wall */}
-      <mesh position={[-2.0, 2.5, 7.2]}>
-        <cylinderGeometry args={[0.018, 0.018, 3.2, 8]} rotation={[0, 0, Math.PI / 2]} />
+      <mesh position={[-2.0, 2.5, 7.2]} rotation={[0, 0, Math.PI / 2]}>
+        <cylinderGeometry args={[0.018, 0.018, 3.2, 8]} />
         {mat('#9E9E9E')}
       </mesh>
       {/* Shower head */}
