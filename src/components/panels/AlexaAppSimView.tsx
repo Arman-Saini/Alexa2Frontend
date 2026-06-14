@@ -4,7 +4,7 @@ import { ASSET_MAP } from '../../constants/assets';
 import { useBackendVoice } from '../../hooks/useBackendApi';
 import type { PlacedObject, AlexaNotification } from '../../types';
 
-// ─── Top Status Bar ───────────────────────────────────────────────────────────
+// ── Top Status Bar ────────────────────────────────────────────────────────────
 function StatusBar() {
   const now = new Date();
   // Force 24h "HH:MM" format so it never shows a dot-separated locale time
