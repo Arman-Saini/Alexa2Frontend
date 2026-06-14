@@ -38,7 +38,7 @@ function AlexaRing({ onVoiceSubmit }: { onVoiceSubmit: (text: string) => void })
   const [interimText, setInterimText] = useState('');
   const executeVoiceCommand = useAppStore((s) => s.executeVoiceCommand);
   const addNotification = useAppStore((s) => s.addNotification);
-  const { sendAudio, sendMockText, isProcessing } = useBackendVoice();
+  const { sendMockText, isProcessing } = useBackendVoice();
   const inputRef = useRef<HTMLInputElement>(null);
 
   const speak = (text: string) => {
@@ -56,7 +56,6 @@ function AlexaRing({ onVoiceSubmit }: { onVoiceSubmit: (text: string) => void })
     window.speechSynthesis.speak(utt);
   };
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recognitionRef = useRef<any>(null);
   const isListening = ui.isListeningVoice;
