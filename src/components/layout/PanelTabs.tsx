@@ -1,31 +1,82 @@
 import { useAppStore } from '../../store/store';
 import type { ActivePanel } from '../../types';
 
-const TABS: { id: ActivePanel; label: string; emoji: string }[] = [
-  { id: 'alexa', label: 'Alexa', emoji: '🔵' },
-  { id: 'library', label: 'Library', emoji: '📦' },
-  { id: 'inspector', label: 'Inspector', emoji: '🔍' },
+const TABS: { id: ActivePanel; label: string; icon: React.ReactNode }[] = [
+  {
+    id: 'alexa',
+    label: 'Alexa',
+    icon: (
+      <div
+        className="w-4 h-4 rounded-full flex items-center justify-center"
+        style={{
+          background: 'conic-gradient(from 0deg, #005580, #00A8E0, #00CAFF, #0080B0, #005580)',
+        }}
+      >
+        <div className="w-2.5 h-2.5 rounded-full bg-[#1A1A1A]" />
+      </div>
+    ),
+  },
+  {
+    id: 'library',
+    label: 'Library',
+    icon: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+      </svg>
+    ),
+  },
+  {
+    id: 'inspector',
+    label: 'Inspector',
+    icon: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+      </svg>
+    ),
+  },
 ];
 
 export function PanelTabs() {
-  const { ui, setActivePanel } = useAppStore();
+  const { ui, setActivePanel, notifications } = useAppStore();
+  const hasSelected = !!ui.selectedObjectId;
+  const unreadNotifs = notifications.length;
 
   return (
-    <div className="flex border-b border-alexa-card shrink-0">
-      {TABS.map((tab) => (
-        <button
-          key={tab.id}
-          onClick={() => setActivePanel(tab.id)}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium transition-colors ${
-            ui.activePanel === tab.id
-              ? 'bg-alexa-dark text-alexa-blue border-b-2 border-alexa-blue'
-              : 'bg-alexa-panel text-gray-400 hover:text-white'
-          }`}
-        >
-          <span>{tab.emoji}</span>
-          <span>{tab.label}</span>
-        </button>
-      ))}
+    <div className="flex bg-[#1A1A1A] border-b border-[#383838] shrink-0">
+      {TABS.map((tab) => {
+        const isActive = ui.activePanel === tab.id;
+        return (
+          <button
+            key={tab.id}
+            onClick={() => setActivePanel(tab.id)}
+            className={`relative flex-1 flex flex-col items-center justify-center gap-1 py-2.5 text-[10px] font-medium transition-all ${
+              isActive
+                ? 'text-[#00A8E0] bg-[#121212]'
+                : 'text-[#8A8A8A] hover:text-white hover:bg-[#242424]'
+            }`}
+          >
+            <span className={isActive ? 'text-[#00A8E0]' : 'text-[#8A8A8A]'}>{tab.icon}</span>
+            <span className="uppercase tracking-wider">{tab.label}</span>
+
+            {/* Active underline */}
+            {isActive && (
+              <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-6 h-0.5 bg-[#00A8E0] rounded-t" />
+            )}
+
+            {/* Badge: notification count on Alexa tab */}
+            {tab.id === 'alexa' && unreadNotifs > 0 && !isActive && (
+              <span className="absolute top-1.5 right-3 w-3.5 h-3.5 bg-[#F44336] rounded-full text-[8px] font-bold text-white flex items-center justify-center">
+                {unreadNotifs > 9 ? '9+' : unreadNotifs}
+              </span>
+            )}
+
+            {/* Badge: selection indicator on Inspector tab */}
+            {tab.id === 'inspector' && hasSelected && !isActive && (
+              <span className="absolute top-1.5 right-3 w-2 h-2 bg-[#00A8E0] rounded-full" />
+            )}
+          </button>
+        );
+      })}
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { PanelTabs } from './components/layout/PanelTabs';
 import { AssetLibraryPanel } from './components/panels/AssetLibraryPanel';
 import { InspectorPanel } from './components/panels/InspectorPanel';
 import { AlexaAppSimView } from './components/panels/AlexaAppSimView';
+import { useSimulation } from './hooks/useSimulation';
 
 const DigitalTwinCanvas = lazy(() =>
   import('./components/canvas/DigitalTwinCanvas').then((m) => ({ default: m.DigitalTwinCanvas }))
@@ -16,7 +17,7 @@ function RightPanel() {
   return (
     <div className="flex flex-col h-full">
       <PanelTabs />
-      <div className="flex-1 overflow-y-auto overflow-x-hidden">
+      <div className="flex-1 overflow-hidden">
         {activePanel === 'alexa' && <AlexaAppSimView />}
         {activePanel === 'library' && <AssetLibraryPanel />}
         {activePanel === 'inspector' && <InspectorPanel />}
@@ -27,32 +28,51 @@ function RightPanel() {
 
 function CanvasLoader() {
   return (
-    <div className="w-full h-full flex items-center justify-center bg-alexa-dark">
+    <div className="w-full h-full flex items-center justify-center bg-[#080810]">
       <div className="text-center">
-        <div className="text-4xl mb-3 animate-pulse">🏠</div>
-        <p className="text-alexa-blue text-sm">Loading Digital Twin...</p>
+        <div
+          className="w-16 h-16 rounded-full mx-auto mb-4 animate-spin"
+          style={{
+            background: 'conic-gradient(from 0deg, #005580, #00A8E0, #00CAFF, transparent)',
+          }}
+        />
+        <p className="text-[#00A8E0] text-sm font-semibold">Loading Digital Twin...</p>
+        <p className="text-[#555] text-xs mt-1">Initializing 3D environment</p>
       </div>
     </div>
   );
 }
 
-export default function App() {
+function AppContent() {
+  // Wire up real-time sensor simulation (2-second tick)
+  useSimulation(2000);
+
   return (
-    <div className="flex flex-col w-full h-full bg-alexa-dark">
+    <div className="flex flex-col w-full h-full bg-[#121212]">
       <Header />
       <div className="flex flex-1 overflow-hidden">
-        {/* 3D Canvas — main content area */}
+        {/* 3D Canvas */}
         <div className="flex-1 relative overflow-hidden">
           <Suspense fallback={<CanvasLoader />}>
             <DigitalTwinCanvas />
           </Suspense>
         </div>
 
-        {/* Right panel — fixed 320px */}
-        <div className="w-80 shrink-0 bg-alexa-panel border-l border-alexa-card flex flex-col overflow-hidden">
+        {/* Right panel — Alexa app simulation */}
+        <div
+          className="w-80 shrink-0 flex flex-col overflow-hidden"
+          style={{
+            background: '#1A1A1A',
+            borderLeft: '1px solid #383838',
+          }}
+        >
           <RightPanel />
         </div>
       </div>
     </div>
   );
+}
+
+export default function App() {
+  return <AppContent />;
 }

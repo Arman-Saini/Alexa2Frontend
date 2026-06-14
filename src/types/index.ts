@@ -13,21 +13,40 @@ export type AlexaDeviceType =
   | 'thermostat'
   | 'smart-lock'
   | 'camera'
-  | 'smoke-detector';
+  | 'smoke-detector'
+  | 'smart-tv'
+  | 'ceiling-fan'
+  | 'doorbell'
+  | 'air-purifier';
 
-export type FurnitureType = 'sofa' | 'bed' | 'table' | 'chair' | 'tv-stand' | 'bookshelf' | 'bathtub' | 'desk';
+export type FurnitureType =
+  | 'sofa'
+  | 'bed'
+  | 'table'
+  | 'chair'
+  | 'tv-stand'
+  | 'bookshelf'
+  | 'bathtub'
+  | 'desk'
+  | 'plant'
+  | 'wardrobe';
 
 export type AssetType = AlexaDeviceType | FurnitureType;
 
 export interface AlexaDeviceState {
   isOn: boolean;
   brightness?: number;       // 0-100
+  colorTemp?: number;        // 2700-6500K
   temperature?: number;      // °C
   humidity?: number;         // %
   motionDetected?: boolean;
   powerConsumption?: number; // Watts
   batteryLevel?: number;     // %
   isLocked?: boolean;
+  volume?: number;           // 0-100
+  speed?: number;            // fan speed 1-5
+  airQuality?: number;       // 0-500 AQI
+  channel?: number;
 }
 
 export interface PlacedObject {
@@ -46,15 +65,18 @@ export interface PlacedObject {
 export interface Room {
   id: string;
   name: string;
+  icon: string;
   width: number;
   depth: number;
   height: number;
   position: Vec3;
   color: string;
   floorColor: string;
+  wallColor: string;
 }
 
 export type ActivePanel = 'alexa' | 'inspector' | 'library';
+export type AlexaTab = 'home' | 'devices' | 'routines';
 
 export interface UIState {
   activeRoomId: string | null;
@@ -63,4 +85,32 @@ export interface UIState {
   placementAssetType: AssetType | null;
   isPlacementMode: boolean;
   hoveredRoomId: string | null;
+  alexaTab: AlexaTab;
+  showMiniMap: boolean;
+  isListeningVoice: boolean;
+}
+
+export interface AlexaNotification {
+  id: string;
+  message: string;
+  type: 'info' | 'alert' | 'success' | 'warning';
+  timestamp: number;
+  deviceId?: string;
+}
+
+export interface Routine {
+  id: string;
+  name: string;
+  emoji: string;
+  triggerLabel: string;
+  isEnabled: boolean;
+  lastRun?: number;
+}
+
+export interface Scene {
+  id: string;
+  name: string;
+  emoji: string;
+  description: string;
+  color: string;
 }
