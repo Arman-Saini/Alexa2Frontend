@@ -82,8 +82,8 @@ function TwinModePill({ mode }: { mode: string }) {
 }
 
 export function AnticipationsPanel() {
-  const { anticipations, loading, refetch } = useAnticipations();
-  const twinData = useDigitalTwin();
+  const { anticipations, loading, error: anticipationsError, refetch } = useAnticipations();
+  const { twinData } = useDigitalTwin();
   const simulate = useSimulateMode();
 
   return (
@@ -118,9 +118,9 @@ export function AnticipationsPanel() {
         <div className="flex flex-col gap-1.5">
           {(
             [
-              { id: 'study_mode', emoji: '📚', label: 'Study Mode' },
-              { id: 'night_safety_check', emoji: '🌙', label: 'Night Safety' },
-              { id: 'power_cut', emoji: '⚡', label: 'Power Cut' },
+              { id: 'studyMode', emoji: '📚', label: 'Study Mode' },
+              { id: 'nightSafetyCheck', emoji: '🌙', label: 'Night Safety' },
+              { id: 'powerCut', emoji: '⚡', label: 'Power Cut' },
             ] as const
           ).map(({ id, emoji, label }) => (
             <button
@@ -156,6 +156,9 @@ export function AnticipationsPanel() {
           </button>
         </div>
 
+        {anticipationsError && (
+          <div className="text-[10px] text-[#F87171] px-1 mb-1">{anticipationsError}</div>
+        )}
         {anticipations.length === 0 && !loading && (
           <div
             className="flex flex-col items-center justify-center gap-2 py-8 rounded-xl border"

@@ -1,129 +1,90 @@
+// React hooks that wrap the API modules with loading/error state.
+// Components import from here — never call apiClient directly in UI code.
+
 import { useState, useEffect, useCallback } from 'react';
+import { homeApi, voiceApi, simulateApi } from '../api';
+import type { Anticipation, DigitalTwinResponse, SimulateEndpoint } from '../api';
+import { ApiError } from '../api';
+import { env } from '../config/env';
 import { useAppStore } from '../store/store';
 
-const BACKEND = (import.meta as { env?: Record<string, string> }).env?.VITE_BACKEND_URL ?? 'http://localhost:3001';
-const HOME_ID = 'home_001';
+// Re-export types so existing consumers don't need to change imports
+export type { Anticipation, DigitalTwinResponse as DigitalTwinData };
 
-export interface Anticipation {
-  action: string;
-  reason: string;
-  tier: string;
-  confidence: number;
-  trigger_window?: string;
-}
-
-export interface DigitalTwinData {
-  current_mode: string;
-  mode_info: { label: string; color: string; description: string };
-  available_modes: Array<{ mode: string; label: string; description: string; color: string }>;
-  rooms: Array<{
-    id: string;
-    name: string;
-    device_count: number;
-    on_count: number;
-  }>;
-}
+// ── Anticipations ─────────────────────────────────────────────────────────────
 
 export function useAnticipations() {
   const [anticipations, setAnticipations] = useState<Anticipation[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const fetch_ = useCallback(() => {
+  const fetch_ = useCallback(async () => {
     setLoading(true);
-    fetch(`${BACKEND}/api/homes/${HOME_ID}/anticipations`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (Array.isArray(data.anticipations)) {
-          setAnticipations(data.anticipations);
-        }
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    setError(null);
+    try {
+      const data = await homeApi.getAnticipations();
+      setAnticipations(data.anticipations ?? []);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to load anticipations');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
     fetch_();
-    const id = setInterval(fetch_, 30_000);
+    const id = setInterval(fetch_, env.POLL_INTERVAL_MS);
     return () => clearInterval(id);
   }, [fetch_]);
 
-  return { anticipations, loading, refetch: fetch_ };
+  return { anticipations, loading, error, refetch: fetch_ };
 }
 
+// ── Digital Twin State ────────────────────────────────────────────────────────
+
 export function useDigitalTwin() {
-  const [twinData, setTwinData] = useState<DigitalTwinData | null>(null);
+  const [twinData, setTwinData] = useState<DigitalTwinResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchTwin = () => {
-      fetch(`${BACKEND}/api/homes/${HOME_ID}/twin`)
-        .then((r) => r.json())
-        .then((data) => setTwinData(data))
-        .catch(() => {});
+    const fetchTwin = async () => {
+      try {
+        const data = await homeApi.getDigitalTwin();
+        setTwinData(data);
+        setError(null);
+      } catch (err) {
+        setError(err instanceof ApiError ? err.message : 'Backend offline');
+      }
     };
 
     fetchTwin();
-    const id = setInterval(fetchTwin, 30_000);
+    const id = setInterval(fetchTwin, env.POLL_INTERVAL_MS);
     return () => clearInterval(id);
   }, []);
 
-  return twinData;
+  return { twinData, error };
 }
+
+// ── Backend Voice ─────────────────────────────────────────────────────────────
 
 export function useBackendVoice() {
   const [isProcessing, setIsProcessing] = useState(false);
   const addNotification = useAppStore((s) => s.addNotification);
   const executeVoiceCommand = useAppStore((s) => s.executeVoiceCommand);
 
-  const sendAudio = useCallback(
-    async (audioBlob: Blob): Promise<{ transcript: string; response: string } | null> => {
-      setIsProcessing(true);
-      try {
-        const formData = new FormData();
-        formData.append('audio', audioBlob, 'voice.webm');
-        formData.append('auto_route', 'true');
-        formData.append('language', 'en-IN');
-
-        const res = await fetch(`${BACKEND}/api/voice/transcribe`, {
-          method: 'POST',
-          body: formData,
-        });
-        const data = await res.json();
-
-        if (data.transcript) {
-          const response = executeVoiceCommand(data.transcript);
-          addNotification(`🎤 "${data.transcript}" → ${response}`, 'info');
-          return { transcript: data.transcript, response };
-        }
-        return null;
-      } catch {
-        return null;
-      } finally {
-        setIsProcessing(false);
-      }
-    },
-    [executeVoiceCommand, addNotification]
-  );
-
   const sendMockText = useCallback(
     async (text: string): Promise<{ transcript: string; response: string } | null> => {
       setIsProcessing(true);
       try {
-        const res = await fetch(`${BACKEND}/api/voice/transcribe`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ mock_text: text, auto_route: true }),
-        });
-        const data = await res.json();
-
-        if (data.transcript || data.event_result) {
-          const localResponse = executeVoiceCommand(text);
-          addNotification(`🎤 "${text}" → processed`, 'success');
-          return { transcript: text, response: localResponse };
-        }
-        return null;
+        const data = await voiceApi.transcribeMockText(text, true);
+        // Mirror the backend action in local state so the 3D scene updates immediately
+        const localResponse = executeVoiceCommand(data.transcript ?? text);
+        addNotification(`🎤 "${data.transcript ?? text}" → routed via backend`, 'success');
+        return { transcript: data.transcript ?? text, response: localResponse };
       } catch {
-        // Backend offline — fall back to local NLU
+        // Backend offline — degrade gracefully to local NLU
         const response = executeVoiceCommand(text);
+        addNotification(`🎤 "${text}" → local NLU (backend offline)`, 'info');
         return { transcript: text, response };
       } finally {
         setIsProcessing(false);
@@ -132,27 +93,52 @@ export function useBackendVoice() {
     [executeVoiceCommand, addNotification]
   );
 
-  return { sendAudio, sendMockText, isProcessing };
+  const sendAudio = useCallback(
+    async (audioBlob: Blob): Promise<{ transcript: string; response: string } | null> => {
+      setIsProcessing(true);
+      try {
+        const data = await voiceApi.transcribeAudio(audioBlob, true);
+        if (!data.transcript) return null;
+        const localResponse = executeVoiceCommand(data.transcript);
+        addNotification(`🎤 "${data.transcript}"`, 'success');
+        return { transcript: data.transcript, response: localResponse };
+      } catch (err) {
+        addNotification(
+          `Audio transcription failed: ${err instanceof ApiError ? err.message : 'Unknown error'}`,
+          'alert'
+        );
+        return null;
+      } finally {
+        setIsProcessing(false);
+      }
+    },
+    [executeVoiceCommand, addNotification]
+  );
+
+  return { sendMockText, sendAudio, isProcessing };
 }
+
+// ── Simulate Events ───────────────────────────────────────────────────────────
 
 export function useSimulateMode() {
   const addNotification = useAppStore((s) => s.addNotification);
 
   const simulate = useCallback(
-    async (endpoint: 'study_mode' | 'night_safety_check' | 'power_cut') => {
+    async (endpoint: SimulateEndpoint) => {
       try {
-        const res = await fetch(`${BACKEND}/api/simulate/${endpoint}`, { method: 'POST' });
-        const data = await res.json();
-        const label =
-          endpoint === 'study_mode'
-            ? 'Study Mode'
-            : endpoint === 'night_safety_check'
-            ? 'Night Safety Check'
-            : 'Power Cut Simulation';
-        addNotification(`⚡ ${label} simulated — ${data.message ?? 'done'}`, 'info');
+        const data = await simulateApi[endpoint]();
+        const labels: Record<SimulateEndpoint, string> = {
+          studyMode: 'Study Mode',
+          nightSafetyCheck: 'Night Safety Check',
+          powerCut: 'Power Cut Simulation',
+        };
+        addNotification(`⚡ ${labels[endpoint]} — ${data.message ?? 'done'}`, 'info');
         return data;
-      } catch {
-        addNotification('Backend offline — simulation skipped', 'warning');
+      } catch (err) {
+        addNotification(
+          err instanceof ApiError ? `Simulate failed: ${err.message}` : 'Backend offline — simulation skipped',
+          'warning'
+        );
         return null;
       }
     },
