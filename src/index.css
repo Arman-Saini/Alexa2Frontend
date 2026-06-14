@@ -1,0 +1,40 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+  background: #0d0d1a;
+  color: #e2e8f0;
+}
+
+/* Custom scrollbar for dark panels */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: #1a1a2e;
+}
+::-webkit-scrollbar-thumb {
+  background: #533483;
+  border-radius: 2px;
+}
+
+/* Canvas cursor states */
+.canvas-placement {
+  cursor: crosshair !important;
+}
+.canvas-hover {
+  cursor: pointer !important;
+}
