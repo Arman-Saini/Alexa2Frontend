@@ -32,7 +32,7 @@ function AlexaRing({ onVoiceSubmit }: { onVoiceSubmit: (text: string) => void })
   const { ui, setListeningVoice } = useAppStore();
   const [inputText, setInputText] = useState('');
   const [response, setResponse] = useState('');
-  const [backendMode, setBackendMode] = useState(false);
+  const [backendMode, setBackendMode] = useState(true);
   const [isRecording, setIsRecording] = useState(false);
   const [micError, setMicError] = useState<string | null>(null);
   const [interimText, setInterimText] = useState('');
@@ -67,115 +67,85 @@ function AlexaRing({ onVoiceSubmit }: { onVoiceSubmit: (text: string) => void })
     setResponse('');
     setListeningVoice(true);
 
-    if (backendMode) {
-      // Backend mode: MediaRecorder → blob → POST /api/voice/transcribe
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const recorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
-        mediaRecorderRef.current = recorder;
-        chunksRef.current = [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const SpeechRecognitionClass = (window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition;
 
-        recorder.ondataavailable = (e) => {
-          if (e.data.size > 0) chunksRef.current.push(e.data);
-        };
+    if (!SpeechRecognitionClass) {
+      setIsRecording(false);
+      setListeningVoice(false);
+      setTimeout(() => inputRef.current?.focus(), 100);
+      return;
+    }
 
-        recorder.onstop = async () => {
-          stream.getTracks().forEach((t) => t.stop());
-          const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
-          const result = await sendAudio(blob);
-          if (result) {
-            setResponse(result.response);
-            onVoiceSubmit(result.transcript);
-          }
-          setIsRecording(false);
-          setListeningVoice(false);
-        };
+    const recognition = new SpeechRecognitionClass();
+    recognitionRef.current = recognition;
+    recognition.lang = 'en-US';
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
 
-        recorder.start();
-        setIsRecording(true);
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Microphone access denied';
-        setMicError(msg);
-        setListeningVoice(false);
-        addNotification('🎤 ' + msg, 'alert');
+    recognition.onresult = async (event: SpeechRecognitionEvent) => {
+      let interim = '';
+      let final = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        if (event.results[i].isFinal) final += event.results[i][0].transcript;
+        else interim += event.results[i][0].transcript;
       }
-    } else {
-      // Local mode: Web Speech API (Chrome/Edge built-in STT, no backend needed)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const SpeechRecognitionClass = (window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition;
-
-      if (!SpeechRecognitionClass) {
-        // Fallback: show text input if browser doesn't support Web Speech API
+      setInterimText(interim);
+      if (final) {
+        const cleaned = final.replace(/^(hey\s+)?alexa[,\s]*/i, '').trim() || final.trim();
+        recognition.stop();
         setIsRecording(false);
-        setTimeout(() => inputRef.current?.focus(), 100);
-        return;
-      }
-
-      const recognition = new SpeechRecognitionClass();
-      recognitionRef.current = recognition;
-      recognition.lang = 'en-US';
-      recognition.continuous = true;
-      recognition.interimResults = true;
-      recognition.maxAlternatives = 1;
-
-      recognition.onresult = (event: SpeechRecognitionEvent) => {
-        let interim = '';
-        let final = '';
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          if (event.results[i].isFinal) {
-            final += event.results[i][0].transcript;
-          } else {
-            interim += event.results[i][0].transcript;
-          }
-        }
-        setInterimText(interim);
-        if (final) {
-          // Strip "Alexa" / "Hey Alexa" wake word prefix if present
-          const cleaned = final.replace(/^(hey\s+)?alexa[,\s]*/i, '').trim() || final.trim();
+        setListeningVoice(false);
+        setInterimText('');
+        if (backendMode) {
+          // Browser STT transcript → backend T0/T1/T3 pipeline
+          const result = await sendMockText(cleaned);
+          const resp = result?.response ?? cleaned;
+          speak(resp);
+          setResponse(resp);
+          onVoiceSubmit(cleaned);
+        } else {
           const result = executeVoiceCommand(cleaned);
           speak(result);
           setResponse(result);
-          setInterimText('');
           onVoiceSubmit(cleaned);
-          recognition.stop();
-          setListeningVoice(false);
-          setIsRecording(false);
         }
-      };
-
-      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-        if (event.error === 'no-speech') {
-          // Retry silently — keep listening state, just clear interim
-          setInterimText('');
-          return;
-        }
-        const msg = event.error === 'not-allowed'
-          ? 'Mic denied — click the lock icon in your browser address bar'
-          : event.error === 'network'
-          ? 'Network error — check internet connection'
-          : `Voice error: ${event.error}`;
-        setMicError(msg);
-        setIsRecording(false);
-        setListeningVoice(false);
-        addNotification('🎤 ' + msg, 'alert');
-      };
-
-      recognition.onend = () => {
-        // With continuous=true, restart if still supposed to be listening
-        if (isRecording) {
-          try { recognition.start(); } catch { /* already stopped */ }
-          return;
-        }
-        setIsRecording(false);
-        setListeningVoice(false);
-      };
-
-      try {
-        recognition.start();
-        setIsRecording(true);
-      } catch {
-        setTimeout(() => inputRef.current?.focus(), 100);
       }
+    };
+
+    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+      if (event.error === 'no-speech') { setInterimText(''); return; }
+      if (event.error === 'network') {
+        // Chrome STT couldn't reach Google — fall back to text input silently
+        setIsRecording(false);
+        setListeningVoice(false);
+        setTimeout(() => inputRef.current?.focus(), 100);
+        return;
+      }
+      const msg = event.error === 'not-allowed'
+        ? 'Mic denied — click the lock icon in your browser address bar'
+        : `Voice error: ${event.error}`;
+      setMicError(msg);
+      setIsRecording(false);
+      setListeningVoice(false);
+      addNotification('🎤 ' + msg, 'alert');
+    };
+
+    recognition.onend = () => {
+      if (isRecording) {
+        try { recognition.start(); } catch { /* already stopped */ }
+        return;
+      }
+      setIsRecording(false);
+      setListeningVoice(false);
+    };
+
+    try {
+      recognition.start();
+      setIsRecording(true);
+    } catch {
+      setTimeout(() => inputRef.current?.focus(), 100);
     }
   };
 
