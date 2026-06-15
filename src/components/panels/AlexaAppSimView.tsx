@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { useAppStore } from '../../store/store';
 import { ASSET_MAP } from '../../constants/assets';
 import { useBackendVoice } from '../../hooks/useBackendApi';
+import { voiceApi } from '../../api';
 import type { PlacedObject, AlexaNotification } from '../../types';
 
 // ── Top Status Bar ────────────────────────────────────────────────────────────
@@ -41,19 +42,48 @@ function AlexaRing({ onVoiceSubmit }: { onVoiceSubmit: (text: string) => void })
   const { sendMockText, isProcessing } = useBackendVoice();
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Cross-browser speechSynthesis: Firefox loads voices async via onvoiceschanged
   const speak = (text: string) => {
     if (!window.speechSynthesis) return;
-    window.speechSynthesis.cancel();
     const utt = new SpeechSynthesisUtterance(text);
     utt.lang = 'en-IN';
     utt.rate = 0.88;
     utt.pitch = 1.1;
     utt.volume = 0.92;
-    // Prefer an Indian English voice if available
-    const voices = window.speechSynthesis.getVoices();
-    const preferred = voices.find(v => v.lang === 'en-IN') ?? voices.find(v => v.lang.startsWith('en'));
-    if (preferred) utt.voice = preferred;
-    window.speechSynthesis.speak(utt);
+
+    const doSpeak = () => {
+      const voices = window.speechSynthesis.getVoices();
+      const preferred = voices.find(v => v.lang === 'en-IN') ?? voices.find(v => v.lang.startsWith('en'));
+      if (preferred) utt.voice = preferred;
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(utt);
+    };
+
+    if (window.speechSynthesis.getVoices().length > 0) {
+      doSpeak();
+    } else {
+      // Firefox: voices aren't ready synchronously — wait for the event
+      window.speechSynthesis.onvoiceschanged = () => {
+        window.speechSynthesis.onvoiceschanged = null;
+        doSpeak();
+      };
+    }
+  };
+
+  // Polly TTS via backend — audio/mpeg base64 works in every browser.
+  // Falls back to speechSynthesis if the backend is offline.
+  const speakPolly = async (text: string) => {
+    try {
+      const result = await voiceApi.synthesise(text, 'kajal');
+      if (result.audio_base64) {
+        const audio = new Audio(`data:audio/mpeg;base64,${result.audio_base64}`);
+        audio.play().catch(() => speak(text));
+        return;
+      }
+    } catch {
+      // backend offline — degrade to browser TTS
+    }
+    speak(text);
   };
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -101,7 +131,7 @@ function AlexaRing({ onVoiceSubmit }: { onVoiceSubmit: (text: string) => void })
           // Browser STT transcript → backend T0/T1/T3 pipeline
           const result = await sendMockText(cleaned);
           const resp = result?.response ?? cleaned;
-          speak(resp);
+          speakPolly(resp);
           setResponse(resp);
           onVoiceSubmit(cleaned);
         } else {
@@ -177,7 +207,7 @@ function AlexaRing({ onVoiceSubmit }: { onVoiceSubmit: (text: string) => void })
     if (backendMode) {
       const result = await sendMockText(text);
       const resp = result?.response ?? 'Sent to backend.';
-      speak(resp);
+      speakPolly(resp);
       setResponse(resp);
     } else {
       const result = executeVoiceCommand(text);
