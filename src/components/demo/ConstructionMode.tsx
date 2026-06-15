@@ -11,12 +11,12 @@ import { backendApi } from '../../api';
 const CONSTRUCTION_SYSTEM_HINT = `
 You are Alexa+ in Scenario Builder mode.
 The user will describe a home automation scenario or situation.
-Your job: extract a T0 automation rule. Ask ONE short clarifying question at a time if needed.
-When you have enough info, respond with ONLY valid JSON on one line:
+Your job: IMMEDIATELY extract a T0 automation rule from their input — fill in any gaps with sensible defaults.
+Never ask clarifying questions. Never say you need more info. Always produce the JSON rule.
+Respond with ONLY valid JSON on one line (no other text):
 {"description":"...","trigger_event":"...","action":"...","confidence":0.9}
-Otherwise respond with a friendly clarifying question (max 1 sentence).
 Indian home context: LPG, geyser, pressure cooker, inverter, pooja room, water motor, ceiling fan.
-Keep ALL responses under 2 sentences. Never use markdown.`;
+If unsure, make a reasonable assumption and set confidence lower (0.7). Never use markdown.`;
 
 interface Message {
   role: 'user' | 'alexa';
@@ -108,6 +108,7 @@ export function ConstructionMode({ onBack }: Props) {
   const [pendingRule, setPendingRule] = useState<PendingRule | null>(null);
   const [applied, setApplied]       = useState(false);
   const [thinking, setThinking]     = useState(false);
+  const [awaitingRefinement, setAwaitingRefinement] = useState(false);
   const weatherRef = useRef<WeatherInfo | null>(null);
   const listRef    = useRef<HTMLDivElement>(null);
   const tts = useTTSBest();
@@ -129,15 +130,29 @@ export function ConstructionMode({ onBack }: Props) {
     const trimmed = text.trim();
     if (!trimmed) return;
     setInput('');
+
+    // Handle yes/no to refinement offer
+    if (awaitingRefinement) {
+      setAwaitingRefinement(false);
+      const lower = trimmed.toLowerCase();
+      if (lower.startsWith('n') || lower === 'no' || lower === 'nope' || lower === 'done') {
+        addMessage('user', trimmed);
+        const msg = 'Perfect! Your rule is ready — click "Add to T0 Chain" to activate it.';
+        addMessage('alexa', msg);
+        tts.speak(msg);
+        return;
+      }
+      // "yes" — fall through to normal flow so user can refine
+    }
+
     addMessage('user', trimmed);
     setThinking(true);
 
-    // Inject construction hint into askGroq via a prefixed transcript
     const augmented = `[CONSTRUCTION MODE]\nUser: ${trimmed}\n${CONSTRUCTION_SYSTEM_HINT}`;
     const groq = await askGroq(augmented, weatherRef.current);
     setThinking(false);
 
-    let responseText = groq.response || 'Could you describe the situation in a bit more detail?';
+    const responseText = groq.response ?? '';
 
     // Try to parse JSON rule from the response
     try {
@@ -147,16 +162,31 @@ export function ConstructionMode({ onBack }: Props) {
         if (parsed.trigger_event && parsed.action) {
           setPendingRule(parsed);
           setApplied(false);
-          responseText = `Got it! Here\'s your T0 rule. Review it on the right, then click "Add to T0 Chain" to activate it.`;
+          const ruleMsg = 'Got it! Here\'s your T0 rule. Would you like to add more detail, or is this good to go?';
+          setAwaitingRefinement(true);
+          addMessage('alexa', ruleMsg);
+          tts.speak(ruleMsg);
+          return;
         }
       }
     } catch {
-      // not JSON, keep as plain text response
+      // not JSON
     }
 
-    addMessage('alexa', responseText);
-    tts.speak(responseText);
-  }, [addMessage, tts]);
+    // Fallback: LLM didn't produce JSON — generate a rule from the raw input anyway
+    const fallbackRule: PendingRule = {
+      description: trimmed,
+      trigger_event: trimmed,
+      action: 'notify user',
+      confidence: 0.6,
+    };
+    setPendingRule(fallbackRule);
+    setApplied(false);
+    setAwaitingRefinement(true);
+    const fallbackMsg = 'I\'ve built a basic rule from your description. Would you like to add more detail, or is this good to go?';
+    addMessage('alexa', fallbackMsg);
+    tts.speak(fallbackMsg);
+  }, [addMessage, tts, awaitingRefinement]);
 
   const handleApplyRule = useCallback(async () => {
     if (!pendingRule) return;
@@ -319,6 +349,16 @@ export function ConstructionMode({ onBack }: Props) {
                 Send
               </button>
             </form>
+            {awaitingRefinement && (
+              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                <button onClick={() => handleUserInput('yes')} style={{ flex: 1, padding: '6px 0', background: C.cyanBg, border: `1px solid ${C.cyanDim}`, color: C.cyan, borderRadius: 6, cursor: 'pointer', fontSize: F.xs, fontWeight: 700 }}>
+                  Yes, refine it
+                </button>
+                <button onClick={() => handleUserInput('no')} style={{ flex: 1, padding: '6px 0', background: C.greenBg, border: `1px solid ${C.greenDim}`, color: C.green, borderRadius: 6, cursor: 'pointer', fontSize: F.xs, fontWeight: 700 }}>
+                  No, looks good
+                </button>
+              </div>
+            )}
             <div style={{ marginTop: 6, fontSize: F.badge, color: C.text3 }}>
               {mic.listening ? '🔴 Listening…' : 'Press mic or type to describe your scenario'}
             </div>
