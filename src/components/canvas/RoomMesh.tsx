@@ -1,17 +1,27 @@
-import { useRef, useMemo } from 'react';
+import { useRef } from 'react';
 import { type ThreeEvent, useFrame } from '@react-three/fiber';
-import { Text } from '@react-three/drei';
 import * as THREE from 'three';
 import { useAppStore } from '../../store/store';
 import type { Room } from '../../types';
 
-// Sims-style vibrant floor palettes
+// Scenario → rooms that get a colored floor tint overlay
+const SCENARIO_TINTS: Record<string, { rooms: string[]; color: string; maxOpacity: number }> = {
+  jeera:    { rooms: ['kitchen'],                                                             color: '#FF6600', maxOpacity: 0.22 },
+  pressure: { rooms: ['kitchen'],                                                             color: '#22FF88', maxOpacity: 0.15 },
+  grid:     { rooms: ['living-room','kitchen','master-bedroom','bathroom','office'],           color: '#FF0000', maxOpacity: 0.20 },
+  pooja:    { rooms: ['master-bedroom'],                                                      color: '#FFB020', maxOpacity: 0.22 },
+  geyser:   { rooms: ['bathroom'],                                                            color: '#FF2200', maxOpacity: 0.28 },
+  away:     { rooms: ['living-room'],                                                         color: '#00C8FF', maxOpacity: 0.18 },
+};
+
+// Warm Indian home floor palettes , deepened for the dark cinematic mood so the
+// warm pendants, device glow and room orbs read against a rich (not bright) floor.
 const FLOOR_PALETTES: Record<string, { floor: string; active: string; accent: string }> = {
-  'living-room':    { floor: '#C8894A', active: '#E8A860', accent: '#A06830' },
-  kitchen:          { floor: '#5AAAC0', active: '#7ACCDE', accent: '#3888A0' },
-  'master-bedroom': { floor: '#A060C0', active: '#C080E0', accent: '#7840A0' },
-  bathroom:         { floor: '#48B888', active: '#60D8A8', accent: '#309868' },
-  office:           { floor: '#A8A830', active: '#C8C848', accent: '#808010' },
+  'living-room':    { floor: '#5A4632', active: '#806546', accent: '#6A523A' },
+  kitchen:          { floor: '#565243', active: '#7A7460', accent: '#6A6452' },
+  'master-bedroom': { floor: '#473729', active: '#65503A', accent: '#564636' },
+  bathroom:         { floor: '#52565C', active: '#727880', accent: '#5E646A' },
+  office:           { floor: '#4E4634', active: '#6E6448', accent: '#5C5440' },
 };
 
 interface RoomMeshProps {
@@ -23,8 +33,10 @@ interface RoomMeshProps {
 export function RoomMesh({ room, isActive, isHovered }: RoomMeshProps) {
   const groupRef   = useRef<THREE.Group>(null);
   const floorRef   = useRef<THREE.MeshStandardMaterial>(null);
+  const tintRef    = useRef<THREE.MeshBasicMaterial>(null);
 
-  const { setActiveRoom, setHoveredRoom, ui, placedObjects } = useAppStore();
+  const { setActiveRoom, setHoveredRoom, ui } = useAppStore();
+  const activeScenarioId = useAppStore(s => s.activeScenarioId);
   const { activeRoomId } = ui;
 
   const hw = room.width  / 2;
@@ -32,14 +44,11 @@ export function RoomMesh({ room, isActive, isHovered }: RoomMeshProps) {
 
   const palette = FLOOR_PALETTES[room.id] ?? { floor: room.floorColor, active: '#4a90d9', accent: '#888' };
 
-  const onDevices = useMemo(
-    () => placedObjects.filter(o => o.isAlexaDevice && o.parentRoomId === room.id && o.alexaDeviceState.isOn),
-    [placedObjects, room.id]
-  );
-  const totalWatts = useMemo(
-    () => onDevices.reduce((s, o) => s + (o.alexaDeviceState.powerConsumption ?? 0), 0),
-    [onDevices]
-  );
+  // Determine if this room has a scenario tint active
+  const scenarioTint = activeScenarioId ? SCENARIO_TINTS[activeScenarioId] ?? null : null;
+  const isTintTarget = scenarioTint ? scenarioTint.rooms.includes(room.id) : false;
+  const tintColor    = scenarioTint?.color ?? '#FFFFFF';
+  const tintTarget   = isTintTarget ? scenarioTint!.maxOpacity : 0;
 
   // "Sink" targets: non-active rooms drop below floor when another room is active
   const hasOtherActive = !!activeRoomId && !isActive;
@@ -54,6 +63,12 @@ export function RoomMesh({ room, isActive, isHovered }: RoomMeshProps) {
     }
     if (floorRef.current) {
       floorRef.current.opacity += (targetOp - floorRef.current.opacity) * t;
+    }
+    if (tintRef.current) {
+      tintRef.current.opacity += (tintTarget - tintRef.current.opacity) * t;
+      if (isTintTarget) {
+        tintRef.current.color.set(tintColor);
+      }
     }
   });
 
@@ -89,10 +104,22 @@ export function RoomMesh({ room, isActive, isHovered }: RoomMeshProps) {
         <meshStandardMaterial
           ref={floorRef}
           color={floorColor}
-          roughness={0.72}
-          metalness={0.02}
+          roughness={0.9}
+          metalness={0.0}
           transparent
           opacity={1}
+        />
+      </mesh>
+
+      {/* Scenario tint overlay , always mounted so opacity can animate smoothly */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.003, 0]}>
+        <planeGeometry args={[room.width, room.depth]} />
+        <meshBasicMaterial
+          ref={tintRef}
+          color={tintColor}
+          transparent
+          opacity={0}
+          depthWrite={false}
         />
       </mesh>
 
@@ -110,38 +137,6 @@ export function RoomMesh({ room, isActive, isHovered }: RoomMeshProps) {
           <planeGeometry args={[room.width, room.depth]} />
           <meshBasicMaterial color="#ffffff" transparent opacity={0.07} />
         </mesh>
-      )}
-
-      {/* ── Room label (no emoji — troika-three-text doesn't render emoji) */}
-      <Text
-        position={[0, 0.05, 0]}
-        rotation={[-Math.PI / 2, 0, 0]}
-        fontSize={isActive ? 0.52 : 0.42}
-        color={isActive ? '#ffffff' : isHovered ? '#ffffff' : '#ffffffcc'}
-        anchorX="center"
-        anchorY="middle"
-        maxWidth={room.width - 1}
-        outlineColor="#00000088"
-        outlineWidth={0.03}
-        letterSpacing={0.04}
-      >
-        {room.name.toUpperCase()}
-      </Text>
-
-      {/* ── Device activity badge — canvas-native Text, no Html ──────── */}
-      {onDevices.length > 0 && !isActive && (
-        <Text
-          position={[hw - 1.4, 0.06, -hd + 0.9]}
-          rotation={[-Math.PI / 2, 0, 0]}
-          fontSize={0.17}
-          color="#22DD66"
-          anchorX="center"
-          anchorY="middle"
-          outlineColor="#000000CC"
-          outlineWidth={0.018}
-        >
-          {`${onDevices.length} ON  ${totalWatts.toFixed(0)}W`}
-        </Text>
       )}
     </group>
   );

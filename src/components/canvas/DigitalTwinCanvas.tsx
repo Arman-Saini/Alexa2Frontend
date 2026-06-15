@@ -1,33 +1,82 @@
 import { Suspense, useEffect, useState, useCallback, useRef } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Environment, ContactShadows } from '@react-three/drei';
+import { EffectComposer, Bloom, Vignette, N8AO } from '@react-three/postprocessing';
 import * as THREE from 'three';
 import { useAppStore } from '../../store/store';
 import { House } from './House';
+import { RoomFurniture } from './RoomFurniture';
+import { EasterEggs } from './EasterEggs';
+import { speakNatural } from '../../utils/voice';
 import { Doors } from './Doors';
-import { HouseDecor } from './HouseDecor';
 import { CameraController } from './CameraController';
 import { MiniMap } from './MiniMap';
 import { SensorTooltip } from './SensorTooltip';
+import { DevicePanel } from './DevicePanel';
 import { SmartLights } from './SmartLights';
 import { GhostPreview } from './GhostPreview';
 import { sharedCameraRef, cameraTransitionRef } from './cameraRef';
 import { draggingObjectIdRef } from './dragRef';
+import { ScenarioReactor } from './ScenarioReactor';
+import { RoomWindows } from './RoomWindows';
+import { FurnitureInspector } from './FurnitureInspector';
+import { DoorInspector } from './DoorInspector';
+import { WindowInspector } from './WindowInspector';
 import type { AssetType } from '../../types';
 
+// Scenario overrides for SceneLighting , muted when ScenarioReactor takes over
+const SCENARIO_LIGHTING: Record<string, {
+  sunColor: string; sunInt: number; ambColor: string; ambInt: number; fogColor: string;
+}> = {
+  grid:  { sunColor: '#200010', sunInt: 0.12, ambColor: '#100010', ambInt: 0.06, fogColor: '#0A0010' },
+  pooja: { sunColor: '#FFB020', sunInt: 1.2,  ambColor: '#4A2800', ambInt: 0.22, fogColor: '#2A1800' },
+  geyser:{ sunColor: '#FF6020', sunInt: 1.4,  ambColor: '#1A0800', ambInt: 0.20, fogColor: '#1A0A08' },
+  jeera: { sunColor: '#FF8010', sunInt: 1.8,  ambColor: '#2A0800', ambInt: 0.18, fogColor: '#1A0800' },
+  pressure:{ sunColor: '#C0FFC0', sunInt: 1.2,ambColor: '#081808', ambInt: 0.18, fogColor: '#0A1A0A' },
+  away:  { sunColor: '#40C8FF', sunInt: 0.8,  ambColor: '#081020', ambInt: 0.22, fogColor: '#081422' },
+};
+
+// Room light positions (approximate 3D positions for each room)
+const ROOM_LIGHT_POS: Record<string, [number, number, number]> = {
+  kitchen:  [  5,   2,   5],
+  bathroom: [ -5,   2,   5],
+  living:   [  0,   2,  -5],
+  pooja:    [  5,   2,  -5],
+  all:      [  0,   3,   0],
+};
+
+// Scenario glow colors
+const SCENARIO_GLOW: Record<string, { room: string; color: string }> = {
+  jeera:    { room: 'kitchen',  color: '#F5A623' },
+  pressure: { room: 'kitchen',  color: '#7CC87A' },
+  grid:     { room: 'all',      color: '#E07070' },
+  pooja:    { room: 'pooja',    color: '#A895F0' },
+  geyser:   { room: 'bathroom', color: '#4ECDC4' },
+  away:     { room: 'living',   color: '#4ECDC4' },
+};
+
 function SceneLighting() {
-  const hour = new Date().getHours();
-  // Dynamic colour + intensity based on real time of day
-  const sunColor   = hour >= 6  && hour < 9  ? '#FFB060'  // golden sunrise
-                   : hour >= 9  && hour < 17 ? '#FFF5D0'  // neutral daylight
-                   : hour >= 17 && hour < 20 ? '#FF9040'  // warm sunset
-                   : '#6070A0';                            // cool night
-  const sunInt     = hour >= 6 && hour < 20 ? 2.6 : 0.7;
-  const ambColor   = hour >= 6 && hour < 20 ? '#F0E8D8' : '#1A2040';
-  const ambInt     = hour >= 6 && hour < 20 ? 0.32 : 0.14;
+  const activeScenarioId = useAppStore(s => s.activeScenarioId);
+
+  // Default mood: dark, cinematic night , the lit house reads against darkness, matching
+  // the reference (image.png). Active scenarios still override via SCENARIO_LIGHTING.
+  const baseSunColor = '#9FB4FF';   // cool moonlight key
+  const baseSunInt   = 0.75;
+  const baseAmbColor = '#10162E';   // deep navy fill
+  const baseAmbInt   = 0.24;
+  const baseFog      = '#070912';
+
+  const ov = activeScenarioId ? SCENARIO_LIGHTING[activeScenarioId] : null;
+  const sunColor = ov?.sunColor ?? baseSunColor;
+  const sunInt   = ov?.sunInt   ?? baseSunInt;
+  const ambColor = ov?.ambColor ?? baseAmbColor;
+  const ambInt   = ov?.ambInt   ?? baseAmbInt;
+  const fogColor = ov?.fogColor ?? baseFog;
 
   return (
     <>
+      <color attach="background" args={[fogColor]} />
+      <fog attach="fog" args={[fogColor, 80, 220]} />
       <directionalLight
         position={[18, 28, 12]}
         intensity={sunInt}
@@ -48,17 +97,55 @@ function SceneLighting() {
   );
 }
 
+function SceneWarmLights() {
+  const activeScenarioId = useAppStore(s => s.activeScenarioId);
+
+  const glowEntry = activeScenarioId ? SCENARIO_GLOW[activeScenarioId] : null;
+  const glowPos = glowEntry ? (ROOM_LIGHT_POS[glowEntry.room] ?? ROOM_LIGHT_POS.all) : null;
+
+  return (
+    <>
+      {/* Per-room warm ceiling pendants at the new room centres (13×10 plan) , warm pools
+          of light so each room reads against the dark mood. */}
+      <pointLight position={[ 2.5, 2.85, -2.0]} intensity={2.6} color="#FFD27A" distance={11} decay={2} />{/* living */}
+      <pointLight position={[-4.0, 2.85, -2.5]} intensity={2.2} color="#FFB860" distance={9}  decay={2} />{/* bedroom */}
+      <pointLight position={[-4.0, 2.85,  1.0]} intensity={1.8} color="#CFE4FF" distance={7}  decay={2} />{/* bathroom */}
+      <pointLight position={[-4.0, 2.85,  3.5]} intensity={2.0} color="#DCEBFF" distance={8}  decay={2} />{/* office */}
+      <pointLight position={[ 4.0, 2.85,  3.0]} intensity={2.2} color="#FFE6B0" distance={9}  decay={2} />{/* kitchen */}
+      <pointLight position={[ 0.0, 2.85,  3.0]} intensity={1.3} color="#FFE0B0" distance={6}  decay={2} />{/* hallway */}
+      {glowEntry && glowPos && (
+        <pointLight
+          key={activeScenarioId ?? ''}
+          position={glowPos}
+          intensity={1.4}
+          color={glowEntry.color}
+          distance={6}
+        />
+      )}
+    </>
+  );
+}
+
 export function DigitalTwinCanvas() {
   const {
     ui, rooms, placedObjects,
     setActiveRoom, setSelectedObject, exitPlacementMode,
     toggleMiniMap, setAlexaTab, setListeningVoice, setActivePanel,
     addPlacedObject, enterPlacementMode, setDraggedAsset,
-    updatePlacedObject, exitLayoutEditMode, lockLayout,
+    updatePlacedObject, exitLayoutEditMode, lockLayout, runLocalCommand,
   } = useAppStore();
 
   const [mousePos, setMousePos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
+  const [showCta, setShowCta] = useState(true);
+
+  // Onboarding: run a suggested command exactly like a real voice command so the judge
+  // sees the full choreography (room zoom → device animates → confirm glow → spoken reply).
+  const tryCommand = useCallback((cmd: string) => {
+    const res = runLocalCommand(cmd);
+    speakNatural(res.response);
+    setShowCta(false);
+  }, [runLocalCommand]);
   const canvasWrapperRef = useRef<HTMLDivElement>(null);
 
   const hoveredObj = ui.hoveredObjectId
@@ -190,40 +277,73 @@ export function DigitalTwinCanvas() {
       <Canvas
         orthographic
         shadows
-        camera={{ position: [22, 20, 22], zoom: 22, near: -500, far: 500 }}
+        camera={{ position: [15, 13.5, 15], zoom: 40, near: -500, far: 500 }}
         gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
-        style={{ background: '#1a1a2e' }}
+        onCreated={({ gl }) => {
+          gl.toneMapping = THREE.ACESFilmicToneMapping;
+          gl.toneMappingExposure = 1.05;
+        }}
+        style={{ background: '#070912' }}
       >
         <Suspense fallback={null}>
-          <color attach="background" args={['#D5EAF7']} />
-          <fog attach="fog" args={['#D5EAF7', 60, 160]} />
           <SceneLighting />
-          <Environment preset="apartment" background={false} />
-          <ContactShadows position={[0, 0.01, 0]} opacity={0.45} scale={50} blur={1.8} far={6} />
+          <ScenarioReactor />
+          <Environment files="/hdri/interior_2k.hdr" background={false} environmentIntensity={0.28} />
+          <ContactShadows position={[0, 0.01, 0]} opacity={0.8} scale={50} blur={1.6} far={6} color="#000008" />
           <SmartLights />
           <GhostPreview />
           <CameraController />
+          {/* 3/4 isometric with orbit ENABLED (per design spec §3): mouse drag / touch to
+              orbit, scroll to zoom; room focus is driven by CameraController choreography. */}
           <OrbitControls
             makeDefault
             enabled={!ui.isPlacementMode && !isDragging}
-            minZoom={8}
-            maxZoom={160}
+            enablePan={true}
+            enableZoom={true}
+            enableRotate={true}
+            mouseButtons={{
+              LEFT: THREE.MOUSE.ROTATE,
+              MIDDLE: THREE.MOUSE.DOLLY,
+              RIGHT: THREE.MOUSE.PAN,
+            }}
+            touches={{
+              ONE: THREE.TOUCH.ROTATE,
+              TWO: THREE.TOUCH.DOLLY_PAN,
+            }}
+            minZoom={22}
+            maxZoom={130}
             maxPolarAngle={Math.PI / 2.15}
             minPolarAngle={Math.PI / 5}
-            enablePan
+            minDistance={5}
+            maxDistance={80}
             panSpeed={0.6}
             rotateSpeed={0.4}
             zoomSpeed={0.9}
             onStart={() => { cameraTransitionRef.current = false; }}
           />
           <House />
+          <RoomFurniture />
+          <RoomWindows />
           <Doors />
-          <HouseDecor />
-          <hemisphereLight args={['#B8D4FF', '#4A7A20', 0.35]} />
+          <SceneWarmLights />
+          <EasterEggs />
+
+          {/* Cinematic post-processing , SSAO grounds furniture in corners (archviz depth),
+              bloom drives the warm light glow, vignette frames the scene. */}
+          <EffectComposer enableNormalPass>
+            <N8AO aoRadius={1.2} intensity={2.2} distanceFalloff={1} halfRes />
+            <Bloom
+              intensity={0.85}
+              luminanceThreshold={0.6}
+              luminanceSmoothing={0.2}
+              mipmapBlur
+            />
+            <Vignette offset={0.25} darkness={0.7} />
+          </EffectComposer>
         </Suspense>
       </Canvas>
 
-      {/* ── DOM tooltip overlay — renders OUTSIDE Canvas, no WebGL interference ── */}
+      {/* ── DOM tooltip overlay , renders OUTSIDE Canvas, no WebGL interference ── */}
       {hoveredObj && !ui.isPlacementMode && (
         <div
           className="pointer-events-none"
@@ -239,12 +359,27 @@ export function DigitalTwinCanvas() {
         </div>
       )}
 
+      {/* ── Selected device panel (bottom-left, styled like Alexa card) ── */}
+      {ui.selectedObjectId && !ui.isPlacementMode && (() => {
+        const selectedObj = placedObjects.find(o => o.id === ui.selectedObjectId);
+        return selectedObj ? (
+          <div style={{ position: 'fixed', bottom: 16, left: 16, zIndex: 9998 }}>
+            <DevicePanel obj={selectedObj} onClose={() => setSelectedObject(null)} />
+          </div>
+        ) : null;
+      })()}
+
+      {/* ── Furniture inspector (bottom-right) ── */}
+      <FurnitureInspector />
+      <DoorInspector />
+      <WindowInspector />
+
       {/* Minimap */}
       {ui.showMiniMap && !ui.isPlacementMode && <MiniMap />}
       {!ui.isPlacementMode && !ui.showMiniMap && (
         <button
           onClick={toggleMiniMap}
-          className="absolute bottom-12 left-3 z-20 bg-[#1A1A1A] border border-[#383838] rounded-lg px-2 py-1.5 text-[10px] text-[#8A8A8A] hover:text-white hover:border-[#00A8E0] transition-all"
+          className="absolute bottom-12 left-3 z-20 bg-[#1A1A1A] border border-[#404040] rounded-lg px-2 py-1.5 text-[10px] text-[#888888] hover:text-white hover:border-[#E8E8E6] transition-all"
         >
           Show Map
         </button>
@@ -265,7 +400,7 @@ export function DigitalTwinCanvas() {
 
           <button
             onClick={() => { setActivePanel('alexa'); setAlexaTab('home'); setListeningVoice(true); }}
-            className="flex items-center gap-2 bg-[#00A8E0] hover:bg-[#0090C8] text-white rounded-full px-3 py-1.5 text-xs font-semibold shadow-lg transition-all"
+            className="flex items-center gap-2 bg-[#E8E8E6] hover:bg-[#0090C8] text-white rounded-full px-3 py-1.5 text-xs font-semibold shadow-lg transition-all"
             style={{ boxShadow: '0 0 12px rgba(0,168,224,0.5)' }}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
@@ -281,7 +416,7 @@ export function DigitalTwinCanvas() {
       {/* Placement mode banner */}
       {ui.isPlacementMode && (
         <>
-          <div className="absolute inset-0 pointer-events-none border-2 border-[#00A8E0] border-dashed opacity-50 rounded" />
+          <div className="absolute inset-0 pointer-events-none border-2 border-[#E8E8E6] border-dashed opacity-50 rounded" />
           <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 bg-white bg-opacity-90 border border-blue-300 rounded-full px-4 py-1.5 shadow-lg">
             <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
             <span className="text-xs font-semibold text-blue-700">
@@ -303,7 +438,7 @@ export function DigitalTwinCanvas() {
           <div className="absolute inset-0 pointer-events-none border-2 border-[#FF8C00] border-dashed opacity-40 rounded" />
           <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 bg-[#1A1000] bg-opacity-90 border border-[#FF8C00] rounded-full px-4 py-1.5 shadow-lg">
             <span className="w-2 h-2 rounded-full bg-[#FF8C00] animate-pulse" />
-            <span className="text-xs font-semibold text-[#FF8C00]">Layout Edit Mode — drag objects to reposition</span>
+            <span className="text-xs font-semibold text-[#FF8C00]">Layout Edit Mode , drag objects to reposition</span>
             <button
               onClick={() => lockLayout()}
               className="ml-2 text-[10px] bg-[#FF8C00] text-black font-bold rounded-full px-3 py-0.5 hover:bg-[#FFA030] transition-colors"
@@ -327,10 +462,44 @@ export function DigitalTwinCanvas() {
         </div>
       )}
 
-      {/* Bottom hint */}
-      {!ui.activeRoomId && !ui.isPlacementMode && (
-        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 text-[10px] text-white bg-black bg-opacity-30 px-3 py-1.5 rounded-full pointer-events-none backdrop-blur-sm">
-          Click room to zoom · Scroll to zoom · Drag to orbit · Drag asset from library to drop here
+      {/* Onboarding CTA , invites the judge to trigger Alexa and see the whole flow.
+          Each chip runs a real command (camera zoom + device animation + spoken reply). */}
+      {showCta && !ui.activeRoomId && !ui.isPlacementMode && (
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center gap-2">
+          <div className="flex items-center gap-2 text-[11px] text-white/90 font-medium">
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#00C8FF] animate-pulse" />
+            Try Alexa , tap a command to see it run
+          </div>
+          <div className="flex items-center gap-2 flex-wrap justify-center max-w-[680px]">
+            {[
+              ['Turn on the bedroom fan', 'turn on the fan in the bedroom'],
+              ['Movie mode', 'movie mode'],
+              ['Good night', 'good night'],
+              ['Show the kitchen', 'show the kitchen'],
+            ].map(([label, cmd]) => (
+              <button
+                key={cmd}
+                onClick={() => tryCommand(cmd)}
+                className="bg-white/10 hover:bg-[#E8E8E6] border border-white/20 hover:border-[#00C8FF] text-white text-[11px] rounded-full px-3 py-1.5 backdrop-blur-md transition-all shadow-lg"
+              >
+                {label}
+              </button>
+            ))}
+            <button
+              onClick={() => setShowCta(false)}
+              className="text-white/40 hover:text-white/80 text-[11px] px-2 py-1.5"
+              title="Dismiss"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Minimal controls hint once the CTA is dismissed */}
+      {!showCta && !ui.activeRoomId && !ui.isPlacementMode && (
+        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 text-[10px] text-white/70 bg-black/30 px-3 py-1.5 rounded-full pointer-events-none backdrop-blur-sm">
+          Click a room to zoom · Scroll to zoom · Ask Alexa to control devices
         </div>
       )}
     </div>

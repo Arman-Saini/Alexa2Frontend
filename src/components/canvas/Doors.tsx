@@ -1,84 +1,166 @@
-// Door frame + panel for a single doorway.
-// wallAxis='X' → door sits in a horizontal wall (z-axis divider)
-// wallAxis='Z' → door sits in a vertical wall (x-axis divider)
-function Door({
-  x, z, wallAxis, swingDir = 1,
+import { useRef, useMemo, useEffect, useState, useCallback } from 'react';
+import { useGLTF } from '@react-three/drei';
+import { useFrame } from '@react-three/fiber';
+import * as THREE from 'three';
+import { useAppStore } from '../../store/store';
+import _layoutInit from '../../constants/anchorLayout.json';
+import { ROOM_BOUNDS } from '../../constants/roomBounds';
+import { resolveAnchor } from '../../utils/anchorResolver';
+
+const QUAT = '/models/quaternius/';
+
+// ── HMR-reactive layout ──────────────────────────────────────────────────────
+let _layout = _layoutInit;
+if (import.meta.hot) {
+  import.meta.hot.accept('../../constants/anchorLayout.json', (mod) => {
+    _layout = (mod as { default: typeof _layoutInit }).default;
+  });
+}
+
+function baseRotFromWall(wall: string): number {
+  if (wall === 'W2') return -Math.PI / 2;
+  if (wall === 'W3') return Math.PI;
+  if (wall === 'W4') return Math.PI / 2;
+  return 0;
+}
+
+function GLBDoor({
+  model, x, z, baseRotY, swingDir = 1, size = 0.9, open, selected, onClick,
 }: {
-  x: number; z: number; wallAxis: 'X' | 'Z'; swingDir?: 1 | -1;
+  model: string; x: number; z: number;
+  baseRotY: number; swingDir: 1 | -1; size?: number; open: boolean;
+  selected?: boolean; onClick: () => void;
 }) {
-  const W = 0.9;
-  const H = 2.1;
-  const T = 0.13;
-  const frameY = H / 2;
-  const rotY = wallAxis === 'X' ? 0 : Math.PI / 2;
-  const panelSwing = (Math.PI / 10) * swingDir; // 18° ajar
+  const url = QUAT + model + '.glb';
+  const { scene } = useGLTF(url);
+  const cloned = useMemo(() => scene.clone(true), [scene]);
+  const groupRef = useRef<THREE.Group>(null);
+
+  useEffect(() => {
+    // Reset before each computation so scales never compound
+    cloned.scale.set(1, 1, 1);
+    cloned.position.y = 0;
+    const box = new THREE.Box3().setFromObject(cloned);
+    const s = box.getSize(new THREE.Vector3());
+    const scaleXZ = size / (Math.max(s.x, s.z) || 1);
+    const scaleH = (size * (2.2 / 0.9)) / (s.y || 1);
+    cloned.scale.set(scaleXZ, scaleH, scaleXZ);
+    const box2 = new THREE.Box3().setFromObject(cloned);
+    cloned.position.y -= box2.min.y;
+    cloned.traverse(c => {
+      if (c instanceof THREE.Mesh) { c.castShadow = true; c.receiveShadow = true; }
+    });
+  }, [cloned, size]);
+
+  // Shift hinge so door CENTER sits at the anchor position when closed
+  const hx = x - Math.cos(baseRotY) * (size / 2);
+  const hz = z - Math.sin(baseRotY) * (size / 2);
+
+  useFrame((_, delta) => {
+    if (!groupRef.current) return;
+    const target = open
+      ? baseRotY + swingDir * (Math.PI * (120 / 180))
+      : baseRotY;
+    const t = 1 - Math.exp(-0.014 * 60 * delta);
+    groupRef.current.rotation.y += (target - groupRef.current.rotation.y) * t;
+  });
 
   return (
-    <group position={[x, 0, z]}>
-      {/* Left frame post */}
-      <mesh position={[-W / 2 - 0.065, frameY, 0]} rotation={[0, rotY, 0]} castShadow>
-        <boxGeometry args={[0.13, H + 0.1, T + 0.05]} />
-        <meshStandardMaterial color="#7B5030" roughness={0.7} metalness={0.05} />
-      </mesh>
-      {/* Right frame post */}
-      <mesh position={[W / 2 + 0.065, frameY, 0]} rotation={[0, rotY, 0]} castShadow>
-        <boxGeometry args={[0.13, H + 0.1, T + 0.05]} />
-        <meshStandardMaterial color="#7B5030" roughness={0.7} metalness={0.05} />
-      </mesh>
-      {/* Top lintel */}
-      <mesh position={[0, H + 0.05, 0]} rotation={[0, rotY, 0]} castShadow>
-        <boxGeometry args={[W + 0.26, 0.12, T + 0.05]} />
-        <meshStandardMaterial color="#7B5030" roughness={0.7} metalness={0.05} />
-      </mesh>
-
-      {/* Door panel — hinged at left, slightly ajar */}
-      <group position={[-W / 2, 0, 0]} rotation={[0, panelSwing, 0]}>
-        <mesh position={[W / 2, H / 2, 0]} rotation={[0, rotY, 0]} castShadow receiveShadow>
-          <boxGeometry args={[W, H, 0.045]} />
-          <meshStandardMaterial color="#A06840" roughness={0.65} metalness={0.0} />
+    <group ref={groupRef} position={[hx, 0, hz]} onClick={(e) => { e.stopPropagation(); onClick(); }}>
+      <primitive object={cloned} />
+      {selected && (
+        <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[0.5, 0.6, 32]} />
+          <meshBasicMaterial color="#FFD700" transparent opacity={0.85} depthWrite={false} />
         </mesh>
-        {/* Raised panel details */}
-        {[H * 0.27, H * 0.67].map((py, i) => (
-          <mesh key={i} position={[W / 2, py, 0.025]} rotation={[0, rotY, 0]}>
-            <boxGeometry args={[W * 0.62, H * 0.26, 0.012]} />
-            <meshStandardMaterial color="#8C5828" roughness={0.7} />
-          </mesh>
-        ))}
-        {/* Knob */}
-        <mesh position={[W * 0.8, H * 0.47, 0.052]} rotation={[0, rotY, 0]}>
-          <sphereGeometry args={[0.03, 10, 10]} />
-          <meshStandardMaterial color="#C8A830" roughness={0.2} metalness={0.8} />
-        </mesh>
-        {/* Knob stem */}
-        <mesh position={[W * 0.8, H * 0.47, 0.036]} rotation={[0, rotY, 0]}>
-          <cylinderGeometry args={[0.01, 0.01, 0.04, 8]} />
-          <meshStandardMaterial color="#B09020" roughness={0.3} metalness={0.7} />
-        </mesh>
-      </group>
+      )}
     </group>
   );
 }
+
+type DoorDef = {
+  id: string;
+  model: string;
+  anchor: { type: string; wall: string; along: number };
+  swingDir?: number;
+  distFromWall?: number;
+  size?: number;
+};
 
 export function Doors() {
+  const globalUnlocked = useAppStore(s =>
+    s.placedObjects.some(o => o.type === 'smart-lock' && o.alexaDeviceState?.isLocked === false)
+  );
+  const doorOverrides = useAppStore(s => s.doorOverrides);
+  const selectedDoorId = useAppStore(s => s.selectedDoorId);
+  const setSelectedDoor = useAppStore(s => s.setSelectedDoor);
+
+  const [clickedOpen, setClickedOpen] = useState<Set<string>>(new Set());
+
+  const toggleDoor = useCallback((id: string) => {
+    setClickedOpen(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const doors = useMemo(() => {
+    const result: Array<{
+      key: string; model: string; x: number; z: number;
+      baseRotY: number; swingDir: 1 | -1; size: number;
+    }> = [];
+
+    for (const [roomId, roomDef] of Object.entries(_layout.rooms)) {
+      const bounds = ROOM_BOUNDS[roomId];
+      if (!bounds) continue;
+      const roomDoors = (roomDef as { doors?: DoorDef[] }).doors;
+      if (!roomDoors) continue;
+      for (const door of roomDoors) {
+        if (door.anchor.type !== 'wall') continue;
+        const ov = doorOverrides[door.id] ?? {};
+        const wall = (ov.wall ?? door.anchor.wall) as 'W1' | 'W2' | 'W3' | 'W4';
+        const along = ov.along ?? door.anchor.along;
+        const dist = ov.distFromWall ?? door.distFromWall ?? 0;
+        const anchor = { type: 'wall' as const, wall, along };
+        const [x, , z] = resolveAnchor(anchor, bounds, { distFromWall: dist });
+        const modelName = door.model.replace(/^(?:quat|furn):/, '');
+        const rawSwing = ov.swingDir ?? (door.swingDir ?? 1);
+        const swingDir = (rawSwing === 1 ? 1 : -1) as 1 | -1;
+        const size = ov.size ?? door.size ?? 0.9;
+        result.push({ key: door.id, model: modelName, x, z, baseRotY: baseRotFromWall(wall), swingDir, size });
+      }
+    }
+    return result;
+  }, [doorOverrides]);
+
   return (
     <group>
-      {/* Main entrance — north wall of living room */}
-      <Door x={-7} z={-8} wallAxis="X" swingDir={1} />
-
-      {/* Living Room ↔ Kitchen — wall at x=4 */}
-      <Door x={4} z={-6} wallAxis="Z" swingDir={-1} />
-
-      {/* Living Room ↔ Master Bedroom — wall at z=0 */}
-      <Door x={-8} z={0} wallAxis="X" swingDir={1} />
-
-      {/* Living Room ↔ Bathroom zone — wall at z=0, centred on smaller bathroom */}
-      <Door x={-2} z={0} wallAxis="X" swingDir={-1} />
-
-      {/* Kitchen ↔ Office — wall at z=0 */}
-      <Door x={8} z={0} wallAxis="X" swingDir={1} />
-
-      {/* Master Bedroom ↔ Bathroom — wall at x=-4 */}
-      <Door x={-4} z={4} wallAxis="Z" swingDir={1} />
+      {doors.map(d => (
+        <GLBDoor
+          key={d.key}
+          model={d.model}
+          x={d.x}
+          z={d.z}
+          baseRotY={d.baseRotY}
+          swingDir={d.swingDir}
+          size={d.size}
+          open={globalUnlocked || clickedOpen.has(d.key)}
+          selected={d.key === selectedDoorId}
+          onClick={() => {
+            if (selectedDoorId === d.key) {
+              setSelectedDoor(null);
+            } else {
+              setSelectedDoor(d.key);
+              toggleDoor(d.key);
+            }
+          }}
+        />
+      ))}
     </group>
   );
 }
+
+['Door1','Door2','Door3','Door4','Door5','Door6','Door7','Door8'].forEach(m =>
+  useGLTF.preload(QUAT + m + '.glb')
+);

@@ -23,11 +23,11 @@ function Row({ icon, label, value, bar, barColor, barMax, highlight }: {
   return (
     <div className={`flex flex-col gap-0.5 py-1 border-b border-[#2a2a2a] last:border-0`}>
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[10px] text-[#8A8A8A] flex items-center gap-1">
+        <span className="text-[10px] text-[#888888] flex items-center gap-1">
           <span>{icon}</span>
           <span>{label}</span>
         </span>
-        <span className={`text-[10px] font-semibold ${highlight ? 'text-[#F44336]' : 'text-[#00A8E0]'}`}>{value}</span>
+        <span className={`text-[10px] font-semibold ${highlight ? 'text-[#F44336]' : 'text-[#E8E8E6]'}`}>{value}</span>
       </div>
       {bar && barColor && barMax !== undefined && (
         <Bar value={parseFloat(value)} max={barMax} color={barColor} />
@@ -83,7 +83,7 @@ export function SensorTooltip({ obj }: SensorTooltipProps) {
   if (ds.airQuality !== undefined) {
     const aqiLabel = ds.airQuality < 50 ? 'Good' : ds.airQuality < 100 ? 'Moderate' : 'Poor';
     rows.push(
-      <Row key="aqi" icon="🌬️" label="Air Quality" value={`AQI ${ds.airQuality.toFixed(0)} — ${aqiLabel}`}
+      <Row key="aqi" icon="🌬️" label="Air Quality" value={`AQI ${ds.airQuality.toFixed(0)} , ${aqiLabel}`}
         highlight={ds.airQuality > 100} />
     );
   }
@@ -142,12 +142,12 @@ export function SensorTooltip({ obj }: SensorTooltipProps) {
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-xs font-bold text-white truncate leading-tight">{obj.deviceName}</p>
-          <p className="text-[10px] text-[#8A8A8A] capitalize leading-tight">{obj.type.replace(/-/g,' ')}</p>
+          <p className="text-[10px] text-[#888888] capitalize leading-tight">{obj.type.replace(/-/g,' ')}</p>
         </div>
         <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold ${
-          isOn ? 'bg-[#1DB95425] text-[#1DB954]' : 'bg-[#38383825] text-[#8A8A8A]'
+          isOn ? 'bg-[#5A9A5A25] text-[#5A9A5A]' : 'bg-[#40404025] text-[#888888]'
         }`}>
-          <span className={`w-1.5 h-1.5 rounded-full ${isOn ? 'bg-[#1DB954]' : 'bg-[#8A8A8A]'}`} />
+          <span className={`w-1.5 h-1.5 rounded-full ${isOn ? 'bg-[#5A9A5A]' : 'bg-[#888888]'}`} />
           {isOn ? 'ON' : 'OFF'}
         </div>
       </div>

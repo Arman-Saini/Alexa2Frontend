@@ -48,15 +48,15 @@ export function MiniMap() {
 
   return (
     <div
-      className="absolute bottom-12 left-3 z-20 bg-[#121212] border border-[#383838] rounded-xl overflow-hidden shadow-2xl"
+      className="absolute bottom-12 left-3 z-20 bg-[#111111] border border-[#404040] rounded-xl overflow-hidden shadow-2xl"
       style={{ width: MAP_W, height: MAP_H }}
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-2 py-1 border-b border-[#383838]">
-        <span className="text-[9px] font-semibold text-[#8A8A8A] uppercase tracking-wider">Floor Plan</span>
+      <div className="flex items-center justify-between px-2 py-1 border-b border-[#404040]">
+        <span className="text-[9px] font-semibold text-[#888888] uppercase tracking-wider">Floor Plan</span>
         <button
           onClick={toggleMiniMap}
-          className="text-[#8A8A8A] hover:text-white text-xs leading-none"
+          className="text-[#888888] hover:text-white text-xs leading-none"
         >
           ×
         </button>
@@ -88,7 +88,7 @@ export function MiniMap() {
                 rx={3}
                 fill={color}
                 fillOpacity={isActive ? 0.5 : 0.2}
-                stroke={isActive ? '#00A8E0' : isHovered ? '#6699cc' : '#383838'}
+                stroke={isActive ? '#E8E8E6' : isHovered ? '#6699cc' : '#404040'}
                 strokeWidth={isActive ? 1.5 : 0.75}
                 style={{ cursor: 'pointer' }}
                 onClick={() => setActiveRoom(isActive ? null : room.id)}
@@ -100,7 +100,7 @@ export function MiniMap() {
                 textAnchor="middle"
                 dominantBaseline="middle"
                 fontSize={roomH > 20 ? 9 : 7}
-                fill={isActive ? '#00A8E0' : '#8A8A8A'}
+                fill={isActive ? '#E8E8E6' : '#888888'}
               >
                 {room.icon}
               </text>
@@ -112,7 +112,7 @@ export function MiniMap() {
                     cy={tl.y + 6}
                     r={5}
                     fill="#1A1A1A"
-                    stroke="#1DB954"
+                    stroke="#5A9A5A"
                     strokeWidth={1}
                   />
                   <text
@@ -122,7 +122,7 @@ export function MiniMap() {
                     dominantBaseline="middle"
                     fontSize={6}
                     fontWeight="bold"
-                    fill="#1DB954"
+                    fill="#5A9A5A"
                   >
                     {activeDevices}
                   </text>
@@ -145,8 +145,8 @@ export function MiniMap() {
               cx={pt.x}
               cy={pt.y}
               r={isSelected ? 4 : 3}
-              fill={isOn ? '#00A8E0' : '#383838'}
-              stroke={isSelected ? '#00CAFF' : 'none'}
+              fill={isOn ? '#E8E8E6' : '#404040'}
+              stroke={isSelected ? '#F0F0EE' : 'none'}
               strokeWidth={1.5}
               opacity={isOn ? 0.9 : 0.5}
             />

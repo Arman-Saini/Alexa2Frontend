@@ -4,31 +4,31 @@ import { Grid } from '@react-three/drei';
 import * as THREE from 'three';
 import { useAppStore } from '../../store/store';
 import { RoomMesh } from './RoomMesh';
-import { PlacedObjectMesh } from './PlacedObjectMesh';
 import { ConnectedWalls } from './ConnectedWalls';
+// import { PlacedObjectMesh } from './PlacedObjectMesh';
 
-// Sims-style grass ground outside the house footprint
+// Dark plinth the house sits on , keeps the lit interior the hero against deep navy.
 function GroundPlane() {
   return (
     <>
-      {/* Grass base */}
+      {/* Dark base */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.04, 0]} receiveShadow>
         <planeGeometry args={[80, 80]} />
-        <meshStandardMaterial color="#4E7A35" roughness={0.9} metalness={0.0} />
+        <meshStandardMaterial color="#0A0D18" roughness={1} metalness={0.0} />
       </mesh>
 
-      {/* Subtle garden grid — shows outside the house */}
+      {/* Faint tech grid , barely visible, gives a premium "platform" feel */}
       <Grid
         position={[0, -0.03, 0]}
         args={[80, 80]}
         cellSize={2}
         cellThickness={0.3}
-        cellColor="#4A7030"
+        cellColor="#10203A"
         sectionSize={8}
-        sectionThickness={0.8}
-        sectionColor="#3A6020"
-        fadeDistance={40}
-        fadeStrength={1.2}
+        sectionThickness={0.7}
+        sectionColor="#16345C"
+        fadeDistance={38}
+        fadeStrength={1.5}
         followCamera={false}
         infiniteGrid={false}
       />
@@ -37,14 +37,14 @@ function GroundPlane() {
 }
 
 export function House() {
-  const { ui, rooms, placedObjects, addPlacedObject, exitPlacementMode, setActiveRoom } = useAppStore();
+  const { ui, rooms, /* placedObjects, */ addPlacedObject, exitPlacementMode, setActiveRoom } = useAppStore();
   const { activeRoomId, isPlacementMode, placementAssetType, hoveredRoomId } = ui;
   const groundRef = useRef<THREE.Mesh>(null);
 
   const visibleRooms = activeRoomId ? rooms.filter(r => r.id === activeRoomId) : rooms;
-  const visibleObjects = activeRoomId
-    ? placedObjects.filter(o => o.parentRoomId === activeRoomId)
-    : placedObjects;
+  // const visibleObjects = activeRoomId
+  //   ? placedObjects.filter(o => o.parentRoomId === activeRoomId)
+  //   : placedObjects;
 
   const isInsideHouse = (x: number, z: number) =>
     rooms.some((room) => {
@@ -94,7 +94,7 @@ export function House() {
   return (
     <group>
       {/* Fully transparent floor for placement clicks.
-          Must NOT use visible={false} — Three.js skips invisible meshes in raycasting. */}
+          Must NOT use visible={false} , Three.js skips invisible meshes in raycasting. */}
       <mesh
         ref={groundRef}
         rotation={[-Math.PI / 2, 0, 0]}
@@ -108,7 +108,7 @@ export function House() {
 
       <GroundPlane />
 
-      {/* Connected wall system — shared node graph, no seams */}
+      {/* Connected wall system , shared node graph, no seams */}
       <ConnectedWalls />
 
       {/* Room floors */}
@@ -121,10 +121,10 @@ export function House() {
         />
       ))}
 
-      {/* Placed objects */}
+      {/* Placed objects , commented out while static furniture dresses the scene
       {visibleObjects.map(obj => (
         <PlacedObjectMesh key={obj.id} obj={obj} />
-      ))}
+      ))} */}
     </group>
   );
 }

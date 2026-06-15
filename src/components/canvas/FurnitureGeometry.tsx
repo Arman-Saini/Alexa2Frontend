@@ -1,8 +1,9 @@
 import { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
+import { useAppStore } from '../../store/store';
 
-// PBR material — realistic look without cel-shading bands.
+// PBR material , realistic look without cel-shading bands.
 function mat(color: string, roughness = 0.75, metalness = 0.05, emissive?: string, emissiveIntensity = 0) {
   return (
     <meshStandardMaterial
@@ -163,7 +164,7 @@ export function TVStandGeometry() {
       {/* Main body */}
       <mesh position={[0,0.26,0]} castShadow receiveShadow>
         <boxGeometry args={[1.52,0.5,0.46]}/>
-        {mat('#1a1a1a',0.4,0.3)}
+        {mat('#1A1A1A',0.4,0.3)}
       </mesh>
       {/* Door panels */}
       {[-0.38,0.38].map((x,i)=>(
@@ -197,7 +198,7 @@ export function TVStandGeometry() {
 
 export function BookshelfGeometry() {
   const wood = '#6D4C2A';
-  const bookColors = ['#C0392B','#2980B9','#27AE60','#8E44AD','#F39C12','#16A085','#E74C3C','#3498DB'];
+  const bookColors = ['#C06060','#2980B9','#27AE60','#8E44AD','#F39C12','#16A085','#E74C3C','#3498DB'];
   return (
     <group>
       {/* Frame */}
@@ -301,7 +302,7 @@ export function DeskGeometry() {
       {/* Monitor */}
       <mesh position={[0,0.98,-0.18]} rotation={[0.12,0,0]} castShadow>
         <boxGeometry args={[0.52,0.35,0.04]}/>
-        {mat('#1a1a1a',0.3,0.2)}
+        {mat('#1A1A1A',0.3,0.2)}
       </mesh>
       <mesh position={[0,0.82,-0.1]}>
         <boxGeometry args={[0.06,0.24,0.06]}/>
@@ -396,12 +397,12 @@ export function EchoDotGeometry({ isOn }: { isOn: boolean }) {
       {/* Top face */}
       <mesh position={[0,0.101,0]}>
         <cylinderGeometry args={[0.155,0.155,0.005,24]}/>
-        {mat('#1a1a1a',0.2,0.1)}
+        {mat('#1A1A1A',0.2,0.1)}
       </mesh>
       {/* LED ring */}
       <mesh position={[0,0.1,0]}>
         <torusGeometry args={[0.115,0.012,8,32]}/>
-        {mat(isOn ? '#00A8E0' : '#1a1a1a', 0.1, 0.3, isOn ? '#00A8E0' : '#000', isOn ? 1.0 : 0)}
+        {mat(isOn ? '#E8E8E6' : '#1A1A1A', 0.1, 0.3, isOn ? '#E8E8E6' : '#000', isOn ? 1.0 : 0)}
       </mesh>
       {/* Mic dots */}
       {[0,90,180,270].map((deg,i)=>{
@@ -424,7 +425,7 @@ export function EchoShowGeometry({ isOn }: { isOn: boolean }) {
       {/* Base */}
       <mesh position={[0,0.04,0.04]} castShadow>
         <boxGeometry args={[0.52,0.08,0.32]}/>
-        {mat('#1a1a1a',0.2,0.2)}
+        {mat('#1A1A1A',0.2,0.2)}
       </mesh>
       {/* Screen */}
       <mesh position={[0,0.28,-0.06]} rotation={[0.35,0,0]} castShadow>
@@ -651,7 +652,7 @@ export function SmartTVGeometry({ isOn }: { isOn: boolean }) {
         <boxGeometry args={[1.4,0.82,0.06]}/>
         {mat('#111111',0.2,0.15)}
       </mesh>
-      {/* Screen face — animated when on */}
+      {/* Screen face , animated when on */}
       <mesh position={[0,0.5,0.032]}>
         <boxGeometry args={[1.3,0.74,0.001]}/>
         <meshStandardMaterial
@@ -666,7 +667,7 @@ export function SmartTVGeometry({ isOn }: { isOn: boolean }) {
       {/* Bezel */}
       <mesh position={[0,0.5,0.034]}>
         <boxGeometry args={[1.34,0.78,0.001]}/>
-        {mat('#1a1a1a',0.2)}
+        {mat('#1A1A1A',0.2)}
       </mesh>
       {/* Stand neck */}
       <mesh position={[0,0.06,0.01]}>
@@ -689,13 +690,18 @@ export function SmartTVGeometry({ isOn }: { isOn: boolean }) {
 
 export function CeilingFanGeometry({ isOn, speed = 1 }: { isOn: boolean; speed?: number }) {
   const bladesRef = useRef<THREE.Group>(null);
+  const activeScenarioId = useAppStore(s => s.activeScenarioId);
+  const powerCut = activeScenarioId === 'grid';
 
   useFrame((_, delta) => {
     if (!bladesRef.current) return;
+    if (powerCut) {
+      // Grid failure , fans stop dead
+      return;
+    }
     if (isOn) {
       bladesRef.current.rotation.y += delta * speed * 4.5;
     } else if (Math.abs(bladesRef.current.rotation.y % (Math.PI * 2)) > 0.01) {
-      // Gradual deceleration when turned off
       bladesRef.current.rotation.y += delta * 0.5;
     }
   });
@@ -764,6 +770,40 @@ export function DoorbellGeometry({ isOn }: { isOn: boolean }) {
   );
 }
 
+export function FloorLampGeometry({ isOn }: { isOn: boolean }) {
+  return (
+    <group>
+      {/* Base */}
+      <mesh position={[0, 0.04, 0]} castShadow receiveShadow>
+        <cylinderGeometry args={[0.18, 0.2, 0.06, 16]} />
+        {mat('#2a2a2a', 0.3, 0.5)}
+      </mesh>
+      {/* Pole */}
+      <mesh position={[0, 0.8, 0]} castShadow>
+        <cylinderGeometry args={[0.018, 0.022, 1.5, 10]} />
+        {mat('#888888', 0.25, 0.6)}
+      </mesh>
+      {/* Shade outer */}
+      <mesh position={[0, 1.6, 0]} castShadow>
+        <cylinderGeometry args={[0.22, 0.14, 0.3, 16, 1, true]} />
+        {mat('#d4b896', 0.7, 0.05)}
+      </mesh>
+      {/* Shade inner (emissive when on) */}
+      <mesh position={[0, 1.6, 0]}>
+        <cylinderGeometry args={[0.21, 0.13, 0.29, 16, 1, true]} />
+        {mat(isOn ? '#ffe8b0' : '#c8a870', 0.8, 0, isOn ? '#ffcc66' : '#000', isOn ? 1.2 : 0)}
+      </mesh>
+      {/* Bulb glow disc below shade */}
+      {isOn && (
+        <mesh position={[0, 1.44, 0]} rotation={[Math.PI / 2, 0, 0]}>
+          <circleGeometry args={[0.16, 16]} />
+          <meshStandardMaterial color="#ffcc66" emissive="#ffcc66" emissiveIntensity={0.7} transparent opacity={0.22} />
+        </mesh>
+      )}
+    </group>
+  );
+}
+
 export function AirPurifierGeometry({ isOn }: { isOn: boolean }) {
   return (
     <group>
@@ -785,7 +825,7 @@ export function AirPurifierGeometry({ isOn }: { isOn: boolean }) {
       {/* Control panel */}
       <mesh position={[0,0.22,0.14]}>
         <boxGeometry args={[0.1,0.12,0.01]}/>
-        {mat('#1a1a1a',0.2)}
+        {mat('#1A1A1A',0.2)}
       </mesh>
     </group>
   );

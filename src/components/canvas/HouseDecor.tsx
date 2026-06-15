@@ -1,6 +1,11 @@
+import { useRef } from 'react';
+import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-
-void (THREE.Color);
+import { useAppStore } from '../../store/store';
+import layout from '../../constants/anchorLayout.json';
+import { ROOM_BOUNDS } from '../../constants/roomBounds';
+import { resolveAnchor } from '../../utils/anchorResolver';
+import { Curtain } from './Curtains';
 
 function mat(color: string, emissive = '#000', emissiveIntensity = 0, roughness = 0.75, metalness = 0.05) {
   return (
@@ -14,137 +19,137 @@ function mat(color: string, emissive = '#000', emissiveIntensity = 0, roughness 
   );
 }
 
-// ── Reusable window component ─────────────────────────────────────────────────
-function Win({ x, y = 1.45, z, rotY = 0 }: { x: number; y?: number; z: number; rotY?: number }) {
+// ── Anchor-driven window components ──────────────────────────────────────────
+const WIN_Y = 1.7; // center height on 3.5m wall
+
+function ArchWindow({ x, z, rotY, model }: { x: number; z: number; rotY: number; model: string }) {
+  const isLarge = model === 'WindowLarge';
+  const W = isLarge ? 1.6 : 1.0;
+  const H = 1.3;
   return (
-    <group position={[x, y, z]} rotation={[0, rotY, 0]}>
+    <group position={[x, WIN_Y, z]} rotation={[0, rotY, 0]}>
       {/* Frame */}
       <mesh castShadow>
-        <boxGeometry args={[1.32, 1.15, 0.1]} />
-        {mat('#8B6F47')}
+        <boxGeometry args={[W + 0.14, H + 0.14, 0.1]} />
+        <meshStandardMaterial color="#8B6F47" roughness={0.6} />
       </mesh>
-      {/* Glass pane */}
-      <mesh position={[0, 0, 0.02]}>
-        <boxGeometry args={[1.14, 0.97, 0.02]} />
-        <meshStandardMaterial
-          color="#B3DEF5"
-          emissive="#90C8E8"
-          emissiveIntensity={0.25}
-          transparent
-          opacity={0.52}
-        />
+      {/* Glass */}
+      <mesh position={[0, 0, 0.03]}>
+        <boxGeometry args={[W, H, 0.02]} />
+        <meshStandardMaterial color="#B3DEF5" emissive="#90C8E8" emissiveIntensity={0.3} transparent opacity={0.55} />
       </mesh>
-      {/* Horizontal cross bar */}
-      <mesh position={[0, 0, 0.05]}>
-        <boxGeometry args={[1.12, 0.045, 0.045]} />
-        {mat('#8B6F47')}
+      {/* Horizontal mullion */}
+      <mesh position={[0, 0, 0.06]}>
+        <boxGeometry args={[W, 0.045, 0.045]} />
+        <meshStandardMaterial color="#8B6F47" roughness={0.6} />
       </mesh>
-      {/* Vertical cross bar */}
-      <mesh position={[0, 0, 0.05]}>
-        <boxGeometry args={[0.045, 0.95, 0.045]} />
-        {mat('#8B6F47')}
+      {/* Vertical mullion */}
+      <mesh position={[0, 0, 0.06]}>
+        <boxGeometry args={[0.045, H, 0.045]} />
+        <meshStandardMaterial color="#8B6F47" roughness={0.6} />
       </mesh>
-      {/* Sill */}
-      <mesh position={[0, -0.62, 0.05]}>
-        <boxGeometry args={[1.42, 0.07, 0.18]} />
-        {mat('#A0856A')}
-      </mesh>
+      <Curtain width={W} />
     </group>
   );
 }
 
-// ── Windows on all exterior walls ─────────────────────────────────────────────
 function Windows() {
-  const H = Math.PI / 2;
-  return (
-    <group>
-      {/* Living room — north wall (z=-8), two windows */}
-      <Win x={-9}  y={1.45} z={-7.96} rotY={0} />
-      <Win x={-3}  y={1.45} z={-7.96} rotY={0} />
-      {/* Living room — west wall (x=-12) */}
-      <Win x={-11.96} y={1.45} z={-5} rotY={H} />
-
-      {/* Kitchen — north wall (z=-8) */}
-      <Win x={8}  y={1.45} z={-7.96} rotY={0} />
-      {/* Kitchen — east wall (x=12) */}
-      <Win x={11.96} y={1.45} z={-5} rotY={H} />
-
-      {/* Master bedroom — west wall (x=-12) */}
-      <Win x={-11.96} y={1.45} z={4} rotY={H} />
-      {/* Master bedroom — south wall (z=8) */}
-      <Win x={-8} y={1.45} z={7.96} rotY={0} />
-
-      {/* Office — east wall (x=12) */}
-      <Win x={11.96} y={1.45} z={4} rotY={H} />
-      {/* Office — south wall (z=8) */}
-      <Win x={8} y={1.45} z={7.96} rotY={0} />
-
-      {/* Bathroom — south wall (z=8), small frosted window */}
-      <Win x={-2} y={1.7} z={7.96} rotY={0} />
-    </group>
-  );
+  const wins: React.ReactElement[] = [];
+  for (const [roomId, roomDef] of Object.entries(layout.rooms)) {
+    const bounds = ROOM_BOUNDS[roomId];
+    if (!bounds) continue;
+    const windowDefs = (roomDef as { windows: Array<{ id: string; wall: string; along: number; model: string; anchor: { type: string; wall: string; along: number } }> }).windows;
+    for (const win of windowDefs) {
+      const anchor = { type: 'wall' as const, wall: win.anchor.wall as 'W1' | 'W2' | 'W3' | 'W4', along: win.anchor.along };
+      const [x, , z] = resolveAnchor(anchor, bounds, { distFromWall: 0 });
+      const wall = win.anchor.wall;
+      const rotY = wall === 'W2' ? -Math.PI / 2
+                 : wall === 'W4' ?  Math.PI / 2
+                 : wall === 'W3' ?  Math.PI : 0;
+      const modelName = win.model.replace(/^quat:/, '');
+      wins.push(<ArchWindow key={win.id} x={x} z={z} rotY={rotY} model={modelName} />);
+    }
+  }
+  return <group>{wins}</group>;
 }
 
 // ── Kitchen counter + stove + fridge ──────────────────────────────────────────
 function KitchenFixtures() {
+  const activeScenarioId = useAppStore(s => s.activeScenarioId);
+  const kitchenHot = activeScenarioId === 'jeera' || activeScenarioId === 'pressure';
+  const burnerRefs = useRef<(THREE.MeshStandardMaterial | null)[]>([null, null, null, null]);
+
+  useFrame(({ clock }) => {
+    if (!kitchenHot) {
+      burnerRefs.current.forEach(m => { if (m) m.emissiveIntensity = 0; });
+      return;
+    }
+    const t = Math.abs(Math.sin(clock.getElapsedTime() * 7));
+    // jeera = full-burn orange-red, pressure = controlled cooking amber
+    const base = activeScenarioId === 'jeera' ? 1.8 : 0.9;
+    const amp  = activeScenarioId === 'jeera' ? 2.0 : 1.0;
+    burnerRefs.current.forEach(m => { if (m) m.emissiveIntensity = base + t * amp; });
+  });
+
+  const burnerColor = activeScenarioId === 'jeera'    ? '#FF3300'
+                    : activeScenarioId === 'pressure' ? '#FF8800'
+                    : '#000';
+
   return (
     <group>
-      {/* Counter along north wall (z=-7.5) of kitchen, x[5,11] */}
-      <mesh position={[8, 0.46, -7.3]} castShadow receiveShadow>
-        <boxGeometry args={[5.5, 0.9, 0.7]} />
-        {mat('#D7CCC8')}
+      {/* Stove top surface — sits on top of the GLB stove unit */}
+      <mesh position={[8.1, 0.94, 2.4]}>
+        <boxGeometry args={[0.7, 0.02, 0.55]} />
+        {mat('#1A1A1A')}
       </mesh>
-      {/* Countertop slab */}
-      <mesh position={[8, 0.92, -7.3]} castShadow>
-        <boxGeometry args={[5.5, 0.06, 0.72]} />
-        {mat('#BCAAA4')}
-      </mesh>
-      {/* Sink basin */}
-      <mesh position={[6.5, 0.84, -7.28]}>
-        <boxGeometry args={[0.7, 0.14, 0.44]} />
-        {mat('#90A4AE')}
-      </mesh>
-      {/* Tap */}
-      <mesh position={[6.5, 1.04, -7.52]}>
-        <cylinderGeometry args={[0.018, 0.018, 0.26, 8]} />
-        {mat('#B0BEC5')}
-      </mesh>
-      <mesh position={[6.5, 1.18, -7.36]} rotation={[Math.PI / 2.5, 0, 0]}>
-        <cylinderGeometry args={[0.012, 0.012, 0.18, 8]} />
-        {mat('#B0BEC5')}
-      </mesh>
-      {/* Stove */}
-      <mesh position={[9.2, 0.92, -7.28]}>
-        <boxGeometry args={[0.7, 0.03, 0.56]} />
-        {mat('#1a1a1a')}
-      </mesh>
-      {/* Burners */}
-      {[[-0.18, -0.13], [0.18, -0.13], [-0.18, 0.13], [0.18, 0.13]].map(([bx, bz], i) => (
-        <mesh key={i} position={[9.2 + bx, 0.945, -7.28 + bz]}>
-          <cylinderGeometry args={[0.07, 0.07, 0.01, 12]} />
-          {mat('#444')}
+      {/* Burners — emissive controlled by useFrame */}
+      {([[-0.15, -0.11], [0.15, -0.11], [-0.15, 0.11], [0.15, 0.11]] as [number,number][]).map(([bx, bz], i) => (
+        <mesh key={i} position={[8.1 + bx, 0.955, 2.4 + bz]}>
+          <cylinderGeometry args={[0.06, 0.06, 0.01, 12]} />
+          <meshStandardMaterial
+            ref={(m) => { burnerRefs.current[i] = m; }}
+            color={kitchenHot ? '#FF6600' : '#444'}
+            emissive={burnerColor}
+            emissiveIntensity={kitchenHot ? 1.5 : 0}
+            roughness={0.6}
+          />
         </mesh>
       ))}
-      {/* Chimney / exhaust hood */}
-      <mesh position={[9.2, 1.6, -7.5]} castShadow>
-        <boxGeometry args={[0.85, 0.5, 0.1]} />
+      {/* Exhaust hood / chimney above stove at x≈8.1 */}
+      <mesh position={[8.1, 1.62, 2.18]} castShadow>
+        <boxGeometry args={[1.0, 0.5, 0.12]} />
         {mat('#9E9E9E')}
       </mesh>
-      <mesh position={[9.2, 2.0, -7.5]}>
-        <boxGeometry args={[0.4, 0.8, 0.08]} />
+      <mesh position={[8.1, 2.1, 2.16]}>
+        <boxGeometry args={[0.45, 0.9, 0.1]} />
         {mat('#BDBDBD')}
       </mesh>
-      {/* Fridge */}
-      <mesh position={[11.2, 0.9, -6.5]} castShadow receiveShadow>
-        <boxGeometry args={[0.65, 1.82, 0.66]} />
+      {/* Wall cabinets — left of chimney and right side */}
+      <mesh position={[6.5, 1.9, 2.2]} castShadow>
+        <boxGeometry args={[2.5, 0.65, 0.38]} />
+        {mat('#C8B8B0')}
+      </mesh>
+      <mesh position={[9.5, 1.9, 2.2]} castShadow>
+        <boxGeometry args={[2.0, 0.65, 0.38]} />
+        {mat('#C8B8B0')}
+      </mesh>
+      {/* Cabinet divider lines */}
+      {[5.3, 6.5, 7.7, 8.6, 9.6, 10.5].map((cx, i) => (
+        <mesh key={i} position={[cx, 1.9, 2.39]}>
+          <boxGeometry args={[0.03, 0.65, 0.02]} />
+          {mat('#A09090')}
+        </mesh>
+      ))}
+      {/* Fridge against east wall (W2) — x=13 */}
+      <mesh position={[12.2, 0.9, 3.4]} castShadow receiveShadow>
+        <boxGeometry args={[0.7, 1.82, 0.72]} />
         {mat('#E0E0E0')}
       </mesh>
-      <mesh position={[11.2, 0.9, -6.16]}>
-        <boxGeometry args={[0.6, 1.72, 0.02]} />
+      <mesh position={[12.2, 0.9, 3.76]}>
+        <boxGeometry args={[0.65, 1.72, 0.02]} />
         {mat('#EEEEEE')}
       </mesh>
-      {/* Fridge handle */}
-      <mesh position={[11.1, 1.1, -6.14]}>
+      <mesh position={[12.1, 1.1, 3.78]}>
         <cylinderGeometry args={[0.012, 0.012, 0.28, 8]} />
         {mat('#9E9E9E')}
       </mesh>
@@ -154,45 +159,51 @@ function KitchenFixtures() {
 
 // ── Bathroom: compact fixtures all in left half (x ≤ 0) ──────────────────────
 function BathroomFixtures() {
+  const activeScenarioId = useAppStore(s => s.activeScenarioId);
+  const geyserActive = activeScenarioId === 'geyser';
+  const geyserRef = useRef<THREE.MeshStandardMaterial>(null);
+
+  useFrame(({ clock }) => {
+    if (!geyserRef.current) return;
+    if (geyserActive) {
+      geyserRef.current.emissiveIntensity = 1.5 + Math.abs(Math.sin(clock.getElapsedTime() * 5)) * 2.5;
+    } else {
+      geyserRef.current.emissiveIntensity = 0;
+    }
+  });
+
   return (
     <group>
-      {/* Toilet — in left half */}
-      <mesh position={[-2.8, 0.22, 1.2]} castShadow receiveShadow>
+      {/* Toilet , against east wall (x≈0), facing west */}
+      <mesh position={[-0.5, 0.22, 1.5]} castShadow receiveShadow>
         <boxGeometry args={[0.42, 0.44, 0.66]} />
         {mat('#F5F5F5')}
       </mesh>
-      {/* Toilet tank */}
-      <mesh position={[-2.8, 0.58, 0.88]}>
+      <mesh position={[-0.5, 0.58, 1.18]}>
         <boxGeometry args={[0.38, 0.38, 0.22]} />
         {mat('#F0F0F0')}
       </mesh>
-      {/* Toilet seat */}
-      <mesh position={[-2.8, 0.46, 1.22]} rotation={[-0.1, 0, 0]}>
+      <mesh position={[-0.5, 0.46, 1.52]} rotation={[-0.1, 0, 0]}>
         <boxGeometry args={[0.38, 0.03, 0.52]} />
         {mat('#E8E8E8')}
       </mesh>
-
-      {/* Vanity / sink unit — left half */}
+      {/* Vanity */}
       <mesh position={[-3.2, 0.4, 3.2]} castShadow receiveShadow>
         <boxGeometry args={[0.7, 0.82, 0.48]} />
         {mat('#D7CCC8')}
       </mesh>
-      {/* Countertop */}
       <mesh position={[-3.2, 0.82, 3.2]}>
         <boxGeometry args={[0.72, 0.05, 0.5]} />
         {mat('#BCAAA4')}
       </mesh>
-      {/* Basin */}
       <mesh position={[-3.2, 0.78, 3.2]}>
         <boxGeometry args={[0.42, 0.12, 0.3]} />
         {mat('#90A4AE')}
       </mesh>
-      {/* Tap */}
       <mesh position={[-3.2, 0.98, 3.0]}>
         <cylinderGeometry args={[0.015, 0.015, 0.22, 8]} />
         {mat('#B0BEC5')}
       </mesh>
-      {/* Mirror above vanity */}
       <mesh position={[-3.2, 1.45, 2.96]}>
         <boxGeometry args={[0.62, 0.7, 0.03]} />
         {mat('#CFD8DC')}
@@ -201,16 +212,31 @@ function BathroomFixtures() {
         <boxGeometry args={[0.56, 0.64, 0.005]} />
         {mat('#E8F4F8', '#B0C8D8', 0.12)}
       </mesh>
-
-      {/* Shower area — left half, against south wall */}
+      {/* Shower pipe */}
       <mesh position={[-2.0, 2.5, 7.2]} rotation={[0, 0, Math.PI / 2]}>
         <cylinderGeometry args={[0.018, 0.018, 3.2, 8]} />
         {mat('#9E9E9E')}
       </mesh>
-      {/* Shower head */}
+      {/* Shower head , glows red when geyser scenario is active */}
       <mesh position={[-2.0, 2.42, 7.6]}>
         <cylinderGeometry args={[0.06, 0.04, 0.12, 12]} />
-        {mat('#B0BEC5')}
+        <meshStandardMaterial
+          ref={geyserRef}
+          color={geyserActive ? '#FF4422' : '#B0BEC5'}
+          emissive="#FF2200"
+          emissiveIntensity={0}
+          roughness={0.5}
+        />
+      </mesh>
+      {/* Geyser unit on wall , small box above shower, indicates hot water */}
+      <mesh position={[-1.6, 2.1, 7.8]} castShadow>
+        <boxGeometry args={[0.28, 0.28, 0.16]} />
+        <meshStandardMaterial
+          color={geyserActive ? '#FF6644' : '#EEEEEE'}
+          emissive={geyserActive ? '#FF2200' : '#000'}
+          emissiveIntensity={geyserActive ? 1.2 : 0}
+          roughness={0.6}
+        />
       </mesh>
       {/* Shower tray */}
       <mesh position={[-2.0, 0.02, 7.0]} receiveShadow>
@@ -234,7 +260,6 @@ function BedroomDecor() {
         <boxGeometry args={[0.52, 0.04, 0.48]} />
         {mat('#5D3C31')}
       </mesh>
-      {/* Bedside lamp left */}
       <mesh position={[-9.2, 0.82, 6.5]}>
         <cylinderGeometry args={[0.02, 0.02, 0.3, 8]} />
         {mat('#BCAAA4')}
@@ -243,7 +268,6 @@ function BedroomDecor() {
         <cylinderGeometry args={[0.12, 0.07, 0.22, 12]} />
         {mat('#FFF9C4', '#FFEE58', 0.4)}
       </mesh>
-
       {/* Nightstand right */}
       <mesh position={[-6.8, 0.32, 6.5]} castShadow receiveShadow>
         <boxGeometry args={[0.5, 0.62, 0.46]} />
@@ -253,7 +277,6 @@ function BedroomDecor() {
         <boxGeometry args={[0.52, 0.04, 0.48]} />
         {mat('#5D3C31')}
       </mesh>
-      {/* Bedside lamp right */}
       <mesh position={[-6.8, 0.82, 6.5]}>
         <cylinderGeometry args={[0.02, 0.02, 0.3, 8]} />
         {mat('#BCAAA4')}
@@ -262,7 +285,6 @@ function BedroomDecor() {
         <cylinderGeometry args={[0.12, 0.07, 0.22, 12]} />
         {mat('#FFF9C4', '#FFEE58', 0.4)}
       </mesh>
-
       {/* Bedroom rug */}
       <mesh position={[-8, 0.005, 4.5]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <planeGeometry args={[3.5, 2.2]} />
@@ -272,8 +294,7 @@ function BedroomDecor() {
         <planeGeometry args={[2.8, 1.6]} />
         {mat('#7E57C2')}
       </mesh>
-
-      {/* Dresser / chest of drawers */}
+      {/* Dresser */}
       <mesh position={[-5.5, 0.48, 0.8]} castShadow receiveShadow>
         <boxGeometry args={[0.9, 0.96, 0.48]} />
         {mat('#6D4C41')}
@@ -282,7 +303,6 @@ function BedroomDecor() {
         <boxGeometry args={[0.92, 0.04, 0.5]} />
         {mat('#5D3C31')}
       </mesh>
-      {/* Drawer handles */}
       {[0.24, 0, -0.24].map((dy, i) => (
         <mesh key={i} position={[-5.1, 0.48 + dy, 0.8]}>
           <boxGeometry args={[0.02, 0.04, 0.22]} />
@@ -293,11 +313,10 @@ function BedroomDecor() {
   );
 }
 
-// ── Living room: rug + decor ───────────────────────────────────────────────────
+// ── Living room: rug + decor ──────────────────────────────────────────────────
 function LivingRoomDecor() {
   return (
     <group>
-      {/* Area rug under sofa + side sofas */}
       <mesh position={[-4, 0.005, -4.2]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <planeGeometry args={[5.5, 4.0]} />
         {mat('#D32F2F')}
@@ -310,12 +329,6 @@ function LivingRoomDecor() {
         <planeGeometry args={[4.0, 0.15]} />
         {mat('#FFCDD2')}
       </mesh>
-
-      {/* TV unit lower shelving */}
-      <mesh position={[-2.0, 0.2, -7.2]} castShadow receiveShadow>
-        <boxGeometry args={[1.4, 0.4, 0.4]} />
-        {mat('#5D4037')}
-      </mesh>
     </group>
   );
 }
@@ -324,7 +337,6 @@ function LivingRoomDecor() {
 function OfficeDecor() {
   return (
     <group>
-      {/* Whiteboard on west wall (facing east into room) */}
       <mesh position={[5.04, 1.4, 3.5]} rotation={[0, Math.PI / 2, 0]} castShadow>
         <boxGeometry args={[2.0, 1.1, 0.06]} />
         {mat('#ECEFF1')}
@@ -333,13 +345,10 @@ function OfficeDecor() {
         <boxGeometry args={[1.88, 0.98, 0.01]} />
         {mat('#F5F5F5', '#E3F2FD', 0.05)}
       </mesh>
-      {/* Marker tray */}
       <mesh position={[5.05, 0.88, 3.5]} rotation={[0, Math.PI / 2, 0]}>
         <boxGeometry args={[1.8, 0.06, 0.12]} />
         {mat('#B0BEC5')}
       </mesh>
-
-      {/* Office rug */}
       <mesh position={[8, 0.005, 3.2]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <planeGeometry args={[4.0, 3.0]} />
         {mat('#455A64')}
@@ -348,8 +357,6 @@ function OfficeDecor() {
         <planeGeometry args={[3.4, 2.4]} />
         {mat('#546E7A')}
       </mesh>
-
-      {/* Second monitor stand on desk (right side) */}
       <mesh position={[9.8, 0.96, 1.5]} castShadow>
         <boxGeometry args={[0.72, 0.58, 0.1]} />
         {mat('#1A1A1A')}
@@ -362,11 +369,24 @@ function OfficeDecor() {
   );
 }
 
-// ── India context: Tulsi plant + prayer corner + water cooler ─────────────────
+// ── India context: Tulsi plant + prayer corner ────────────────────────────────
 function IndiaDecor() {
+  const activeScenarioId = useAppStore(s => s.activeScenarioId);
+  const diyaRef = useRef<THREE.MeshStandardMaterial>(null);
+
+  useFrame(({ clock }) => {
+    if (!diyaRef.current) return;
+    if (activeScenarioId === 'pooja') {
+      // Bright flickering devotional flame
+      diyaRef.current.emissiveIntensity = 3.0 + Math.abs(Math.sin(clock.getElapsedTime() * 4.5)) * 2.5;
+    } else {
+      diyaRef.current.emissiveIntensity = 1.2;
+    }
+  });
+
   return (
     <group>
-      {/* Tulsi pot — living room near entrance */}
+      {/* Tulsi pot */}
       <mesh position={[2.5, 0.22, -1.2]} castShadow>
         <cylinderGeometry args={[0.14, 0.1, 0.44, 10]} />
         <meshStandardMaterial color="#B5451B" roughness={0.8} />
@@ -385,7 +405,7 @@ function IndiaDecor() {
         );
       })}
 
-      {/* Prayer corner / Mandir shelf — master bedroom corner */}
+      {/* Prayer shelf */}
       <mesh position={[-11.2, 1.2, 0.8]} castShadow>
         <boxGeometry args={[0.6, 0.06, 0.36]} />
         <meshStandardMaterial color="#C8860A" roughness={0.75} />
@@ -394,15 +414,31 @@ function IndiaDecor() {
         <cylinderGeometry args={[0.04, 0.05, 0.18, 8]} />
         <meshStandardMaterial color="#DAA520" emissive="#A07010" emissiveIntensity={0.3} roughness={0.7} />
       </mesh>
-      {/* Diya */}
+      {/* Diya base */}
       <mesh position={[-11.0, 1.28, 0.7]}>
         <cylinderGeometry args={[0.04, 0.055, 0.04, 10]} />
         <meshStandardMaterial color="#C8860A" roughness={0.75} />
       </mesh>
+      {/* Diya flame , animates on pooja scenario */}
       <mesh position={[-11.0, 1.32, 0.7]}>
         <sphereGeometry args={[0.018, 6, 6]} />
-        <meshStandardMaterial color="#FFF176" emissive="#FFD600" emissiveIntensity={1.2} roughness={0.7} />
+        <meshStandardMaterial
+          ref={diyaRef}
+          color="#FFF176"
+          emissive="#FFD600"
+          emissiveIntensity={1.2}
+          roughness={0.7}
+          toneMapped={false}
+        />
       </mesh>
+
+      {/* Marigold flower petals near prayer shelf */}
+      {([[-0.08, 0.06], [0.08, 0.06], [-0.12, 0.12], [0.12, 0.12]] as [number,number][]).map(([dx, dz], i) => (
+        <mesh key={i} position={[-11.0 + dx, 1.26, 0.7 + dz]}>
+          <sphereGeometry args={[0.022, 6, 6]} />
+          <meshStandardMaterial color="#FF9500" emissive="#FF6000" emissiveIntensity={0.4} />
+        </mesh>
+      ))}
 
       {/* Water cooler in kitchen */}
       <mesh position={[5.5, 0.5, -7.2]} castShadow receiveShadow>

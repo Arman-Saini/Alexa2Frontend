@@ -11,7 +11,7 @@ function groundToFloor(group: THREE.Group) {
   group.position.y -= box.min.y;
 }
 
-// ── Scale helper — normalises a loaded GLB so its longest XZ dimension
+// ── Scale helper , normalises a loaded GLB so its longest XZ dimension
 // matches targetSize world units. Applies BEFORE grounding.
 function normaliseScale(group: THREE.Group, targetSize: number) {
   const box = new THREE.Box3().setFromObject(group);
@@ -84,7 +84,7 @@ function GLBModel({
 // ── Exported furniture components ────────────────────────────────────────────
 
 export function GLBSofa() {
-  return <GLBModel url="/models/furniture/GlamVelvetSofa.glb" targetSize={1.8} />;
+  return <GLBModel url="/models/furniture/premium_sofa.glb" targetSize={2.2} />;
 }
 
 export function GLBLoungeSofa() {
@@ -100,11 +100,15 @@ export function GLBModernChair() {
 }
 
 export function GLBBed() {
-  return <GLBModel url="/models/furniture/bedDouble.glb" targetSize={1.7} />;
+  return <GLBModel url="/models/furniture/premium_bed.glb" targetSize={2.1} />;
 }
 
-export function GLBTable({ round = false }: { round?: boolean }) {
-  return <GLBModel url={round ? '/models/furniture/tableCoffee.glb' : '/models/furniture/table.glb'} targetSize={1.1} />;
+// `dining` → the dressed premium dining table (kitchen). Otherwise a plain coffee table
+// for the living room, so the candle/plate-dressed hero piece only shows where it belongs.
+export function GLBTable({ dining = false }: { dining?: boolean; round?: boolean }) {
+  return dining
+    ? <GLBModel url="/models/furniture/premium_dining.glb" targetSize={1.9} />
+    : <GLBModel url="/models/furniture/tableCoffee.glb" targetSize={1.0} />;
 }
 
 export function GLBCoffeeTable() {
@@ -120,7 +124,7 @@ export function GLBWardrobe() {
 }
 
 export function GLBTVStand() {
-  return <GLBModel url="/models/furniture/cabinetTelevision.glb" targetSize={1.2} />;
+  return <GLBModel url="/models/furniture/premium_tvconsole.glb" targetSize={1.9} />;
 }
 
 export function GLBDesk() {
@@ -132,7 +136,7 @@ export function GLBBathtub() {
 }
 
 export function GLBPlant() {
-  return <GLBModel url="/models/furniture/pottedPlant.glb" targetSize={0.38} />;
+  return <GLBModel url="/models/furniture/premium_plant.glb" targetSize={0.9} />;
 }
 
 export function GLBSpeaker({ isOn }: { isOn: boolean }) {
@@ -140,7 +144,7 @@ export function GLBSpeaker({ isOn }: { isOn: boolean }) {
     <GLBModel
       url="/models/furniture/speakerSmall.glb"
       targetSize={0.22}
-      emissiveColor={isOn ? '#00A8E0' : undefined}
+      emissiveColor={isOn ? '#E8E8E6' : undefined}
       emissiveIntensity={isOn ? 0.6 : 0}
     />
   );
@@ -151,7 +155,7 @@ export function GLBEchoShow({ isOn }: { isOn: boolean }) {
     <GLBModel
       url="/models/furniture/computerScreen.glb"
       targetSize={0.28}
-      emissiveColor={isOn ? '#00CAFF' : '#111'}
+      emissiveColor={isOn ? '#F0F0EE' : '#111'}
       emissiveIntensity={isOn ? 1.2 : 0.05}
     />
   );
@@ -168,7 +172,7 @@ export function GLBSmartTV({ isOn }: { isOn: boolean }) {
   );
 }
 
-// Kitchen appliance set — rendered as a group at a fixed local offset
+// Kitchen appliance set , rendered as a group at a fixed local offset
 export function GLBKitchenFridge() {
   return <GLBModel url="/models/furniture/kitchenFridge.glb" targetSize={0.68} />;
 }
@@ -186,19 +190,19 @@ export function GLBKitchenCabinet() {
 }
 
 // Preload all models so they're ready when the canvas renders
-useGLTF.preload('/models/furniture/GlamVelvetSofa.glb');
+useGLTF.preload('/models/furniture/premium_sofa.glb');
 useGLTF.preload('/models/furniture/loungeSofa.glb');
 useGLTF.preload('/models/furniture/chairCushion.glb');
 useGLTF.preload('/models/furniture/chairModernCushion.glb');
-useGLTF.preload('/models/furniture/bedDouble.glb');
-useGLTF.preload('/models/furniture/table.glb');
+useGLTF.preload('/models/furniture/premium_bed.glb');
+useGLTF.preload('/models/furniture/premium_dining.glb');
 useGLTF.preload('/models/furniture/tableCoffee.glb');
 useGLTF.preload('/models/furniture/bookcaseOpen.glb');
 useGLTF.preload('/models/furniture/cabinetBedDrawer.glb');
-useGLTF.preload('/models/furniture/cabinetTelevision.glb');
+useGLTF.preload('/models/furniture/premium_tvconsole.glb');
 useGLTF.preload('/models/furniture/desk.glb');
 useGLTF.preload('/models/furniture/bathtub.glb');
-useGLTF.preload('/models/furniture/pottedPlant.glb');
+useGLTF.preload('/models/furniture/premium_plant.glb');
 useGLTF.preload('/models/furniture/speakerSmall.glb');
 useGLTF.preload('/models/furniture/computerScreen.glb');
 useGLTF.preload('/models/furniture/televisionModern.glb');

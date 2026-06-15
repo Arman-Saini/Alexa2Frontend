@@ -4,23 +4,24 @@ import * as THREE from 'three';
 import { useAppStore } from '../../store/store';
 import { sharedCameraRef, cameraTransitionRef } from './cameraRef';
 
-const ISO_DIST = 26;
-const ISO_POS  = new THREE.Vector3(ISO_DIST, ISO_DIST * 0.88, ISO_DIST);
+// Tuned for the 26×20 (1 unit = 1 m) floor plan (2× scale).
+const ISO_DIST = 28;
+const ISO_POS  = new THREE.Vector3(ISO_DIST, ISO_DIST * 0.9, ISO_DIST);
 
 const HOUSE_VIEW = {
   position: ISO_POS.clone(),
   target:   new THREE.Vector3(0, 0, 0),
-  zoom:     22,
+  zoom:     20,
 };
 
 function getRoomView(room: { position: { x: number; y: number; z: number }; width: number; depth: number }) {
   const rx = room.position.x;
   const rz = room.position.z;
   const maxDim = Math.max(room.width, room.depth);
-  const d    = maxDim * 0.85;
-  const zoom = Math.min(88, Math.max(36, 680 / maxDim));
+  const d    = maxDim * 1.1;
+  const zoom = Math.min(115, Math.max(58, 470 / maxDim));
   return {
-    position: new THREE.Vector3(rx + d, d * 0.9, rz + d),
+    position: new THREE.Vector3(rx + d, d * 0.95, rz + d),
     target:   new THREE.Vector3(rx, 0, rz),
     zoom,
   };
@@ -52,7 +53,7 @@ export function CameraController() {
     const ortho = camera as THREE.OrthographicCamera;
 
     if (!activeRoomId) {
-      // Returning to house view — restore position/look but keep user's zoom
+      // Returning to house view , restore position/look but keep user's zoom
       targetPos.current.copy(HOUSE_VIEW.position);
       targetLook.current.copy(HOUSE_VIEW.target);
       // If the user had a custom zoom before entering a room, bring it back.
@@ -60,7 +61,7 @@ export function CameraController() {
       targetZoom.current = savedUserZoom.current ?? HOUSE_VIEW.zoom;
       savedUserZoom.current = null;
     } else {
-      // Entering a room — save current zoom so we can restore it on exit
+      // Entering a room , save current zoom so we can restore it on exit
       if (ortho.isOrthographicCamera) {
         savedUserZoom.current = ortho.zoom;
       }
@@ -80,7 +81,7 @@ export function CameraController() {
   useEffect(() => { sharedCameraRef.current = camera; }, [camera]);
 
   useFrame((_, delta) => {
-    // cameraTransitionRef is cleared by OrbitControls onStart — user interaction wins
+    // cameraTransitionRef is cleared by OrbitControls onStart , user interaction wins
     if (!cameraTransitionRef.current) return;
 
     const t = 1 - Math.exp(-0.014 * 60 * delta);
