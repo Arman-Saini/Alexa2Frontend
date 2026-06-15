@@ -70,21 +70,30 @@ function AlexaRing({ onVoiceSubmit }: { onVoiceSubmit: (text: string) => void })
     }
   };
 
-  // Polly TTS via backend — audio/mpeg base64 works in every browser.
-  // Falls back to speechSynthesis if the backend is offline.
-  const speakPolly = async (text: string) => {
+  // Keep response short: take up to 2 sentences or 130 chars, strip escaped quotes
+  const toTts = (text: string): string => {
+    const clean = text.replace(/\\"/g, '').replace(/\\n/g, ' ').trim();
+    if (clean.length <= 130) return clean;
+    const m = clean.match(/^.{20,130}[.!?]/);
+    return m ? m[0] : clean.slice(0, 130);
+  };
+
+  // Backend TTS (Sarvam Hinglish / Polly fallback) → browser speechSynthesis if offline
+  const speakBackend = async (rawText: string) => {
+    const text = toTts(rawText);
     try {
       const result = await voiceApi.synthesise(text, 'kajal');
       if (result.audio_base64) {
-        const audio = new Audio(`data:audio/mpeg;base64,${result.audio_base64}`);
+        const mime = result.content_type ?? 'audio/mpeg';
+        const audio = new Audio(`data:${mime};base64,${result.audio_base64}`);
         audio.play().catch(() => speak(text));
         return;
       }
     } catch (err) {
-      const detail = err instanceof ApiError
-        ? `${err.status} ${err.statusText}`
-        : 'backend offline';
-      addNotification(`🔊 Polly TTS failed (${detail}) — using browser voice`, 'warning');
+      if (err instanceof ApiError) {
+        addNotification(`🔊 TTS error ${err.status} — using browser voice`, 'warning');
+      }
+      // Network / timeout errors fall back silently to browser voice
     }
     speak(text);
   };
@@ -134,7 +143,7 @@ function AlexaRing({ onVoiceSubmit }: { onVoiceSubmit: (text: string) => void })
           // Browser STT transcript → backend T0/T1/T3 pipeline
           const result = await sendMockText(cleaned);
           const resp = result?.response ?? cleaned;
-          speakPolly(resp);
+          speakBackend(resp);
           setResponse(resp);
           onVoiceSubmit(cleaned);
         } else {
@@ -210,7 +219,7 @@ function AlexaRing({ onVoiceSubmit }: { onVoiceSubmit: (text: string) => void })
     if (backendMode) {
       const result = await sendMockText(text);
       const resp = result?.response ?? 'Sent to backend.';
-      speakPolly(resp);
+      speakBackend(resp);
       setResponse(resp);
     } else {
       const result = executeVoiceCommand(text);

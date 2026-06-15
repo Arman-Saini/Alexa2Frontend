@@ -36,7 +36,7 @@ export const voiceApi = {
       auto_route: autoRoute,
       language: 'en-IN',
       speaker_id: 'owner_1',
-    }),
+    }, { timeoutMs: 20_000 }),
 
   // Upload a real audio Blob recorded from the browser mic
   transcribeAudio: (audioBlob: Blob, autoRoute = true) => {
@@ -45,10 +45,10 @@ export const voiceApi = {
     form.append('home_id', env.HOME_ID);
     form.append('auto_route', String(autoRoute));
     form.append('language', 'en-IN');
-    return apiClient.postForm<TranscribeResponse>(endpoints.transcribe, form);
+    return apiClient.postForm<TranscribeResponse>(endpoints.transcribe, form, { timeoutMs: 20_000 });
   },
 
   // Text-to-speech via Amazon Polly — returns base64 MP3 playable in all browsers
   synthesise: (text: string, voice = 'kajal') =>
-    apiClient.post<TtsResponse>(endpoints.tts, { text, voice, home_id: env.HOME_ID }),
+    apiClient.post<TtsResponse>(endpoints.tts, { text, voice, home_id: env.HOME_ID }, { timeoutMs: 30_000 }),
 };
