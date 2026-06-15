@@ -94,12 +94,13 @@ function AlexaRing({ onVoiceSubmit }: { onVoiceSubmit: (text: string) => void })
     return m ? m[0] : clean.slice(0, 130);
   };
 
-  // Backend TTS (Sarvam Hinglish / Polly fallback) → browser speechSynthesis if offline
+  // Backend TTS (Sarvam / Polly) → browser neural voice if mock or offline
   const speakBackend = async (rawText: string) => {
     const text = toTts(rawText);
     try {
       const result = await voiceApi.synthesise(text, 'kajal');
-      if (result.audio_base64) {
+      // Skip mock stub audio — it plays as silence and never triggers .catch()
+      if (result.audio_base64 && !result.is_mock) {
         const mime = result.content_type ?? 'audio/mpeg';
         const audio = new Audio(`data:${mime};base64,${result.audio_base64}`);
         audio.play().catch(() => speak(text));
@@ -109,7 +110,6 @@ function AlexaRing({ onVoiceSubmit }: { onVoiceSubmit: (text: string) => void })
       if (err instanceof ApiError) {
         addNotification(`🔊 TTS error ${err.status} — using browser voice`, 'warning');
       }
-      // Network / timeout errors fall back silently to browser voice
     }
     speak(text);
   };

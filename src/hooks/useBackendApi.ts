@@ -86,20 +86,37 @@ export function useBackendVoice() {
         const er = data.event_result as any;
         let response = '';
         if (er?.tier === 'T3' || er?.tier === 'CACHED') {
-          const tc = (er?.result?.tool_calls ?? [])[0];
-          if (tc?.tool_name === 'order_amazon_now') {
-            const item = tc.tool_input?.items?.[0];
+          const toolCalls: any[] = er?.result?.tool_calls ?? [];
+          const orderCall = toolCalls.find((tc: any) => tc.tool_name === 'order_amazon_now');
+          const actuateCall = toolCalls.find((tc: any) => tc.tool_name === 'actuate_home_device');
+          const notifCall = toolCalls.find((tc: any) => tc.tool_name === 'send_user_notification');
+          if (orderCall) {
+            const item = orderCall.tool_input?.items?.[0];
             response = item ? `Ordered ${item.quantity} ${item.unit} of ${item.name}.` : 'Order placed.';
+          } else if (actuateCall) {
+            const state = actuateCall.tool_input?.target_state === 'ON' ? 'on' : 'off';
+            const dev = (actuateCall.tool_input?.device_id ?? '').replace(/_/g, ' ');
+            response = `Done, I've turned ${state} the ${dev}.`;
+          } else if (notifCall) {
+            // Strip [MOCK] prefix from notification messages
+            response = (notifCall.tool_input?.message ?? '').replace(/\[MOCK\]\s*/gi, '');
           } else {
-            response = (er?.result?.reasoning ?? '').split('.')[0] + '.';
+            // Strip "MOCK MODE ACTIVE..." boilerplate from raw reasoning
+            const raw = er?.result?.reasoning ?? '';
+            const clean = raw.replace(/^MOCK\s+MODE\s+ACTIVE[^.]*\.\s*/i, '');
+            response = clean.split('.')[0] + '.';
           }
         } else if (er?.tier === 'T0' || er?.tier === 'T1') {
           response = (er?.result?.explanation ?? '').split('.')[0] + '.';
         } else if (er?.tier === 'LOGGED') {
           response = "I can help control your home devices. Try: \"bedroom fan on\" or \"dim the lights\".";
         }
+        // Final guard: if response is still empty or just a period, use a helpful default
+        if (!response || response === '.' || response.trim().length < 3) {
+          response = "How may I help you? Try: \"bedroom fan on\", \"dim the lights\", or \"good night\".";
+        }
         addNotification(`🌐 "${transcript}" — backend processed`, 'success');
-        return { transcript, response: response.trim() || '' };
+        return { transcript, response: response.trim() };
       } catch (err) {
         const detail = err instanceof ApiError
           ? `${err.status} ${err.statusText}`

@@ -82,6 +82,35 @@ export function processCommand(raw: string, objects: PlacedObject[]): CommandRes
     updates: [],
   };
 
+  // ─── GREETINGS + SOCIAL (T0) ─────────────────────────────────────────────
+
+  if (/\b(hello|hi|hey|howdy|hiya|what'?s\s+up|yo)\b/.test(q) &&
+      !/\b(light|bulb|fan|tv|geyser|lock|door|thermostat|ac|purifier|plug|temperature|scene)\b/.test(q)) {
+    return { matched: true, tier: 'T0_LOCAL', response: 'Hi! How may I help you?', updates: [] };
+  }
+
+  if (/\b(how\s+are\s+you|are\s+you\s+there|you\s+there|you\s+awake|you\s+listening|you\s+ok)\b/.test(q)) {
+    return { matched: true, tier: 'T0_LOCAL', response: "I'm here and listening! What can I do for you?", updates: [] };
+  }
+
+  if (/\b(what\s+can\s+you\s+do|help\s+me|your\s+capabilities|what\s+do\s+you\s+do|what\s+are\s+you\s+capable\s+of)\b/.test(q)) {
+    return {
+      matched: true, tier: 'T0_LOCAL',
+      response: "I can control lights, fans, TV, geyser, AC, and smart locks. Try: \"bedroom fan on\", \"dim the lights\", \"good night\", or \"turn off everything in the kitchen\".",
+      updates: [],
+    };
+  }
+
+  if (/\bthank(s|\s+you)\b/.test(q)) {
+    return { matched: true, tier: 'T0_LOCAL', response: "You're welcome! Anything else?", updates: [] };
+  }
+
+  if (/\b(okay|ok|got\s+it|understood|sure|alright|sounds\s+good)\b/.test(q) &&
+      !/\b(okay\s+alexa|ok\s+alexa)\b/.test(q) &&
+      !/\b(light|fan|tv|geyser|lock|door|ac)\b/.test(q)) {
+    return { matched: true, tier: 'T0_LOCAL', response: 'Got it! Let me know if you need anything.', updates: [] };
+  }
+
   // ─── SCENES (T0) ──────────────────────────────────────────────────────────
 
   if (/\bgood\s+morning\b|\bmorning\s+mode\b|\bwake\s+up\b/.test(q)) {
