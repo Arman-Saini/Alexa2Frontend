@@ -1063,28 +1063,50 @@ function HomeModePanel() {
 // ── AI Predictions Panel ───────────────────────────────────────────────────────
 
 function AiComingUpPanel() {
-  const { anticipations, loading } = useAnticipations();
+  const { anticipations, loading, error } = useAnticipations();
 
   return (
     <div className="px-4 py-4 border-b" style={{ borderColor: C.border }}>
-      <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: C.text3 }}>AI predicts next</p>
-      {loading ? (
-        <p className="text-xs" style={{ color: C.text3 }}>Loading...</p>
-      ) : anticipations.length === 0 ? (
-        <p className="text-xs leading-snug" style={{ color: C.text3 }}>
-          Run AI Learning first — predictions appear once the AI knows your patterns
+      <div className="flex items-center gap-2 mb-3">
+        <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: C.text3 }}>AI predicts next</p>
+        {loading && <span className="text-[9px]" style={{ color: C.text3 }}>refreshing...</span>}
+      </div>
+
+      {error ? (
+        <p className="text-[10px] leading-snug" style={{ color: C.red }}>
+          {error}
+        </p>
+      ) : anticipations.length === 0 && !loading ? (
+        <p className="text-[10px] leading-snug" style={{ color: C.text3 }}>
+          No predictions yet — backend offline or loading
         </p>
       ) : (
         <div className="space-y-2">
-          {anticipations.slice(0, 3).map((a, i) => (
-            <div key={i} className="p-2.5 rounded-lg border" style={{ background: C.card, borderColor: C.border }}>
-              <p className="text-xs leading-snug" style={{ color: C.text }}>AI expects: {a.action}</p>
-              <p className="text-[10px] mt-0.5" style={{ color: C.text3 }}>
-                {a.trigger_window ? `${a.trigger_window} · ` : ''}
-                {Math.round(a.confidence * 100)}% confident
-              </p>
-            </div>
-          ))}
+          {anticipations.slice(0, 4).map((a, i) => {
+            const conf = Math.round(a.confidence * 100);
+            const confColor = conf >= 90 ? C.green : conf >= 80 ? C.amber : C.text2;
+            return (
+              <div key={i} className="p-2.5 rounded-xl border" style={{ background: C.card, borderColor: C.border }}>
+                <div className="flex items-start justify-between gap-2 mb-1">
+                  <p className="text-xs font-medium leading-snug flex-1" style={{ color: C.text }}>{a.action}</p>
+                  <span
+                    className="text-[8px] font-bold px-1.5 py-0.5 rounded shrink-0"
+                    style={{ color: confColor, background: confColor + '18' }}
+                  >
+                    {conf}%
+                  </span>
+                </div>
+                {a.trigger_window && (
+                  <p className="text-[10px] font-semibold mb-0.5" style={{ color: C.cyan }}>
+                    {a.trigger_window}
+                  </p>
+                )}
+                <p className="text-[10px] leading-snug" style={{ color: C.text3 }}>
+                  {a.reason}
+                </p>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
