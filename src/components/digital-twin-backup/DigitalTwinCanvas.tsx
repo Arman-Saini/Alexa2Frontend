@@ -1,7 +1,6 @@
 import { Suspense, useEffect, useState, useCallback, useRef } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Environment, ContactShadows, AdaptiveDpr } from '@react-three/drei';
-import { EffectComposer, Bloom, Vignette } from '@react-three/postprocessing';
 import * as THREE from 'three';
 import { useAppStore } from '../../store/store';
 import { House } from './House';
@@ -192,18 +191,6 @@ export function DigitalTwinCanvas() {
           <Doors />
           <HouseDecor />
           <hemisphereLight args={['#2A3A60', '#102010', 0.28]} />
-
-          {/* Post-processing: Bloom makes active LEDs/emissives visually glow;
-              Vignette gives the scene a professional dashboard edge-darkening */}
-          <EffectComposer multisampling={4}>
-            <Bloom
-              luminanceThreshold={0.85}
-              luminanceSmoothing={0.2}
-              intensity={0.9}
-              radius={0.6}
-            />
-            <Vignette offset={0.28} darkness={0.42} eskil={false} />
-          </EffectComposer>
 
           {/* Adaptive DPR — automatically reduces pixel ratio under GPU load */}
           <AdaptiveDpr pixelated />

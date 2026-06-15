@@ -6,7 +6,6 @@ import { useAppStore } from '../../store/store';
 import { RoomMesh } from './RoomMesh';
 import { PlacedObjectMesh } from './PlacedObjectMesh';
 import { ConnectedWalls } from './ConnectedWalls';
-import { TOON_GRADIENT } from './ToonMaterial';
 
 // Sims-style grass ground outside the house footprint
 function GroundPlane() {

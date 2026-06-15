@@ -45,19 +45,31 @@ function AlexaRing({ onVoiceSubmit }: { onVoiceSubmit: (text: string) => void })
     if (!window.speechSynthesis) return;
     window.speechSynthesis.cancel();
     const utt = new SpeechSynthesisUtterance(text);
-    utt.lang = 'en-IN';
-    utt.rate = 0.88;
-    utt.pitch = 1.1;
     utt.volume = 0.92;
-    // Prefer an Indian English voice if available
+    const trySpeak = () => {
+      const voices = window.speechSynthesis.getVoices();
+      const pick =
+        voices.find(v => /Aria|Jenny/i.test(v.name) && v.name.includes('Neural')) ??
+        voices.find(v => v.name.includes('Neural') && v.lang.startsWith('en')) ??
+        voices.find(v => (v.name.includes('Natural') || v.name.includes('Online')) && v.lang.startsWith('en')) ??
+        voices.find(v => v.name.includes('Google UK English Female')) ??
+        voices.find(v => v.name.includes('Google US English')) ??
+        voices.find(v => v.lang === 'en-US') ??
+        voices.find(v => v.lang.startsWith('en'));
+      if (pick) { utt.voice = pick; utt.lang = pick.lang; }
+      else { utt.lang = 'en-IN'; utt.rate = 0.88; utt.pitch = 1.1; }
+      window.speechSynthesis.speak(utt);
+    };
     const voices = window.speechSynthesis.getVoices();
-    const preferred = voices.find(v => v.lang === 'en-IN') ?? voices.find(v => v.lang.startsWith('en'));
-    if (preferred) utt.voice = preferred;
-    window.speechSynthesis.speak(utt);
+    if (voices.length === 0) {
+      window.speechSynthesis.addEventListener('voiceschanged', trySpeak, { once: true });
+    } else {
+      trySpeak();
+    }
   };
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const recognitionRef = useRef<{ stop: () => void } | null>(null);
   const isListening = ui.isListeningVoice;
 
   // Kick off real mic capture
@@ -100,10 +112,8 @@ function AlexaRing({ onVoiceSubmit }: { onVoiceSubmit: (text: string) => void })
       }
     } else {
       // Local mode: Web Speech API (Chrome/Edge built-in STT, no backend needed)
-      const SpeechRecognitionClass =
-        (window as unknown as { SpeechRecognition?: typeof SpeechRecognition; webkitSpeechRecognition?: typeof SpeechRecognition })
-          .SpeechRecognition ??
-        (window as unknown as { webkitSpeechRecognition?: typeof SpeechRecognition }).webkitSpeechRecognition;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const SpeechRecognitionClass = (window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition;
 
       if (!SpeechRecognitionClass) {
         // Fallback: show text input if browser doesn't support Web Speech API
@@ -119,7 +129,7 @@ function AlexaRing({ onVoiceSubmit }: { onVoiceSubmit: (text: string) => void })
       recognition.interimResults = true;
       recognition.maxAlternatives = 1;
 
-      recognition.onresult = (event) => {
+      recognition.onresult = (event: SpeechRecognitionEvent) => {
         let interim = '';
         let final = '';
         for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -144,7 +154,7 @@ function AlexaRing({ onVoiceSubmit }: { onVoiceSubmit: (text: string) => void })
         }
       };
 
-      recognition.onerror = (event) => {
+      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
         if (event.error === 'no-speech') {
           // Retry silently — keep listening state, just clear interim
           setInterimText('');

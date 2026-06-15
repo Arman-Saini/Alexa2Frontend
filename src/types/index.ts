@@ -31,7 +31,10 @@ export type AlexaDeviceType =
   | 'smart-tv'
   | 'ceiling-fan'
   | 'doorbell'
-  | 'air-purifier';
+  | 'air-purifier'
+  | 'geyser'
+  | 'water-motor'
+  | 'pressure-cooker';
 
 export type FurnitureType =
   | 'sofa'
@@ -61,6 +64,10 @@ export interface AlexaDeviceState {
   speed?: number;            // fan speed 1-5
   airQuality?: number;       // 0-500 AQI
   channel?: number;
+  timerMinutes?: number;     // geyser timer
+  waterLevel?: number;       // water motor fill %
+  whistleCount?: number;     // pressure cooker whistles
+  pressure?: number;         // pressure cooker pressure
 }
 
 export interface PlacedObject {

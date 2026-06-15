@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { backendApi, homeApi, simulateApi } from '../../api';
+import { backendApi, homeApi } from '../../api';
 import type { RegimeState, T0Rule, ProposedRule } from '../../api';
 import { env } from '../../config/env';
 
@@ -110,7 +110,7 @@ function HealthPanel() {
         <Btn label={loading ? '…' : 'Check Health'} onClick={run} color="green" />
         <StatusBadge ok={ok} />
       </div>
-      {result && <JsonBlock data={result} />}
+      {result != null && <JsonBlock data={result} />}
     </div>
   );
 }
@@ -142,14 +142,14 @@ function HomePanel() {
             <Btn label="State" onClick={runState} color="blue" />
             <StatusBadge ok={stateOk} />
           </div>
-          {stateRes && <JsonBlock data={stateRes} />}
+          {stateRes != null && <JsonBlock data={stateRes} />}
         </div>
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-1.5">
             <Btn label="Stats" onClick={runStats} color="blue" />
             <StatusBadge ok={statsOk} />
           </div>
-          {statsRes && <JsonBlock data={statsRes} />}
+          {statsRes != null && <JsonBlock data={statsRes} />}
         </div>
       </div>
       <div className="flex flex-wrap gap-1.5">
@@ -166,13 +166,13 @@ function HomePanel() {
           <StatusBadge ok={resetOk} />
         </div>
       </div>
-      {resetRes && <JsonBlock data={resetRes} />}
-      {seedHistRes && <JsonBlock data={seedHistRes} />}
+      {resetRes != null && <JsonBlock data={resetRes} />}
+      {seedHistRes != null && <JsonBlock data={seedHistRes} />}
       <div className="flex items-center gap-1.5 mt-1">
         <Btn label="Event History" onClick={runEvents} color="gray" />
         <StatusBadge ok={eventsOk} />
       </div>
-      {eventsRes && <JsonBlock data={eventsRes} />}
+      {eventsRes != null && <JsonBlock data={eventsRes} />}
 
       {/* PATCH inventory */}
       <div className="border border-[#2A2A2A] rounded-lg p-2.5 flex flex-col gap-2 mt-1">
@@ -187,7 +187,7 @@ function HomePanel() {
           <Btn label="Update Inventory" onClick={runInventory} color="orange" />
           <StatusBadge ok={invOk} />
         </div>
-        {invRes && <JsonBlock data={invRes} />}
+        {invRes != null && <JsonBlock data={invRes} />}
       </div>
     </div>
   );
@@ -240,8 +240,8 @@ function DevicePanel() {
           <StatusBadge ok={listOk} />
         </div>
       </div>
-      {typesRes && <JsonBlock data={typesRes} />}
-      {listRes && <JsonBlock data={listRes} />}
+      {typesRes != null && <JsonBlock data={typesRes} />}
+      {listRes != null && <JsonBlock data={listRes} />}
 
       {/* POST — register */}
       <div className="border border-[#2A2A2A] rounded-lg p-2.5 flex flex-col gap-2">
@@ -253,7 +253,7 @@ function DevicePanel() {
           <Btn label="Register" onClick={runReg} color="green" />
           <StatusBadge ok={regOk} />
         </div>
-        {regRes && <JsonBlock data={regRes} />}
+        {regRes != null && <JsonBlock data={regRes} />}
       </div>
 
       {/* PATCH — update property */}
@@ -268,7 +268,7 @@ function DevicePanel() {
           <Btn label="Update" onClick={runUpdate} color="orange" />
           <StatusBadge ok={updateOk} />
         </div>
-        {updateRes && <JsonBlock data={updateRes} />}
+        {updateRes != null && <JsonBlock data={updateRes} />}
       </div>
 
       {/* PATCH — set online */}
@@ -286,7 +286,7 @@ function DevicePanel() {
           <Btn label="Set" onClick={runOnline} color="blue" />
           <StatusBadge ok={onlineOk} />
         </div>
-        {onlineRes && <JsonBlock data={onlineRes} />}
+        {onlineRes != null && <JsonBlock data={onlineRes} />}
       </div>
 
       {/* DELETE */}
@@ -297,7 +297,7 @@ function DevicePanel() {
           <Btn label="Delete" onClick={runDelete} color="red" />
         </div>
         <StatusBadge ok={deleteOk} />
-        {deleteRes && <JsonBlock data={deleteRes} />}
+        {deleteRes != null && <JsonBlock data={deleteRes} />}
       </div>
     </div>
   );
@@ -323,7 +323,7 @@ function RoomsPanel() {
         <Btn label="List Rooms" onClick={runList} color="blue" />
         <StatusBadge ok={listOk} />
       </div>
-      {listRes && <JsonBlock data={listRes} />}
+      {listRes != null && <JsonBlock data={listRes} />}
 
       <div className="border border-[#2A2A2A] rounded-lg p-2.5 flex flex-col gap-2">
         <p className="text-[9px] font-bold text-[#8A8A8A] uppercase tracking-wider">POST — Create Room</p>
@@ -339,7 +339,7 @@ function RoomsPanel() {
           <Btn label="Create" onClick={runCreate} color="green" />
           <StatusBadge ok={createOk} />
         </div>
-        {createRes && <JsonBlock data={createRes} />}
+        {createRes != null && <JsonBlock data={createRes} />}
       </div>
 
       <div className="border border-[#2A2A2A] rounded-lg p-2.5 flex flex-col gap-2">
@@ -357,7 +357,7 @@ function RoomsPanel() {
           <Btn label="Update" onClick={runOccupancy} color="orange" />
           <StatusBadge ok={occOk} />
         </div>
-        {occRes && <JsonBlock data={occRes} />}
+        {occRes != null && <JsonBlock data={occRes} />}
       </div>
     </div>
   );
@@ -377,13 +377,13 @@ function RegimePanel() {
         <Btn label="Get Regime" onClick={runGet} color="blue" />
         <StatusBadge ok={getOk} msg={(getRes as RegimeState | null)?.current_regime} />
       </div>
-      {getRes && <JsonBlock data={getRes} />}
+      {getRes != null && <JsonBlock data={getRes} />}
 
       <div className="flex items-center gap-1.5">
         <Btn label="Refresh" onClick={runRefresh} color="gray" />
         <StatusBadge ok={refreshOk} />
       </div>
-      {refreshRes && <JsonBlock data={refreshRes} />}
+      {refreshRes != null && <JsonBlock data={refreshRes} />}
 
       <div className="flex flex-col gap-1.5">
         <p className="text-[9px] font-bold text-[#8A8A8A] uppercase tracking-wider">Force Regime</p>
@@ -402,7 +402,7 @@ function RegimePanel() {
             <StatusBadge ok={forceOk} />
           </div>
         </div>
-        {forceRes && <JsonBlock data={forceRes} />}
+        {forceRes != null && <JsonBlock data={forceRes} />}
       </div>
     </div>
   );
@@ -455,7 +455,7 @@ function RulesPanel() {
           <JsonBlock data={listRes} />
         </div>
       )}
-      {mineRes && <JsonBlock data={mineRes} />}
+      {mineRes != null && <JsonBlock data={mineRes} />}
 
       <div className="flex items-center gap-1.5">
         <Btn label="Proposed Rules" onClick={runProposed} color="blue" />
@@ -510,7 +510,7 @@ function VoicePanel() {
         <Btn label="Voice Config" onClick={runConfig} color="blue" />
         <StatusBadge ok={configOk} />
       </div>
-      {configRes && <JsonBlock data={configRes} />}
+      {configRes != null && <JsonBlock data={configRes} />}
 
       <div className="flex flex-col gap-1.5">
         <p className="text-[9px] font-bold text-[#8A8A8A] uppercase tracking-wider">POST /voice/speak (TTS)</p>
@@ -523,7 +523,7 @@ function VoicePanel() {
           <Btn label="Synthesize" onClick={runTts} color="blue" />
           <StatusBadge ok={ttsOk} />
         </div>
-        {ttsRes && <JsonBlock data={ttsRes} />}
+        {ttsRes != null && <JsonBlock data={ttsRes} />}
       </div>
 
       <div className="flex flex-col gap-1.5">
@@ -538,7 +538,7 @@ function VoicePanel() {
           <Btn label="Respond" onClick={runRespond} color="blue" />
           <StatusBadge ok={respondOk} />
         </div>
-        {respondRes && <JsonBlock data={respondRes} />}
+        {respondRes != null && <JsonBlock data={respondRes} />}
       </div>
 
       {/* GET /voice/speak — TTS via query param */}
@@ -558,7 +558,7 @@ function VoicePanel() {
         <Btn label="Demo Phrases" onClick={runDemo} color="gray" />
         <StatusBadge ok={demoOk} />
       </div>
-      {demoRes && <JsonBlock data={demoRes} />}
+      {demoRes != null && <JsonBlock data={demoRes} />}
     </div>
   );
 }
@@ -641,8 +641,8 @@ function AppStoreExtrasPanel() {
           <StatusBadge ok={modsOk} />
         </div>
       </div>
-      {templateRes && <JsonBlock data={templateRes} />}
-      {modsRes && <JsonBlock data={modsRes} />}
+      {templateRes != null && <JsonBlock data={templateRes} />}
+      {modsRes != null && <JsonBlock data={modsRes} />}
 
       {/* PATCH /sounds/:cluster_id/identify */}
       <div className="border border-[#2A2A2A] rounded-lg p-2.5 flex flex-col gap-2">
@@ -657,7 +657,7 @@ function AppStoreExtrasPanel() {
           <Btn label="Identify" onClick={runIdentifySound} color="orange" />
         </div>
         <StatusBadge ok={soundOk} />
-        {soundRes && <JsonBlock data={soundRes} />}
+        {soundRes != null && <JsonBlock data={soundRes} />}
       </div>
     </div>
   );
