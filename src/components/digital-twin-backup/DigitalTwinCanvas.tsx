@@ -1,6 +1,7 @@
 import { Suspense, useEffect, useState, useCallback, useRef } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls, Environment, ContactShadows } from '@react-three/drei';
+import { OrbitControls, Environment, ContactShadows, AdaptiveDpr } from '@react-three/drei';
+import { EffectComposer, Bloom, Vignette } from '@react-three/postprocessing';
 import * as THREE from 'three';
 import { useAppStore } from '../../store/store';
 import { House } from './House';
@@ -12,19 +13,15 @@ import { SensorTooltip } from './SensorTooltip';
 import { SmartLights } from './SmartLights';
 import { GhostPreview } from './GhostPreview';
 import { sharedCameraRef, cameraTransitionRef } from './cameraRef';
-import { draggingObjectIdRef } from './dragRef';
 import type { AssetType } from '../../types';
 
 function SceneLighting() {
-  const hour = new Date().getHours();
-  // Dynamic colour + intensity based on real time of day
-  const sunColor   = hour >= 6  && hour < 9  ? '#FFB060'  // golden sunrise
-                   : hour >= 9  && hour < 17 ? '#FFF5D0'  // neutral daylight
-                   : hour >= 17 && hour < 20 ? '#FF9040'  // warm sunset
-                   : '#6070A0';                            // cool night
-  const sunInt     = hour >= 6 && hour < 20 ? 2.6 : 0.7;
-  const ambColor   = hour >= 6 && hour < 20 ? '#F0E8D8' : '#1A2040';
-  const ambInt     = hour >= 6 && hour < 20 ? 0.32 : 0.14;
+  // Night mode: indoor smart bulb lighting dominates. Rooms with lights ON glow;
+  // rooms with lights OFF stay dim — shows the digital twin's live state clearly.
+  const sunColor   = '#6070A0';
+  const sunInt     = 0.55;
+  const ambColor   = '#1A2035';
+  const ambInt     = 0.18;
 
   return (
     <>
@@ -54,11 +51,10 @@ export function DigitalTwinCanvas() {
     setActiveRoom, setSelectedObject, exitPlacementMode,
     toggleMiniMap, setAlexaTab, setListeningVoice, setActivePanel,
     addPlacedObject, enterPlacementMode, setDraggedAsset,
-    updatePlacedObject, exitLayoutEditMode, lockLayout,
+    updatePlacedObject, removePlacedObject,
   } = useAppStore();
 
   const [mousePos, setMousePos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = useState(false);
   const canvasWrapperRef = useRef<HTMLDivElement>(null);
 
   const hoveredObj = ui.hoveredObjectId
@@ -67,51 +63,34 @@ export function DigitalTwinCanvas() {
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      // Ignore key events if the user is typing in inputs or textareas (like voice search / generate module)
+      const activeEl = document.activeElement;
+      if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || (activeEl as HTMLElement).isContentEditable)) {
+        return;
+      }
+
       if (e.key === 'Escape') {
         if (ui.isPlacementMode) exitPlacementMode();
         else if (ui.selectedObjectId) setSelectedObject(null);
         else if (ui.activeRoomId) setActiveRoom(null);
+      } else if ((e.key === 'r' || e.key === 'R') && ui.selectedObjectId) {
+        const obj = placedObjects.find((o) => o.id === ui.selectedObjectId);
+        if (obj) {
+          const newY = (obj.rotation.y + Math.PI / 2) % (Math.PI * 2);
+          updatePlacedObject(ui.selectedObjectId, {
+            rotation: { ...obj.rotation, y: newY },
+          });
+        }
+      } else if ((e.key === 'Delete' || e.key === 'Backspace') && ui.selectedObjectId) {
+        removePlacedObject(ui.selectedObjectId);
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [ui, setActiveRoom, setSelectedObject, exitPlacementMode]);
+  }, [ui, placedObjects, setActiveRoom, setSelectedObject, exitPlacementMode, updatePlacedObject, removePlacedObject]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     setMousePos({ x: e.clientX, y: e.clientY });
-
-    const dragId = draggingObjectIdRef.current;
-    if (!dragId || !ui.isLayoutEditMode) return;
-
-    const camera = sharedCameraRef.current;
-    const wrapper = canvasWrapperRef.current;
-    if (!camera || !wrapper) return;
-
-    const rect = wrapper.getBoundingClientRect();
-    const xNdc = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-    const yNdc = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-
-    const raycaster = new THREE.Raycaster();
-    raycaster.setFromCamera(new THREE.Vector2(xNdc, yNdc), camera);
-    const floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
-    const hitPoint = new THREE.Vector3();
-    if (raycaster.ray.intersectPlane(floorPlane, hitPoint)) {
-      updatePlacedObject(dragId, { position: { x: hitPoint.x, y: 0, z: hitPoint.z } });
-    }
-  }, [ui.isLayoutEditMode, updatePlacedObject]);
-
-  const handleMouseUp = useCallback(() => {
-    if (draggingObjectIdRef.current) {
-      draggingObjectIdRef.current = null;
-      setIsDragging(false);
-      document.body.style.cursor = 'default';
-    }
-  }, []);
-
-  const handleMouseDown = useCallback(() => {
-    setTimeout(() => {
-      if (draggingObjectIdRef.current) setIsDragging(true);
-    }, 0);
   }, []);
 
   // Drag-and-drop from the asset library panel
@@ -170,20 +149,13 @@ export function DigitalTwinCanvas() {
     setDraggedAsset(null);
   }, [rooms, addPlacedObject, enterPlacementMode, setDraggedAsset]);
 
-  const isEditMode = ui.isLayoutEditMode && !ui.layoutLocked;
-  const cursorClass = ui.isPlacementMode
-    ? 'cursor-crosshair'
-    : isEditMode
-    ? isDragging ? 'cursor-grabbing' : 'cursor-grab'
-    : '';
+  const cursorClass = ui.isPlacementMode ? 'cursor-crosshair' : '';
 
   return (
     <div
       ref={canvasWrapperRef}
       className={`w-full h-full relative ${cursorClass}`}
       onMouseMove={handleMouseMove}
-      onMouseDown={handleMouseDown}
-      onMouseUp={handleMouseUp}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
@@ -195,8 +167,8 @@ export function DigitalTwinCanvas() {
         style={{ background: '#1a1a2e' }}
       >
         <Suspense fallback={null}>
-          <color attach="background" args={['#D5EAF7']} />
-          <fog attach="fog" args={['#D5EAF7', 60, 160]} />
+          <color attach="background" args={['#07090F']} />
+          <fog attach="fog" args={['#07090F', 55, 140]} />
           <SceneLighting />
           <Environment preset="apartment" background={false} />
           <ContactShadows position={[0, 0.01, 0]} opacity={0.45} scale={50} blur={1.8} far={6} />
@@ -205,7 +177,7 @@ export function DigitalTwinCanvas() {
           <CameraController />
           <OrbitControls
             makeDefault
-            enabled={!ui.isPlacementMode && !isDragging}
+            enabled={!ui.isPlacementMode}
             minZoom={8}
             maxZoom={160}
             maxPolarAngle={Math.PI / 2.15}
@@ -219,7 +191,22 @@ export function DigitalTwinCanvas() {
           <House />
           <Doors />
           <HouseDecor />
-          <hemisphereLight args={['#B8D4FF', '#4A7A20', 0.35]} />
+          <hemisphereLight args={['#2A3A60', '#102010', 0.28]} />
+
+          {/* Post-processing: Bloom makes active LEDs/emissives visually glow;
+              Vignette gives the scene a professional dashboard edge-darkening */}
+          <EffectComposer multisampling={4}>
+            <Bloom
+              luminanceThreshold={0.85}
+              luminanceSmoothing={0.2}
+              intensity={0.9}
+              radius={0.6}
+            />
+            <Vignette offset={0.28} darkness={0.42} eskil={false} />
+          </EffectComposer>
+
+          {/* Adaptive DPR — automatically reduces pixel ratio under GPU load */}
+          <AdaptiveDpr pixelated />
         </Suspense>
       </Canvas>
 
@@ -297,38 +284,42 @@ export function DigitalTwinCanvas() {
         </>
       )}
 
-      {/* Layout Edit Mode banner */}
-      {isEditMode && (
-        <>
-          <div className="absolute inset-0 pointer-events-none border-2 border-[#FF8C00] border-dashed opacity-40 rounded" />
-          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 bg-[#1A1000] bg-opacity-90 border border-[#FF8C00] rounded-full px-4 py-1.5 shadow-lg">
-            <span className="w-2 h-2 rounded-full bg-[#FF8C00] animate-pulse" />
-            <span className="text-xs font-semibold text-[#FF8C00]">Layout Edit Mode — drag objects to reposition</span>
+      {/* Floating item selection action bar */}
+      {ui.selectedObjectId && !ui.isPlacementMode && (
+        <div
+          className="absolute bottom-14 left-1/2 -translate-x-1/2 z-20 flex items-center gap-3 bg-[#111116] border border-[#383848] rounded-xl px-4 py-2 shadow-2xl backdrop-blur-md animate-fade-in"
+          style={{ boxShadow: '0 8px 32px rgba(0,0,0,0.6)' }}
+        >
+          <span className="text-[10px] font-bold text-alexa-text uppercase tracking-widest">
+            {placedObjects.find(o => o.id === ui.selectedObjectId)?.deviceName ?? 'Selected Object'}
+          </span>
+          <div className="flex items-center gap-1.5 border-l border-[#2B2B3A] pl-3">
             <button
-              onClick={() => lockLayout()}
-              className="ml-2 text-[10px] bg-[#FF8C00] text-black font-bold rounded-full px-3 py-0.5 hover:bg-[#FFA030] transition-colors"
+              onClick={() => {
+                const obj = placedObjects.find((o) => o.id === ui.selectedObjectId);
+                if (obj) {
+                  const newY = (obj.rotation.y + Math.PI / 2) % (Math.PI * 2);
+                  updatePlacedObject(obj.id, { rotation: { ...obj.rotation, y: newY } });
+                }
+              }}
+              className="px-2 py-1 rounded bg-[#252530] text-[9px] text-[#A0A0C0] hover:text-white hover:bg-[#353545] active:scale-95 transition-all font-bold"
             >
-              Lock Layout
+              🔄 Rotate (R)
             </button>
             <button
-              onClick={() => exitLayoutEditMode()}
-              className="text-[10px] text-[#FF8C00] hover:text-white border border-[#FF8C0066] rounded-full px-2 py-0.5"
+              onClick={() => {
+                if (ui.selectedObjectId) removePlacedObject(ui.selectedObjectId);
+              }}
+              className="px-2 py-1 rounded bg-red-950 border border-red-900 text-[9px] text-red-200 hover:text-white hover:bg-red-900 active:scale-95 transition-all font-bold"
             >
-              Exit
+              🗑️ Delete (Del)
             </button>
           </div>
-        </>
-      )}
-
-      {/* Layout locked badge */}
-      {ui.layoutLocked && !isEditMode && (
-        <div className="absolute top-3 right-3 z-20 flex items-center gap-1.5 bg-[#1A1000] border border-[#FF8C00] rounded-full px-3 py-1 text-[10px] text-[#FF8C00] font-semibold">
-          🔒 Layout Locked
         </div>
       )}
 
       {/* Bottom hint */}
-      {!ui.activeRoomId && !ui.isPlacementMode && (
+      {!ui.activeRoomId && !ui.isPlacementMode && !ui.selectedObjectId && (
         <div className="absolute bottom-3 left-1/2 -translate-x-1/2 text-[10px] text-white bg-black bg-opacity-30 px-3 py-1.5 rounded-full pointer-events-none backdrop-blur-sm">
           Click room to zoom · Scroll to zoom · Drag to orbit · Drag asset from library to drop here
         </div>

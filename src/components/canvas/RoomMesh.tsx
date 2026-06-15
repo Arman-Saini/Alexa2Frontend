@@ -4,7 +4,7 @@ import { Text } from '@react-three/drei';
 import * as THREE from 'three';
 import { useAppStore } from '../../store/store';
 import type { Room } from '../../types';
-
+import { TOON_GRADIENT } from './ToonMaterial';
 
 // Sims-style vibrant floor palettes
 const FLOOR_PALETTES: Record<string, { floor: string; active: string; accent: string }> = {
@@ -118,8 +118,7 @@ export function RoomMesh({ room, isActive, isHovered }: RoomMeshProps) {
         position={[0, 0.05, 0]}
         rotation={[-Math.PI / 2, 0, 0]}
         fontSize={isActive ? 0.52 : 0.42}
-        color="#ffffff"
-        fillOpacity={isActive ? 1 : isHovered ? 1 : 0.8}
+        color={isActive ? '#ffffff' : isHovered ? '#ffffff' : '#ffffffcc'}
         anchorX="center"
         anchorY="middle"
         maxWidth={room.width - 1}

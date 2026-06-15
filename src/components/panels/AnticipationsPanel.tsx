@@ -1,4 +1,7 @@
-import { useAnticipations, useDigitalTwin, useSimulateMode } from '../../hooks/useBackendApi';
+import { useState } from 'react';
+import { useAnticipations, useDigitalTwin } from '../../hooks/useBackendApi';
+import { backendApi } from '../../api';
+import { useAppStore } from '../../store/store';
 import type { Anticipation } from '../../hooks/useBackendApi';
 
 const TIER_BADGE: Record<string, { label: string; color: string; bg: string }> = {
@@ -81,10 +84,41 @@ function TwinModePill({ mode }: { mode: string }) {
   );
 }
 
+const ALL_SIMS = [
+  { key: 'simulateStudyMode',      emoji: '📚', label: 'Study Mode',      tier: 'T0' },
+  { key: 'simulateNightSafety',    emoji: '🌙', label: 'Night Safety',     tier: 'T0' },
+  { key: 'simulatePowerCut',       emoji: '⚡', label: 'Power Cut',        tier: 'T0' },
+  { key: 'simulateGeyser',         emoji: '🚿', label: 'Geyser',           tier: 'T0' },
+  { key: 'simulateInventoryDrop',  emoji: '📦', label: 'Inventory Drop',   tier: 'T1' },
+  { key: 'simulateUnknownSound',   emoji: '🔊', label: 'Unknown Sound',    tier: 'T1' },
+  { key: 'simulateMotorSafety',    emoji: '⚙️', label: 'Motor Safety',     tier: 'T0' },
+  { key: 'simulateVoiceCommand',   emoji: '🎤', label: 'Voice Command',    tier: 'T1', hasInput: true },
+] as const;
+
+type SimKey = typeof ALL_SIMS[number]['key'];
+
 export function AnticipationsPanel() {
   const { anticipations, loading, error: anticipationsError, refetch } = useAnticipations();
   const { twinData } = useDigitalTwin();
-  const simulate = useSimulateMode();
+  const addNotification = useAppStore((s) => s.addNotification);
+  const [simResults, setSimResults] = useState<Record<string, string>>({});
+  const [voiceText, setVoiceText] = useState('turn on the lights');
+
+  const runSimulate = async (key: SimKey) => {
+    try {
+      const fn = key === 'simulateVoiceCommand'
+        ? () => backendApi.simulateVoiceCommand(undefined, voiceText)
+        : () => (backendApi[key] as () => Promise<{ message?: string }>)();
+      const res = await fn();
+      const msg = (res as { message?: string }).message ?? 'done';
+      setSimResults((r) => ({ ...r, [key]: msg }));
+      addNotification(`⚡ ${ALL_SIMS.find(s => s.key === key)?.label} — ${msg}`, 'info');
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'error';
+      setSimResults((r) => ({ ...r, [key]: `Error: ${msg}` }));
+      addNotification(`Backend offline — ${key} skipped`, 'warning');
+    }
+  };
 
   return (
     <div className="flex flex-col gap-3 p-3 h-full overflow-y-auto">
@@ -110,33 +144,35 @@ export function AnticipationsPanel() {
         )}
       </div>
 
-      {/* Simulate buttons */}
+      {/* Simulate buttons — all 8 endpoints */}
       <div>
         <p className="text-[10px] text-[#8A8A8A] uppercase tracking-wider font-semibold mb-2 px-1">
           Simulate Events
         </p>
         <div className="flex flex-col gap-1.5">
-          {(
-            [
-              { id: 'studyMode', emoji: '📚', label: 'Study Mode' },
-              { id: 'nightSafetyCheck', emoji: '🌙', label: 'Night Safety' },
-              { id: 'powerCut', emoji: '⚡', label: 'Power Cut' },
-            ] as const
-          ).map(({ id, emoji, label }) => (
-            <button
-              key={id}
-              onClick={() => simulate(id)}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold text-left transition-all hover:opacity-80 active:scale-95"
-              style={{
-                background: '#1A1A26',
-                border: '1px solid #2A2A36',
-                color: '#A0A0C0',
-              }}
-            >
-              <span>{emoji}</span>
-              <span>{label}</span>
-              <span className="ml-auto text-[9px] text-[#555]">T0</span>
-            </button>
+          {ALL_SIMS.map(({ key, emoji, label, tier }) => (
+            <div key={key}>
+              {key === 'simulateVoiceCommand' && (
+                <input
+                  value={voiceText}
+                  onChange={(e) => setVoiceText(e.target.value)}
+                  placeholder="Voice command text…"
+                  className="w-full mb-1 bg-[#1A1A26] border border-[#2A2A36] rounded-lg px-3 py-1.5 text-[10px] text-white placeholder-[#555] focus:outline-none focus:border-[#00A8E0]"
+                />
+              )}
+              <button
+                onClick={() => runSimulate(key)}
+                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold text-left transition-all hover:opacity-80 active:scale-95"
+                style={{ background: '#1A1A26', border: '1px solid #2A2A36', color: '#A0A0C0' }}
+              >
+                <span>{emoji}</span>
+                <span className="flex-1">{label}</span>
+                <span className="text-[9px] text-[#555]">{tier}</span>
+              </button>
+              {simResults[key] && (
+                <p className="text-[9px] text-[#4ADE80] px-2 pt-0.5 truncate">{simResults[key]}</p>
+              )}
+            </div>
           ))}
         </div>
       </div>

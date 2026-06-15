@@ -89,7 +89,7 @@ export interface Room {
   wallColor: string;
 }
 
-export type ActivePanel = 'alexa' | 'inspector' | 'library' | 'anticipations';
+export type ActivePanel = 'alexa' | 'inspector' | 'library' | 'anticipations' | 'backend' | 'store';
 export type AlexaTab = 'home' | 'devices' | 'routines';
 
 export interface UIState {
@@ -104,6 +104,8 @@ export interface UIState {
   showMiniMap: boolean;
   isListeningVoice: boolean;
   draggedAssetType: AssetType | null;    // live drag from library panel
+  isLayoutEditMode: boolean;             // drag-to-reposition objects on the 3D canvas
+  layoutLocked: boolean;                 // once true, all positions are permanently frozen
 }
 
 export interface AlexaNotification {

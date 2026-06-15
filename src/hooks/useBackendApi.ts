@@ -2,13 +2,11 @@
 // Components import from here — never call apiClient directly in UI code.
 
 import { useState, useEffect, useCallback } from 'react';
-import { homeApi, voiceApi, simulateApi } from '../api';
-import type { Anticipation, DigitalTwinResponse, SimulateEndpoint } from '../api';
+import { homeApi, voiceApi, simulateApi, appStoreApi, backendApi } from '../api';
+import type { Anticipation, DigitalTwinResponse, SimulateEndpoint, AppStoreStats, AppStoreModule } from '../api';
 import { ApiError } from '../api';
 import { env } from '../config/env';
 import { useAppStore } from '../store/store';
-
-export type ProcessingTier = 'T0_LOCAL' | 'T1_LOCAL' | 'BACKEND' | null;
 
 // Re-export types so existing consumers don't need to change imports
 export type { Anticipation, DigitalTwinResponse as DigitalTwinData };
@@ -72,65 +70,52 @@ export function useDigitalTwin() {
 export function useBackendVoice() {
   const [isProcessing, setIsProcessing] = useState(false);
   const addNotification = useAppStore((s) => s.addNotification);
+  const executeVoiceCommand = useAppStore((s) => s.executeVoiceCommand);
 
-  // Sends text to the backend T0→T1→T3 pipeline.
-  // Returns the transcript + backend-generated response text.
-  // Caller is responsible for local NLU routing — this only does the network call.
-  const sendToBackend = useCallback(
+  const sendMockText = useCallback(
     async (text: string): Promise<{ transcript: string; response: string } | null> => {
       setIsProcessing(true);
       try {
         const data = await voiceApi.transcribeMockText(text, true);
-        const transcript = data.transcript ?? text;
-        // Extract human-readable response from event_result
-        const er = data.event_result as any;
-        let response = '';
-        if (er?.tier === 'T3' || er?.tier === 'CACHED') {
-          const toolCalls: any[] = er?.result?.tool_calls ?? [];
-          const orderCall = toolCalls.find((tc: any) => tc.tool_name === 'order_amazon_now');
-          const actuateCall = toolCalls.find((tc: any) => tc.tool_name === 'actuate_home_device');
-          const notifCall = toolCalls.find((tc: any) => tc.tool_name === 'send_user_notification');
-          if (orderCall) {
-            const item = orderCall.tool_input?.items?.[0];
-            response = item ? `Ordered ${item.quantity} ${item.unit} of ${item.name}.` : 'Order placed.';
-          } else if (actuateCall) {
-            const state = actuateCall.tool_input?.target_state === 'ON' ? 'on' : 'off';
-            const dev = (actuateCall.tool_input?.device_id ?? '').replace(/_/g, ' ');
-            response = `Done, I've turned ${state} the ${dev}.`;
-          } else if (notifCall) {
-            // Strip [MOCK] prefix from notification messages
-            response = (notifCall.tool_input?.message ?? '').replace(/\[MOCK\]\s*/gi, '');
-          } else {
-            // Strip "MOCK MODE ACTIVE..." boilerplate from raw reasoning
-            const raw = er?.result?.reasoning ?? '';
-            const clean = raw.replace(/^MOCK\s+MODE\s+ACTIVE[^.]*\.\s*/i, '');
-            response = clean.split('.')[0] + '.';
-          }
-        } else if (er?.tier === 'T0' || er?.tier === 'T1') {
-          response = (er?.result?.explanation ?? '').split('.')[0] + '.';
-        } else if (er?.tier === 'LOGGED') {
-          response = "I can help control your home devices. Try: \"bedroom fan on\" or \"dim the lights\".";
-        }
-        // Final guard: if response is still empty or just a period, use a helpful default
-        if (!response || response === '.' || response.trim().length < 3) {
-          response = "How may I help you? Try: \"bedroom fan on\", \"dim the lights\", or \"good night\".";
-        }
-        addNotification(`🌐 "${transcript}" — backend processed`, 'success');
-        return { transcript, response: response.trim() };
+        // Mirror the backend action in local state so the 3D scene updates immediately
+        const localResponse = executeVoiceCommand(data.transcript ?? text);
+        addNotification(`🎤 "${data.transcript ?? text}" → routed via backend`, 'success');
+        return { transcript: data.transcript ?? text, response: localResponse };
+      } catch {
+        // Backend offline — degrade gracefully to local NLU
+        const response = executeVoiceCommand(text);
+        addNotification(`🎤 "${text}" → local NLU (backend offline)`, 'info');
+        return { transcript: text, response };
+      } finally {
+        setIsProcessing(false);
+      }
+    },
+    [executeVoiceCommand, addNotification]
+  );
+
+  const sendAudio = useCallback(
+    async (audioBlob: Blob): Promise<{ transcript: string; response: string } | null> => {
+      setIsProcessing(true);
+      try {
+        const data = await voiceApi.transcribeAudio(audioBlob, true);
+        if (!data.transcript) return null;
+        const localResponse = executeVoiceCommand(data.transcript);
+        addNotification(`🎤 "${data.transcript}"`, 'success');
+        return { transcript: data.transcript, response: localResponse };
       } catch (err) {
-        const detail = err instanceof ApiError
-          ? `${err.status} ${err.statusText}`
-          : 'offline';
-        addNotification(`⚠️ Backend (${detail}) — local only`, 'warning');
+        addNotification(
+          `Audio transcription failed: ${err instanceof ApiError ? err.message : 'Unknown error'}`,
+          'alert'
+        );
         return null;
       } finally {
         setIsProcessing(false);
       }
     },
-    [addNotification]
+    [executeVoiceCommand, addNotification]
   );
 
-  return { sendToBackend, isProcessing };
+  return { sendMockText, sendAudio, isProcessing };
 }
 
 // ── Simulate Events ───────────────────────────────────────────────────────────
@@ -161,4 +146,102 @@ export function useSimulateMode() {
   );
 
   return simulate;
+}
+
+// ── App Store ─────────────────────────────────────────────────────────────────
+
+export function useAppStore_() {
+  const [storeStats, setStoreStats] = useState<AppStoreStats | null>(null);
+  const [modules, setModules] = useState<AppStoreModule[]>([]);
+  const [loading, setLoading] = useState(false);
+  const addNotification = useAppStore((s) => s.addNotification);
+
+  const searchModules = useCallback(async (q?: string, category?: string) => {
+    setLoading(true);
+    try {
+      const data = await appStoreApi.getModules({ q, category });
+      setModules(data.modules ?? []);
+    } catch {
+      // backend offline — leave modules as empty
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    appStoreApi.getStats().then(setStoreStats).catch(() => {});
+    searchModules();
+  }, [searchModules]);
+
+  const installModule = useCallback(
+    async (moduleId: string, moduleName: string) => {
+      try {
+        const result = await appStoreApi.installModule(moduleId);
+        addNotification(`📦 ${moduleName} installed! +${result.extra_rules ?? 0} T0 rules`, 'success');
+        return result;
+      } catch (err) {
+        addNotification(
+          err instanceof ApiError ? `Install failed: ${err.message}` : 'Backend offline',
+          'alert'
+        );
+        return null;
+      }
+    },
+    [addNotification]
+  );
+
+  const generateModule = useCallback(
+    async (desc: string, deviceType: string, brand?: string) => {
+      try {
+        const result = await appStoreApi.generateModule(desc, deviceType, brand);
+        addNotification(`🤖 Module "${result.draft?.name ?? 'draft'}" generated!`, 'success');
+        return result;
+      } catch (err) {
+        addNotification(
+          err instanceof ApiError ? `Generate failed: ${err.message}` : 'Backend offline',
+          'alert'
+        );
+        return null;
+      }
+    },
+    [addNotification]
+  );
+
+  const publishModule = useCallback(
+    async (payload: Partial<AppStoreModule>) => {
+      try {
+        const { apiClient, endpoints } = await import('../api');
+        const result = await apiClient.post(endpoints.appStoreModules, payload);
+        addNotification(`🚀 Module published to App Store!`, 'success');
+        return result;
+      } catch (err) {
+        addNotification(
+          err instanceof ApiError ? `Publish failed: ${err.message}` : 'Backend offline',
+          'alert'
+        );
+        return null;
+      }
+    },
+    [addNotification]
+  );
+
+  return { storeStats, modules, loading, searchModules, installModule, generateModule, publishModule };
+}
+
+export function useInstalledModules() {
+  const [modules, setModules] = useState<Array<{
+    module_id: string; name: string; brand?: string; extra_rules?: number;
+  }>>([]);
+
+  useEffect(() => {
+    backendApi
+      .getInstalledModules()
+      .then((data) => {
+        const raw = (data as { modules?: unknown[] }).modules ?? [];
+        setModules(raw as typeof modules);
+      })
+      .catch(() => {});
+  }, []);
+
+  return { modules };
 }

@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { useAppStore } from '../../store/store';
 import type { PlacedObject } from '../../types';
 import { TOON_GRADIENT } from './ToonMaterial';
+import { draggingObjectIdRef } from './dragRef';
 import {
   SofaGeometry, BedGeometry, TableGeometry, ChairGeometry,
   TVStandGeometry, BookshelfGeometry, BathtubGeometry, DeskGeometry,
@@ -89,10 +90,11 @@ export function PlacedObjectMesh({ obj }: { obj: PlacedObject }) {
   const isOn = obj.alexaDeviceState.isOn;
   const yOffset = HEIGHTS[obj.type] ?? 0;
   const topH = TOP_H[obj.type] ?? 0.5;
+  const isEditMode = ui.isLayoutEditMode && !ui.layoutLocked;
 
   useFrame(({ clock }) => {
     if (!groupRef.current) return;
-    if (obj.isAlexaDevice && isOn && obj.type !== 'ceiling-fan') {
+    if (!isEditMode && obj.isAlexaDevice && isOn && obj.type !== 'ceiling-fan') {
       groupRef.current.position.y = obj.position.y + yOffset + Math.sin(clock.getElapsedTime() * 1.4 + obj.position.x * 0.8) * 0.015;
     } else {
       groupRef.current.position.y = obj.position.y + yOffset;
@@ -100,9 +102,15 @@ export function PlacedObjectMesh({ obj }: { obj: PlacedObject }) {
   });
 
   const handleClick = (e: ThreeEvent<MouseEvent>) => {
-    if (ui.isPlacementMode) return;
+    if (ui.isPlacementMode || isEditMode) return;
     e.stopPropagation();
     setSelectedObject(isSelected ? null : obj.id);
+  };
+
+  const handlePointerDown = (e: ThreeEvent<PointerEvent>) => {
+    if (!isEditMode) return;
+    e.stopPropagation();
+    draggingObjectIdRef.current = obj.id;
   };
 
   return (
@@ -111,10 +119,11 @@ export function PlacedObjectMesh({ obj }: { obj: PlacedObject }) {
       position={[obj.position.x, obj.position.y + yOffset, obj.position.z]}
       rotation={[0, obj.rotation.y, 0]}
       onClick={handleClick}
+      onPointerDown={handlePointerDown}
       onPointerOver={(e) => {
         e.stopPropagation();
         setHoveredObject(obj.id);
-        document.body.style.cursor = 'pointer';
+        document.body.style.cursor = isEditMode ? 'grab' : 'pointer';
       }}
       onPointerOut={() => {
         setHoveredObject(null);
@@ -124,7 +133,7 @@ export function PlacedObjectMesh({ obj }: { obj: PlacedObject }) {
       <DeviceGeometry obj={obj} />
 
       {/* Gold selection ring — no Html, no z-index issues */}
-      {isSelected && (
+      {isSelected && !isEditMode && (
         <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
           <ringGeometry args={[
             Math.max(0.22, topH * 0.38),
@@ -132,6 +141,18 @@ export function PlacedObjectMesh({ obj }: { obj: PlacedObject }) {
             36,
           ]} />
           <meshBasicMaterial color="#FFD700" transparent opacity={0.92} depthWrite={false} />
+        </mesh>
+      )}
+
+      {/* Edit mode drag ring */}
+      {isEditMode && (
+        <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[
+            Math.max(0.22, topH * 0.38),
+            Math.max(0.28, topH * 0.46),
+            36,
+          ]} />
+          <meshBasicMaterial color="#FF8C00" transparent opacity={0.75} depthWrite={false} />
         </mesh>
       )}
 
