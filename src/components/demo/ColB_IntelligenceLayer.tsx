@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useAppStore } from '../../store/store';
 import { C } from './ScenarioDefs';
 import type { ActiveScenario, IntelTab, TierKey } from './ScenarioDefs';
 
@@ -146,38 +147,39 @@ function CascadeTab({ activeScenario, tierCounts }: { activeScenario: ActiveScen
 
 function MemoryTab({ activeScenario }: { activeScenario: ActiveScenario | null }) {
   const isGeyser = activeScenario?.id === 'geyser';
-  const isT3     = activeScenario?.tier === 'T3';
-
-  const stmWidths = isT3 ? [90, 75, 60, 42] : [];
+  const vault = useAppStore((s) => s.activeMemoryVault);
 
   const ltmBars = [35, 48, 40, 55, 44, 50, 38, 52, isGeyser ? 95 : 42];
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: '10px 14px' }}>
-      {/* STM */}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '10px 14px' }}>
+      {/* Active Memory Vault — live lookup decisions */}
       <div style={{ border: `1px solid ${C.border}`, borderRadius: 4, padding: '8px 9px', background: C.card }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 7 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 6 }}>
           <div style={{ width: 5, height: 5, borderRadius: '50%', background: C.cyan, flexShrink: 0 }} />
-          <span style={{ fontSize: 8, fontWeight: 700, color: C.text2 }}>Active memory</span>
-          <span style={{ fontSize: 7, color: C.text3 }}>this session</span>
+          <span style={{ fontSize: 8, fontWeight: 700, color: C.text2 }}>Active Memory</span>
+          <span style={{ fontSize: 7, color: C.text3 }}>lookup decisions this session</span>
         </div>
-        {stmWidths.length > 0 ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            {stmWidths.map((w, i) => (
-              <div key={i} style={{
-                height: 7, borderRadius: 2, width: `${w}%`,
-                background: C.cyan, opacity: 0.6,
-              }} />
+        {vault.length === 0 ? (
+          <div style={{ fontSize: 7, color: C.text3, padding: '4px 0' }}>No lookups yet — ask Alexa a live-data question</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 3, maxHeight: 80, overflowY: 'auto' }}>
+            {vault.map((entry, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                <div style={{
+                  width: 5, height: 5, borderRadius: '50%', flexShrink: 0,
+                  background: entry.approved ? C.cyan : C.red,
+                }} />
+                <span style={{ fontSize: 7, color: C.text2, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {entry.query}
+                </span>
+                <span style={{ fontSize: 6, color: entry.approved ? C.cyan : C.red, flexShrink: 0 }}>
+                  {entry.approved ? 'approved' : 'denied'}
+                </span>
+              </div>
             ))}
           </div>
-        ) : (
-          <div style={{ height: 28, display: 'flex', alignItems: 'center' }}>
-            <div style={{ height: 7, width: '30%', borderRadius: 2, background: C.border }} />
-          </div>
         )}
-        <div style={{ fontSize: 7, color: C.text3, marginTop: 5 }}>
-          {isT3 ? `Thread tokens · ${stmWidths.length} turns active` : 'No active thread'}
-        </div>
       </div>
 
       {/* LTM */}
@@ -199,7 +201,7 @@ function MemoryTab({ activeScenario }: { activeScenario: ActiveScenario | null }
           ))}
         </div>
         <div style={{ fontSize: 7, marginTop: 4, color: isGeyser ? C.red : C.text3 }}>
-          {isGeyser ? 'Geyser anomaly , 45min vs 20min avg' : '7-day Timestream baseline'}
+          {isGeyser ? 'Geyser anomaly · 45min vs 20min avg' : '7-day Timestream baseline'}
         </div>
       </div>
     </div>

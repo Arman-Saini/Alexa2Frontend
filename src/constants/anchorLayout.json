@@ -254,13 +254,13 @@
         }
       ],
       "devices": [
-        { "id": "lr-tv",      "deviceType": "smart-tv",     "anchor": { "type": "wall",   "wall": "W1", "along": 0.5   }, "distFromWall": 0.8,  "rotY": 0,       "desc": "Living Room · 85\" Smart TV on the north wall" },
-        { "id": "lr-bulb",    "deviceType": "smart-bulb",   "anchor": { "type": "ceiling"                               },                       "rotY": 0,       "desc": "Living Room · ceiling light" },
-        { "id": "lr-fan",     "deviceType": "ceiling-fan",  "anchor": { "type": "ceiling"                               },                       "rotY": 0,       "desc": "Living Room · ceiling fan" },
+        { "id": "lr-tv",      "deviceType": "smart-tv",      "anchor": { "type": "wall",   "wall": "W1", "along": 0.5   }, "distFromWall": 0.8,  "rotY": 0,       "desc": "Living Room · 85\" Smart TV on the north wall" },
+        { "id": "lr-bulb",    "deviceType": "smart-bulb",   "anchor": { "type": "wall",   "wall": "W1", "along": 0.65  }, "distFromWall": 5.5,  "rotY": 0,       "desc": "Living Room · ceiling light" },
+        { "id": "lr-fan",     "deviceType": "ceiling-fan",  "anchor": { "type": "wall",   "wall": "W3", "along": 0.35  }, "distFromWall": 6.0,  "rotY": 0,       "desc": "Living Room · ceiling fan" },
         { "id": "lr-echo",    "deviceType": "echo-dot",     "anchor": { "type": "wall",   "wall": "W1", "along": 0.21  }, "distFromWall": 1.4,  "rotY": 0,       "desc": "Living Room · Alexa hub on the console" },
-        { "id": "lr-ac",      "deviceType": "thermostat",   "anchor": { "type": "wall",   "wall": "W2", "along": 0.5   }, "distFromWall": 0.6,  "rotY": -1.5708, "desc": "Living Room · smart AC / thermostat" },
+        { "id": "lr-ac",      "deviceType": "thermostat",   "anchor": { "type": "wall",   "wall": "W2", "along": 0.35  }, "distFromWall": 0.6,  "rotY": -1.5708, "desc": "Living Room · smart AC / thermostat" },
         { "id": "lr-motion",  "deviceType": "motion-sensor","anchor": { "type": "corner", "corner": "NE"               },                       "rotY": 0,       "desc": "Living Room · motion sensor" },
-        { "id": "lr-camera2", "deviceType": "camera",       "anchor": { "type": "wall",   "wall": "W4", "along": 0.625 }, "distFromWall": 0.5,  "rotY": 1.5708,  "desc": "Living Room · indoor security camera" }
+        { "id": "lr-camera2", "deviceType": "camera",       "anchor": { "type": "wall",   "wall": "W4", "along": 0.55  }, "distFromWall": 0.5,  "rotY": 1.5708,  "desc": "Living Room · indoor security camera" }
       ]
     },
     "masterBedroom": {
@@ -442,8 +442,8 @@
         }
       ],
       "devices": [
-        { "id": "mb-bulb", "deviceType": "smart-bulb",  "anchor": { "type": "ceiling"                               },                      "rotY": 0,       "desc": "Master Bedroom · ceiling light" },
-        { "id": "mb-fan",  "deviceType": "ceiling-fan", "anchor": { "type": "ceiling"                               },                      "rotY": 0,       "desc": "Master Bedroom · smart ceiling fan" },
+        { "id": "mb-bulb", "deviceType": "smart-bulb",  "anchor": { "type": "wall", "wall": "W1", "along": 0.5 }, "distFromWall": 3.5, "rotY": 0, "desc": "Master Bedroom · ceiling light" },
+        { "id": "mb-fan",  "deviceType": "ceiling-fan", "anchor": { "type": "wall", "wall": "W3", "along": 0.5 }, "distFromWall": 4.0, "rotY": 0, "desc": "Master Bedroom · smart ceiling fan" },
         { "id": "mb-show", "deviceType": "echo-show",   "anchor": { "type": "wall", "wall": "W2", "along": 0.14 }, "distFromWall": 1.6, "rotY": 0,       "desc": "Master Bedroom · Echo Show on the nightstand" },
         { "id": "mb-lock", "deviceType": "smart-lock",  "anchor": { "type": "wall", "wall": "W2", "along": 0.5  }, "distFromWall": 0.4, "rotY": -1.5708, "desc": "Master Bedroom · smart lock" }
       ]
@@ -568,8 +568,8 @@
         }
       ],
       "devices": [
-        { "id": "ba-bulb",  "deviceType": "smart-bulb",     "anchor": { "type": "ceiling"                              },                      "rotY": 0, "desc": "Bathroom · ceiling light" },
-        { "id": "ba-fan",   "deviceType": "ceiling-fan",    "anchor": { "type": "ceiling"                              },                      "rotY": 0, "desc": "Bathroom · exhaust fan" },
+        { "id": "ba-bulb",  "deviceType": "smart-bulb",     "anchor": { "type": "wall", "wall": "W1", "along": 0.5 }, "distFromWall": 1.5, "rotY": 0, "desc": "Bathroom · ceiling light" },
+        { "id": "ba-fan",   "deviceType": "ceiling-fan",    "anchor": { "type": "wall", "wall": "W3", "along": 0.5 }, "distFromWall": 1.5, "rotY": 0, "desc": "Bathroom · exhaust fan" },
         { "id": "ba-smoke", "deviceType": "smoke-detector", "anchor": { "type": "wall", "wall": "W3", "along": 0.5 }, "distFromWall": 0.6, "rotY": 0, "desc": "Bathroom · smoke & humidity detector" }
       ]
     },
@@ -711,7 +711,7 @@
         }
       ],
       "devices": [
-        { "id": "of-bulb", "deviceType": "smart-bulb",   "anchor": { "type": "ceiling"                              },                      "rotY": 0,      "desc": "Office · ceiling light" },
+        { "id": "of-bulb", "deviceType": "smart-bulb",   "anchor": { "type": "wall", "wall": "W1", "along": 0.4 }, "distFromWall": 2.5, "rotY": 0, "desc": "Office · ceiling light" },
         { "id": "of-tv",   "deviceType": "smart-tv",     "anchor": { "type": "wall", "wall": "W4", "along": 0.5 }, "distFromWall": 1.0, "rotY": 1.5708, "desc": "Office · dual monitors / screen" },
         { "id": "of-echo", "deviceType": "echo-dot",     "anchor": { "type": "wall", "wall": "W1", "along": 0.22}, "distFromWall": 1.6, "rotY": 0,      "desc": "Office · Echo Dot on the desk" },
         { "id": "of-air",  "deviceType": "air-purifier", "anchor": { "type": "wall", "wall": "W2", "along": 0.17}, "distFromWall": 1.4, "rotY": 0,      "desc": "Office · air purifier" }
@@ -966,8 +966,8 @@
         }
       ],
       "devices": [
-        { "id": "kt-bulb",   "deviceType": "smart-bulb",  "anchor": { "type": "ceiling"                               },                      "rotY": 0,       "desc": "Kitchen · ceiling light" },
-        { "id": "kt-fan",    "deviceType": "ceiling-fan", "anchor": { "type": "ceiling"                               },                      "rotY": 0,       "desc": "Kitchen · ceiling fan" },
+        { "id": "kt-bulb",   "deviceType": "smart-bulb",  "anchor": { "type": "wall", "wall": "W1", "along": 0.6 }, "distFromWall": 3.5, "rotY": 0, "desc": "Kitchen · ceiling light" },
+        { "id": "kt-fan",    "deviceType": "ceiling-fan", "anchor": { "type": "wall", "wall": "W3", "along": 0.35}, "distFromWall": 3.0, "rotY": 0, "desc": "Kitchen · ceiling fan" },
         { "id": "kt-echo",   "deviceType": "echo-dot",    "anchor": { "type": "wall", "wall": "W2", "along": 0.15 }, "distFromWall": 1.2, "rotY": -1.5708, "desc": "Kitchen · Echo Dot" },
         { "id": "kt-thermo", "deviceType": "thermostat",  "anchor": { "type": "wall", "wall": "W2", "along": 0.5  }, "distFromWall": 0.6, "rotY": -1.5708, "desc": "Kitchen · thermostat" },
         { "id": "kt-plug",   "deviceType": "smart-plug",  "anchor": { "type": "wall", "wall": "W1", "along": 0.1  }, "distFromWall": 0.8, "rotY": 0,       "desc": "Kitchen · smart plug (water purifier)" }

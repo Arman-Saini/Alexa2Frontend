@@ -655,16 +655,6 @@ function DemoSections({ isListening, activeScenarioName, persona, personas, onPe
     <>
       <div className="h-px bg-alexa-border mx-3 mb-3 shrink-0" />
 
-      {/* Waveform */}
-      <div className="px-3 mb-3 shrink-0">
-        <p className="text-[10px] font-semibold text-alexa-muted uppercase tracking-wider mb-2 px-1">
-          {activeScenarioName ? `Hearing · ${activeScenarioName}` : 'Listening quietly...'}
-        </p>
-        <div className="bg-[#060A04] border border-alexa-border rounded-lg px-2 py-2">
-          <LiveWaveform isListening={isListening} barCount={24} />
-        </div>
-      </div>
-
       {/* Who's home */}
       <div className="px-3 mb-3 shrink-0">
         <p className="text-[10px] font-semibold text-alexa-muted uppercase tracking-wider mb-2 px-1">Who's home right now?</p>
