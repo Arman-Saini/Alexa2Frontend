@@ -418,7 +418,7 @@ export function DemoDashboard({ onOpenConstruct }: { onOpenConstruct?: () => voi
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
 
         {/* ── Column A ──────────────────────────────────────────────────────── */}
-        <div style={{ width: 280, flexShrink: 0, borderRight: `1px solid ${C.border}`, overflow: 'hidden' }}>
+        <div style={{ width: 280, flexShrink: 0, borderRight: `1px solid ${C.border}`, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
           <AlexaAppSimView
             demoSections={{
               isListening: mic.listening,
@@ -455,7 +455,7 @@ export function DemoDashboard({ onOpenConstruct }: { onOpenConstruct?: () => voi
 
         {/* ── Column B ──────────────────────────────────────────────────────── */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          <div data-tour-id="tour-canvas" style={{ flex: 1, position: 'relative', overflow: 'hidden', background: '#0A0A0A' }}>
+          <div data-tour-id="tour-canvas" style={{ flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden', background: '#0A0A0A' }}>
             <Suspense fallback={
               <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <div style={{ width: 32, height: 32, borderRadius: '50%', border: `2px solid ${C.cyan}`, borderTopColor: 'transparent', animation: 'spin .8s linear infinite' }} />

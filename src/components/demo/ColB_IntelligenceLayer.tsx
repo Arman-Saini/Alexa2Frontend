@@ -312,9 +312,9 @@ function KBTab() {
 
 export function ColB_IntelligenceLayer({ activeScenario, activeTab, onTabChange, tierCounts }: Props) {
   return (
-    <div style={{ flexShrink: 0, borderTop: `1px solid ${C.border}`, background: C.surface }}>
+    <div style={{ flex: '0 1 38vh', borderTop: `1px solid ${C.border}`, background: C.surface, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       {/* Tab strip */}
-      <div style={{ display: 'flex', borderBottom: `1px solid ${C.border}` }}>
+      <div style={{ display: 'flex', borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
         {TABS.map(t => {
           const on = activeTab === t.key;
           return (
@@ -336,10 +336,12 @@ export function ColB_IntelligenceLayer({ activeScenario, activeTab, onTabChange,
         })}
       </div>
 
-      {activeTab === 'cascade' && <CascadeTab activeScenario={activeScenario} tierCounts={tierCounts} />}
-      {activeTab === 'memory'  && <MemoryTab  activeScenario={activeScenario} />}
-      {activeTab === 'agents'  && <AgentTreeTab activeScenario={activeScenario} />}
-      {activeTab === 'kb'      && <KBTab />}
+      <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+        {activeTab === 'cascade' && <CascadeTab activeScenario={activeScenario} tierCounts={tierCounts} />}
+        {activeTab === 'memory'  && <MemoryTab  activeScenario={activeScenario} />}
+        {activeTab === 'agents'  && <AgentTreeTab activeScenario={activeScenario} />}
+        {activeTab === 'kb'      && <KBTab />}
+      </div>
     </div>
   );
 }
