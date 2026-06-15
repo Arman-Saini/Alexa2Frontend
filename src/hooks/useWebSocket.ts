@@ -9,114 +9,147 @@ export type WsMessageType =
   | 'regime_change'
   | 'rule_proposed'
   | 'stats_update'
-  | 'ping';
+  | 'ping'
+  | 'voice_command'
+  | 'voice_thinking'
+  | 'voice_response'
+  | 'lookup_request'
+  | 'lookup_approved'
+  | 'lookup_result';
 
 export interface WsMessage {
   type: WsMessageType;
   payload?: Record<string, unknown>;
+  home_id?: string;
+  timestamp?: string;
 }
 
-const MAX_RETRIES = 5;
+const MAX_RETRIES = 8;
+
+// Module-level singleton — one real socket shared across all hook instances
+let _ws: WebSocket | null = null;
+let _retryCount = 0;
+let _circuitOpen = false;
+let _circuitTimer: ReturnType<typeof setTimeout> | null = null;
+let _reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+const _callbacks: Set<(msg: WsMessage) => void> = new Set();
+
+function getWsUrl(): string {
+  return backendState.url.replace(/^http/, 'ws') + `/ws?home_id=${env.HOME_ID}`;
+}
+
+function createSocket() {
+  if (!env.WS_ENABLED) return;
+  if (backendState.source === 'offline') return;
+  if (_circuitOpen) return;
+  if (_ws && (_ws.readyState === WebSocket.OPEN || _ws.readyState === WebSocket.CONNECTING)) return;
+
+  const url = getWsUrl();
+  console.log('[WS] Connecting to', url);
+
+  try {
+    const ws = new WebSocket(url);
+    _ws = ws;
+
+    ws.onopen = () => {
+      _retryCount = 0;
+      _circuitOpen = false;
+      console.info('[WS] Connected');
+    };
+
+    ws.onmessage = (e) => {
+      try {
+        const msg: WsMessage = JSON.parse(e.data);
+        if (msg.type === 'ping') return;
+        _callbacks.forEach(cb => { try { cb(msg); } catch { /* ignore */ } });
+      } catch { /* ignore malformed */ }
+    };
+
+    ws.onclose = () => {
+      if (_ws === ws) _ws = null;
+      _retryCount++;
+      if (_retryCount >= MAX_RETRIES) {
+        _circuitOpen = true;
+        console.warn('[WS] Circuit open after', MAX_RETRIES, 'failures — pausing 30s');
+        if (_circuitTimer) clearTimeout(_circuitTimer);
+        _circuitTimer = setTimeout(() => {
+          _circuitOpen = false;
+          _retryCount = 0;
+          createSocket();
+        }, 30_000);
+        return;
+      }
+      const delay = Math.min(1500 * Math.pow(2, _retryCount - 1), 30_000);
+      if (_reconnectTimer) clearTimeout(_reconnectTimer);
+      _reconnectTimer = setTimeout(createSocket, delay);
+    };
+
+    ws.onerror = () => ws.close();
+  } catch {
+    /* WebSocket unavailable */
+  }
+}
+
+function ensureConnected() {
+  if (!backendState.isResolved) {
+    onBackendResolved(createSocket);
+  } else {
+    createSocket();
+  }
+}
 
 export function useWebSocket() {
-  const wsRef = useRef<WebSocket | null>(null);
   const addNotification = useAppStore((s) => s.addNotification);
-  const reconnectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const wsCallbacksRef = useRef<Array<(msg: WsMessage) => void>>([]);
-  const mountedRef = useRef(true);
-  const retryCountRef = useRef(0);
+  // Keep a stable ref to this instance's notification handler
+  const notifRef = useRef(addNotification);
+  notifRef.current = addNotification;
 
-  const connect = useCallback(() => {
-    if (!mountedRef.current) return;
-    if (wsRef.current?.readyState === WebSocket.OPEN) return;
-
-    // Skip WebSocket entirely when disabled via env (e.g. nginx not configured for WS upgrade)
-    if (!env.WS_ENABLED) return;
-
-    // Wait until the backend probe completes before attempting WS
-    if (!backendState.isResolved) {
-      onBackendResolved(() => { if (mountedRef.current) connect(); });
-      return;
-    }
-
-    // If backend is unreachable, don't attempt WS
-    if (backendState.source === 'offline') return;
-
-    // Circuit breaker: stop after MAX_RETRIES consecutive failures
-    if (retryCountRef.current >= MAX_RETRIES) return;
-
-    const wsUrl = backendState.url.replace(/^http/, 'ws') + `/ws?home_id=${env.HOME_ID}`;
-
-    try {
-      const ws = new WebSocket(wsUrl);
-      wsRef.current = ws;
-
-      ws.onopen = () => {
-        retryCountRef.current = 0;
-        console.info('[WS] Connected to backend');
-      };
-
-      ws.onmessage = (e) => {
-        try {
-          const msg: WsMessage = JSON.parse(e.data);
-          if (msg.type === 'ping') return;
-
-          wsCallbacksRef.current.forEach((cb) => cb(msg));
-
-          if (msg.type === 'regime_change' && msg.payload) {
-            const regime = msg.payload.new_regime as string;
-            addNotification(`Home mode changed to ${regime}`, 'info');
-          }
-
-          if (msg.type === 'rule_proposed' && msg.payload) {
-            addNotification(`New rule proposed: "${msg.payload.title ?? 'Auto rule'}"`, 'success');
-          }
-
-          if (msg.type === 'device_update' && msg.payload) {
-            const { device_id, property, new_value } = msg.payload;
-            addNotification(`${device_id}: ${property} → ${new_value}`, 'info');
-          }
-        } catch {
-          // ignore malformed messages
-        }
-      };
-
-      ws.onclose = () => {
-        wsRef.current = null;
-        if (!mountedRef.current) return;
-        retryCountRef.current++;
-        if (retryCountRef.current >= MAX_RETRIES) return; // circuit open
-        // Exponential backoff: 8s → 16s → 32s → 64s → 128s (cap 120s)
-        const delay = Math.min(8000 * Math.pow(2, retryCountRef.current - 1), 120000);
-        reconnectRef.current = setTimeout(connect, delay);
-      };
-
-      ws.onerror = () => {
-        ws.close();
-      };
-    } catch {
-      // WebSocket API not available
-    }
-  }, [addNotification]);
-
+  // Register a side-effect handler for device/regime/rule notifications
   useEffect(() => {
-    mountedRef.current = true;
-    connect();
-    return () => {
-      mountedRef.current = false;
-      if (reconnectRef.current) clearTimeout(reconnectRef.current);
-      wsRef.current?.close();
+    const handler = (msg: WsMessage) => {
+      if (msg.type === 'regime_change' && msg.payload) {
+        notifRef.current(`Home mode changed to ${msg.payload.new_regime as string}`, 'info');
+      }
+      if (msg.type === 'rule_proposed' && msg.payload) {
+        notifRef.current(`New rule proposed: "${msg.payload.title ?? 'Auto rule'}"`, 'success');
+      }
+      if (msg.type === 'device_update' && msg.payload) {
+        const { device_id, property, new_value } = msg.payload as { device_id: string; property: string; new_value: unknown };
+        notifRef.current(`${device_id}: ${property} → ${new_value}`, 'info');
+        try {
+          const store = useAppStore.getState();
+          const match = store.placedObjects.find(o => o.alexaDeviceId === device_id);
+          if (match) {
+            const camelKey = property.replace(/_([a-z])/g, (_: string, c: string) => c.toUpperCase());
+            store.updateAlexaState(match.id, { [camelKey]: new_value } as Partial<import('../types').AlexaDeviceState>);
+          }
+        } catch { /* ignore */ }
+      }
     };
-  }, [connect]);
+    _callbacks.add(handler);
+    return () => { _callbacks.delete(handler); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const subscribe = useCallback((cb: (msg: WsMessage) => void) => {
-    wsCallbacksRef.current.push(cb);
-    return () => {
-      wsCallbacksRef.current = wsCallbacksRef.current.filter((c) => c !== cb);
-    };
+  // Boot the singleton once per app lifetime
+  useEffect(() => {
+    ensureConnected();
   }, []);
 
-  const isConnected = wsRef.current?.readyState === WebSocket.OPEN;
+  const subscribe = useCallback((cb: (msg: WsMessage) => void) => {
+    _callbacks.add(cb);
+    return () => { _callbacks.delete(cb); };
+  }, []);
 
-  return { subscribe, isConnected };
+  const send = useCallback((msg: WsMessage): boolean => {
+    if (_ws?.readyState === WebSocket.OPEN) {
+      _ws.send(JSON.stringify({ ...msg, timestamp: new Date().toISOString() }));
+      return true;
+    }
+    console.warn('[WS] send failed — not connected (state:', _ws?.readyState, ')');
+    return false;
+  }, []);
+
+  const isConnected = _ws?.readyState === WebSocket.OPEN;
+
+  return { subscribe, send, isConnected };
 }

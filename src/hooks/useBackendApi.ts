@@ -1,5 +1,5 @@
 // React hooks that wrap the API modules with loading/error state.
-// Components import from here — never call apiClient directly in UI code.
+// Components import from here , never call apiClient directly in UI code.
 
 import { useState, useEffect, useCallback } from 'react';
 import { homeApi, voiceApi, simulateApi, appStoreApi, backendApi } from '../api';
@@ -71,18 +71,52 @@ export function useBackendVoice() {
   const [isProcessing, setIsProcessing] = useState(false);
   const addNotification = useAppStore((s) => s.addNotification);
   const executeVoiceCommand = useAppStore((s) => s.executeVoiceCommand);
+  const setLastCloudCommand = useAppStore((s) => s.setLastCloudCommand);
+  const setLastSpecialist = useAppStore((s) => s.setLastSpecialist);
+  const setPendingLookup = useAppStore((s) => s.setPendingLookup);
+  const addActiveMemory = useAppStore((s) => s.addActiveMemory);
 
   const sendMockText = useCallback(
-    async (text: string): Promise<{ transcript: string; response: string } | null> => {
+    async (text: string): Promise<{ transcript: string; response: string; audioBase64?: string; contentType?: string; isMockAudio?: boolean } | null> => {
       setIsProcessing(true);
       try {
-        const data = await voiceApi.transcribeMockText(text, true);
-        // Mirror the backend action in local state so the 3D scene updates immediately
-        const localResponse = executeVoiceCommand(data.transcript ?? text);
-        addNotification(`🎤 "${data.transcript ?? text}" → routed via backend`, 'success');
-        return { transcript: data.transcript ?? text, response: localResponse };
+        const data = await voiceApi.transcribeMockText(text, true, env.HOME_ID);
+        const transcript = data.transcript ?? text;
+        executeVoiceCommand(transcript);
+        const er = data.event_result;
+        const backendResponse =
+          er?.result?.reasoning ??
+          er?.result?.explanation ??
+          er?.result?.final_plan ??
+          er?.spoken_text ??
+          data.spoken_text ??
+          er?.message;
+        const response = backendResponse ?? executeVoiceCommand(transcript);
+        setLastCloudCommand(transcript);
+        const specialist = (er?.result?.routing?.specialist ?? er?.result?.specialist) as string | undefined;
+        if (specialist) setLastSpecialist(specialist);
+
+        // Detect ask-before-lookup marker
+        const lookupMatch = (response ?? '').match(/\[LOOKUP_PENDING:([^\]]+)\]/);
+        if (lookupMatch) {
+          setPendingLookup(lookupMatch[1]);
+          addActiveMemory({ query: lookupMatch[1], timestamp: new Date().toISOString(), approved: false });
+        } else {
+          setPendingLookup(null);
+        }
+
+        addNotification(`🎤 "${transcript}" → routed via backend`, 'success');
+
+        // Extract Polly audio if backend synthesized it
+        const voice = er?.voice ?? data.voice;
+        return {
+          transcript,
+          response,
+          audioBase64: voice?.audio_base64,
+          contentType: voice?.content_type ?? 'audio/mpeg',
+          isMockAudio: voice?.is_mock ?? true,
+        };
       } catch {
-        // Backend offline — degrade gracefully to local NLU
         const response = executeVoiceCommand(text);
         addNotification(`🎤 "${text}" → local NLU (backend offline)`, 'info');
         return { transcript: text, response };
@@ -90,7 +124,7 @@ export function useBackendVoice() {
         setIsProcessing(false);
       }
     },
-    [executeVoiceCommand, addNotification]
+    [executeVoiceCommand, addNotification, setPendingLookup, addActiveMemory]
   );
 
   const sendAudio = useCallback(
@@ -132,11 +166,11 @@ export function useSimulateMode() {
           nightSafetyCheck: 'Night Safety Check',
           powerCut: 'Power Cut Simulation',
         };
-        addNotification(`⚡ ${labels[endpoint]} — ${data.message ?? 'done'}`, 'info');
+        addNotification(`⚡ ${labels[endpoint]} , ${data.message ?? 'done'}`, 'info');
         return data;
       } catch (err) {
         addNotification(
-          err instanceof ApiError ? `Simulate failed: ${err.message}` : 'Backend offline — simulation skipped',
+          err instanceof ApiError ? `Simulate failed: ${err.message}` : 'Backend offline , simulation skipped',
           'warning'
         );
         return null;
@@ -162,7 +196,7 @@ export function useAppStore_() {
       const data = await appStoreApi.getModules({ q, category });
       setModules(data.modules ?? []);
     } catch {
-      // backend offline — leave modules as empty
+      // backend offline , leave modules as empty
     } finally {
       setLoading(false);
     }
