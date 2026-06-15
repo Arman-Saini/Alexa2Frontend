@@ -1,7 +1,7 @@
 // Base HTTP client — all API modules use this instead of raw fetch.
 // Handles: base URL injection, timeout, JSON serialisation, error normalisation, debug logging.
 
-import { env } from '../config/env';
+import { backendState } from '../config/backendState';
 
 export class ApiError extends Error {
   status: number;
@@ -29,7 +29,7 @@ interface RequestOptions extends Omit<RequestInit, 'body'> {
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { body, timeoutMs = 10_000, rawBody, headers: extraHeaders, ...rest } = options;
 
-  const url = `${env.BACKEND_URL}${path}`;
+  const url = `${backendState.url}${path}`;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -40,7 +40,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   }
   Object.assign(headers, extraHeaders as Record<string, string>);
 
-  if (env.API_DEBUG) {
+  if (import.meta.env.VITE_API_DEBUG === 'true') {
     console.debug(`[API] ${rest.method ?? 'GET'} ${url}`, body ?? rawBody ?? '');
   }
 
@@ -64,7 +64,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     parsed = await response.text();
   }
 
-  if (env.API_DEBUG) {
+  if (import.meta.env.VITE_API_DEBUG === 'true') {
     console.debug(`[API] ← ${response.status}`, parsed);
   }
 

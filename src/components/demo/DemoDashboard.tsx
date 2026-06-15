@@ -1,4 +1,4 @@
-import { Suspense, lazy, useState, useEffect, useCallback } from 'react';
+import { Suspense, lazy, useState, useEffect, useCallback, useRef } from 'react';
 import { AlexaAppSimView } from '../panels/AlexaAppSimView';
 import { useDigitalTwin, useAnticipations } from '../../hooks/useBackendApi';
 import { backendApi, homeApi } from '../../api';
@@ -6,6 +6,8 @@ import type { RegimeState, T0Rule, ProposedRule } from '../../api';
 import { useAppStore } from '../../store/store';
 import { useSimulation } from '../../hooks/useSimulation';
 import { useWebSocket } from '../../hooks/useWebSocket';
+import { backendState, onBackendResolved } from '../../config/backendState';
+import type { BackendSource } from '../../config/backendState';
 
 const DigitalTwinCanvas = lazy(() =>
   import('../canvas/DigitalTwinCanvas').then((m) => ({ default: m.DigitalTwinCanvas }))
@@ -69,9 +71,25 @@ function useCurrentTime() {
 
 // ── Header ───────────────────────────────────────────────────────────────────
 
-function DemoHeader({ tierCounts, costSaved }: { tierCounts: TierCounts; costSaved: number }) {
+const BACKEND_LABEL: Record<BackendSource, { label: string; color: string; bg: string; border: string }> = {
+  detecting: { label: '⟳ Connecting',  color: '#AAAA44', bg: '#14140A', border: '#44440A' },
+  cloud:     { label: '☁ Cloud AI',    color: '#4ADE80', bg: '#0A1A0A', border: '#4ADE8030' },
+  local:     { label: '🏠 Local AI',   color: '#60A5FA', bg: '#0A0F1A', border: '#60A5FA30' },
+  offline:   { label: '⚠ Offline',    color: '#F87171', bg: '#1A0A0A', border: '#F8717130' },
+};
+
+function DemoHeader({ tierCounts, costSaved, onTour }: { tierCounts: TierCounts; costSaved: number; onTour: () => void }) {
   const time = useCurrentTime();
   const instantCount = tierCounts.T0 + tierCounts.T1;
+  const [backendSource, setBackendSource] = useState<BackendSource>(backendState.source);
+
+  useEffect(() => {
+    setBackendSource(backendState.source);
+    onBackendResolved(() => setBackendSource(backendState.source));
+  }, []);
+
+  const bk = BACKEND_LABEL[backendSource];
+
   return (
     <div className="shrink-0 flex items-center gap-3 px-4 h-12 border-b border-[#1A1A2A]" style={{ background: '#08080E' }}>
       <div className="shrink-0 flex items-baseline gap-0.5">
@@ -83,16 +101,172 @@ function DemoHeader({ tierCounts, costSaved }: { tierCounts: TierCounts; costSav
       <div className="h-4 w-px bg-[#1E1E2A]" />
       <p className="flex-1 text-center text-[11px] text-[#555]">Arjun's Home · {time}</p>
       <div className="flex items-center gap-1.5 shrink-0">
+        <span
+          className="text-[10px] px-2 py-1 rounded-full border"
+          style={{ color: bk.color, background: bk.bg, borderColor: bk.border }}
+        >
+          {bk.label}
+        </span>
         <span className="text-[10px] px-2 py-1 rounded-full border border-[#4ADE8030] text-[#4ADE80]" style={{ background: '#0A1A0A' }}>
           ⚡ {instantCount} instant
         </span>
         <span className="text-[10px] px-2 py-1 rounded-full border border-[#4ADE8020] text-[#4ADE80]" style={{ background: '#0A1A0A' }}>
           💰 ${costSaved.toFixed(4)} saved
         </span>
-        <span className="text-[10px] px-2 py-1 rounded-full border border-[#4ADE8030] text-[#4ADE80]" style={{ background: '#0A1A0A' }}>
-          🟢 AI Active
-        </span>
+        <button
+          onClick={onTour}
+          className="text-[10px] px-2 py-1 rounded-full border border-[#252535] text-[#555] hover:text-white hover:border-[#383848] transition-colors"
+          title="Guided tour"
+        >
+          ? Tour
+        </button>
       </div>
+    </div>
+  );
+}
+
+// ── Demo Tour ─────────────────────────────────────────────────────────────────
+
+const TOUR_STEPS = [
+  {
+    id: 'welcome',
+    title: '👋 Welcome to Alexa+ India',
+    body: "This is a live demo of an AI that solves problems standard Alexa can't — geysers left running, power cuts, water motor overflows, and more. It acts in 8ms locally, only calling the cloud when it truly needs to.",
+    highlight: null,
+    tip: 'Click Next to take a 60-second tour →',
+  },
+  {
+    id: 'home3d',
+    title: '🏠 Your Live 3D Home',
+    body: "The center panel shows Arjun's home as a live 3D model. Devices glow when they're on, dim when they're off. Click any room to zoom in and see what's running inside.",
+    highlight: 'center',
+    tip: 'After this tour, click any room to explore it.',
+  },
+  {
+    id: 'scenarios',
+    title: '▶ Trigger an AI Scenario',
+    body: "The right panel has 8 real scenarios. Click \"🚿 Geyser Left On\" to see the AI act instantly — no cloud, no internet, just a saved pattern firing in 8ms. Then try \"📦 Milk Running Low\" to see the cloud AI think through 5 steps.",
+    highlight: 'right',
+    tip: '⚡ Instant = local rule  ·  🤔 Deep AI = cloud reasoning',
+  },
+  {
+    id: 'overlay',
+    title: '💡 The AI Decision Card',
+    body: "After clicking a scenario, a card floats over the 3D home showing exactly what the AI did, how fast it responded, and what it cost. For Deep AI scenarios, watch the steps animate in one by one — this is the 4-agent reasoning chain.",
+    highlight: 'center',
+    tip: 'Try a scenario now, then come back and click Next.',
+  },
+  {
+    id: 'voice',
+    title: '🎙 Speak to Alexa',
+    body: "Tap the Alexa ring on the left to speak. Try: \"Turn on the lights\" or \"Set the thermostat to 24 degrees\". When the cloud backend is connected, your voice routes through the full T0→T1→T3 cascade automatically.",
+    highlight: 'left',
+    tip: 'The pill next to the ring shows ☁ Cloud or 🏠 Local — auto-detected.',
+  },
+  {
+    id: 'learning',
+    title: '🧠 AI That Gets Smarter',
+    body: "Scroll down the right panel to \"AI Learning\". Click Step 1 to load a week of home history, then Step 2 to find patterns. The AI will suggest rules like \"Heat geyser at 6:30 AM daily\" — confirm one and it fires instantly next time. Zero cloud. $0.00.",
+    highlight: 'right',
+    tip: 'This is the loop that makes the system faster over time.',
+  },
+  {
+    id: 'analytics',
+    title: '📊 Technical Analytics',
+    body: "For a deeper look, click \"📊 Analytics\" in the top-right of the 3D panel. You'll see the tier cascade chart (what % of actions were instant vs cloud), the live event log, and room status. This is the view for technical judges.",
+    highlight: 'center',
+    tip: "You're ready! Close this tour and explore the demo.",
+  },
+];
+
+function DemoTour({ onClose }: { onClose: () => void }) {
+  const [step, setStep] = useState(0);
+  const current = TOUR_STEPS[step];
+  const isLast = step === TOUR_STEPS.length - 1;
+  const dotRef = useRef<HTMLDivElement>(null);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 pointer-events-none"
+    >
+      {/* Tour card — bottom center */}
+      <div className="pointer-events-auto absolute bottom-6 left-1/2 -translate-x-1/2 w-[480px] max-w-[92vw]">
+        <div
+          className="rounded-2xl border border-[#252540] shadow-2xl overflow-hidden"
+          style={{ background: '#0C0C18', boxShadow: '0 0 60px rgba(0,168,224,0.15)' }}
+        >
+          {/* Progress bar */}
+          <div className="h-0.5 bg-[#1A1A2A]">
+            <div
+              className="h-full bg-[#00A8E0] transition-all duration-500"
+              style={{ width: `${((step + 1) / TOUR_STEPS.length) * 100}%` }}
+            />
+          </div>
+
+          <div className="p-5">
+            <div className="flex items-start justify-between mb-3">
+              <h3 className="text-sm font-bold text-white">{current.title}</h3>
+              <button onClick={onClose} className="text-[#333] hover:text-[#888] text-xs ml-3 shrink-0">Skip tour ×</button>
+            </div>
+
+            <p className="text-[12px] text-[#AAA] leading-relaxed mb-3">{current.body}</p>
+
+            <p className="text-[10px] text-[#00A8E0] bg-[#001828] border border-[#00A8E020] rounded-lg px-3 py-1.5 mb-4 leading-snug">
+              💡 {current.tip}
+            </p>
+
+            <div className="flex items-center justify-between">
+              {/* Step dots */}
+              <div ref={dotRef} className="flex gap-1.5">
+                {TOUR_STEPS.map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setStep(i)}
+                    className={`rounded-full transition-all ${i === step ? 'w-5 h-2 bg-[#00A8E0]' : 'w-2 h-2 bg-[#252535] hover:bg-[#383848]'}`}
+                  />
+                ))}
+              </div>
+
+              {/* Nav buttons */}
+              <div className="flex gap-2">
+                {step > 0 && (
+                  <button
+                    onClick={() => setStep(s => s - 1)}
+                    className="px-3 py-1.5 text-[11px] text-[#555] hover:text-white border border-[#1E1E2A] rounded-lg transition-colors"
+                  >
+                    ← Back
+                  </button>
+                )}
+                {isLast ? (
+                  <button
+                    onClick={onClose}
+                    className="px-4 py-1.5 text-[11px] font-semibold text-white rounded-lg transition-colors"
+                    style={{ background: '#00A8E0' }}
+                  >
+                    Start exploring →
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setStep(s => s + 1)}
+                    className="px-4 py-1.5 text-[11px] font-semibold text-white rounded-lg transition-colors"
+                    style={{ background: '#00A8E0' }}
+                  >
+                    Next →
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Side arrows pointing to the highlighted column */}
+      {current.highlight === 'left' && (
+        <div className="pointer-events-none fixed left-[100px] bottom-[220px] text-[#00A8E0] text-2xl animate-bounce opacity-80">←</div>
+      )}
+      {current.highlight === 'right' && (
+        <div className="pointer-events-none fixed right-[130px] bottom-[220px] text-[#00A8E0] text-2xl animate-bounce opacity-80">→</div>
+      )}
     </div>
   );
 }
@@ -726,9 +900,10 @@ export function DemoDashboard() {
   const [tierCounts, setTierCounts] = useState<TierCounts>({ T0: 8, T1: 3, T3: 1 });
   const [costSaved, setCostSaved] = useState(0.00044);
   const [events, setEvents] = useState<LiveEvent[]>([]);
-  const [showBanner, setShowBanner] = useState(true);
+  const [showBanner, setShowBanner] = useState(false); // banner replaced by tour
   const [overlay, setOverlay] = useState<OverlayInfo | null>(null);
   const [showFullAlexa, setShowFullAlexa] = useState(false);
+  const [showTour, setShowTour] = useState(true); // show tour on first load
 
   useEffect(() => {
     const unsub = subscribe(msg => {
@@ -763,7 +938,7 @@ export function DemoDashboard() {
   return (
     <div className="flex flex-col w-full h-full" style={{ background: '#08080E' }}>
       {showBanner && <OnboardingBanner onDismiss={() => setShowBanner(false)} />}
-      <DemoHeader tierCounts={tierCounts} costSaved={costSaved} />
+      <DemoHeader tierCounts={tierCounts} costSaved={costSaved} onTour={() => setShowTour(true)} />
 
       <div className="flex flex-1 overflow-hidden">
         {/* Left: Compact Alexa (220px) */}
@@ -821,6 +996,9 @@ export function DemoDashboard() {
           <AiLearningPanel />
         </div>
       </div>
+
+      {/* Guided demo tour — fixed overlay, spans full viewport */}
+      {showTour && <DemoTour onClose={() => setShowTour(false)} />}
 
       {/* Full Alexa App modal */}
       {showFullAlexa && (

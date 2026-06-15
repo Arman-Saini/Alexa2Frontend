@@ -1,7 +1,9 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useAppStore } from '../../store/store';
 import { ASSET_MAP } from '../../constants/assets';
 import { useBackendVoice } from '../../hooks/useBackendApi';
+import { backendState, onBackendResolved } from '../../config/backendState';
+import type { BackendSource } from '../../config/backendState';
 import type { PlacedObject, AlexaNotification } from '../../types';
 
 // ─── Top Status Bar ───────────────────────────────────────────────────────────
@@ -32,14 +34,22 @@ function AlexaRing({ onVoiceSubmit }: { onVoiceSubmit: (text: string) => void })
   const { ui, setListeningVoice } = useAppStore();
   const [inputText, setInputText] = useState('');
   const [response, setResponse] = useState('');
-  const [backendMode, setBackendMode] = useState(false);
+  const [backendSource, setBackendSource] = useState<BackendSource>(backendState.source);
   const [isRecording, setIsRecording] = useState(false);
   const [micError, setMicError] = useState<string | null>(null);
   const [interimText, setInterimText] = useState('');
   const executeVoiceCommand = useAppStore((s) => s.executeVoiceCommand);
   const addNotification = useAppStore((s) => s.addNotification);
-  const { sendAudio, sendMockText, isProcessing } = useBackendVoice();
+  const { sendMockText, isProcessing } = useBackendVoice();
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Reflect backend probe result in UI
+  useEffect(() => {
+    setBackendSource(backendState.source);
+    onBackendResolved(() => setBackendSource(backendState.source));
+  }, []);
+
+  const useBackend = backendSource === 'cloud' || backendSource === 'local';
 
   const speak = (text: string) => {
     if (!window.speechSynthesis) return;
@@ -67,136 +77,98 @@ function AlexaRing({ onVoiceSubmit }: { onVoiceSubmit: (text: string) => void })
       trySpeak();
     }
   };
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
   const recognitionRef = useRef<{ stop: () => void } | null>(null);
   const isListening = ui.isListeningVoice;
 
-  // Kick off real mic capture
-  const startListening = async () => {
+  // Voice capture — always uses Web Speech API for STT.
+  // When backend is reachable, the transcript is routed through backend NLU (T0/T1/T3 cascade).
+  // This avoids the /api/voice/transcribe audio-upload endpoint which requires server-side STT.
+  const startListening = () => {
     setMicError(null);
     setResponse('');
     setListeningVoice(true);
 
-    if (backendMode) {
-      // Backend mode: MediaRecorder → blob → POST /api/voice/transcribe
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const recorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
-        mediaRecorderRef.current = recorder;
-        chunksRef.current = [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const SpeechRecognitionClass = (window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition;
 
-        recorder.ondataavailable = (e) => {
-          if (e.data.size > 0) chunksRef.current.push(e.data);
-        };
+    if (!SpeechRecognitionClass) {
+      setIsRecording(false);
+      setTimeout(() => inputRef.current?.focus(), 100);
+      return;
+    }
 
-        recorder.onstop = async () => {
-          stream.getTracks().forEach((t) => t.stop());
-          const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
-          const result = await sendAudio(blob);
-          if (result) {
-            setResponse(result.response);
-            onVoiceSubmit(result.transcript);
-          }
-          setIsRecording(false);
-          setListeningVoice(false);
-        };
+    const recognition = new SpeechRecognitionClass();
+    recognitionRef.current = recognition;
+    recognition.lang = 'en-US';
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
 
-        recorder.start();
-        setIsRecording(true);
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Microphone access denied';
-        setMicError(msg);
-        setListeningVoice(false);
-        addNotification('🎤 ' + msg, 'alert');
-      }
-    } else {
-      // Local mode: Web Speech API (Chrome/Edge built-in STT, no backend needed)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const SpeechRecognitionClass = (window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition;
-
-      if (!SpeechRecognitionClass) {
-        // Fallback: show text input if browser doesn't support Web Speech API
-        setIsRecording(false);
-        setTimeout(() => inputRef.current?.focus(), 100);
-        return;
-      }
-
-      const recognition = new SpeechRecognitionClass();
-      recognitionRef.current = recognition;
-      recognition.lang = 'en-US';
-      recognition.continuous = true;
-      recognition.interimResults = true;
-      recognition.maxAlternatives = 1;
-
-      recognition.onresult = (event: SpeechRecognitionEvent) => {
-        let interim = '';
-        let final = '';
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          if (event.results[i].isFinal) {
-            final += event.results[i][0].transcript;
-          } else {
-            interim += event.results[i][0].transcript;
-          }
+    recognition.onresult = async (event: SpeechRecognitionEvent) => {
+      let interim = '';
+      let final = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        if (event.results[i].isFinal) {
+          final += event.results[i][0].transcript;
+        } else {
+          interim += event.results[i][0].transcript;
         }
-        setInterimText(interim);
-        if (final) {
-          // Strip "Alexa" / "Hey Alexa" wake word prefix if present
-          const cleaned = final.replace(/^(hey\s+)?alexa[,\s]*/i, '').trim() || final.trim();
+      }
+      setInterimText(interim);
+      if (final) {
+        const cleaned = final.replace(/^(hey\s+)?alexa[,\s]*/i, '').trim() || final.trim();
+        recognition.stop();
+        setListeningVoice(false);
+        setIsRecording(false);
+        setInterimText('');
+        onVoiceSubmit(cleaned);
+
+        if (useBackend) {
+          // Route through backend NLU cascade (T0 → T1 → T3)
+          const result = await sendMockText(cleaned);
+          const resp = result?.response ?? cleaned;
+          speak(resp);
+          setResponse(resp);
+        } else {
           const result = executeVoiceCommand(cleaned);
           speak(result);
           setResponse(result);
-          setInterimText('');
-          onVoiceSubmit(cleaned);
-          recognition.stop();
-          setListeningVoice(false);
-          setIsRecording(false);
         }
-      };
-
-      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-        if (event.error === 'no-speech') {
-          // Retry silently — keep listening state, just clear interim
-          setInterimText('');
-          return;
-        }
-        const msg = event.error === 'not-allowed'
-          ? 'Mic denied — click the lock icon in your browser address bar'
-          : event.error === 'network'
-          ? 'Network error — check internet connection'
-          : `Voice error: ${event.error}`;
-        setMicError(msg);
-        setIsRecording(false);
-        setListeningVoice(false);
-        addNotification('🎤 ' + msg, 'alert');
-      };
-
-      recognition.onend = () => {
-        // With continuous=true, restart if still supposed to be listening
-        if (isRecording) {
-          try { recognition.start(); } catch { /* already stopped */ }
-          return;
-        }
-        setIsRecording(false);
-        setListeningVoice(false);
-      };
-
-      try {
-        recognition.start();
-        setIsRecording(true);
-      } catch {
-        setTimeout(() => inputRef.current?.focus(), 100);
       }
+    };
+
+    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+      if (event.error === 'no-speech') { setInterimText(''); return; }
+      const msg = event.error === 'not-allowed'
+        ? 'Mic denied — click the lock icon in your browser address bar'
+        : event.error === 'network'
+        ? 'Network error — check internet connection'
+        : `Voice error: ${event.error}`;
+      setMicError(msg);
+      setIsRecording(false);
+      setListeningVoice(false);
+      addNotification('🎤 ' + msg, 'alert');
+    };
+
+    recognition.onend = () => {
+      if (isRecording) {
+        try { recognition.start(); } catch { /* already stopped */ }
+        return;
+      }
+      setIsRecording(false);
+      setListeningVoice(false);
+    };
+
+    try {
+      recognition.start();
+      setIsRecording(true);
+    } catch {
+      setTimeout(() => inputRef.current?.focus(), 100);
     }
   };
 
   const stopListening = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop();
-    }
-    if (recognitionRef.current) {
-      recognitionRef.current.stop();
-    }
+    if (recognitionRef.current) recognitionRef.current.stop();
     setIsRecording(false);
     setListeningVoice(false);
   };
@@ -216,7 +188,7 @@ function AlexaRing({ onVoiceSubmit }: { onVoiceSubmit: (text: string) => void })
     const text = inputText.trim();
     setInputText('');
 
-    if (backendMode) {
+    if (useBackend) {
       const result = await sendMockText(text);
       const resp = result?.response ?? 'Sent to backend.';
       speak(resp);
@@ -269,23 +241,23 @@ function AlexaRing({ onVoiceSubmit }: { onVoiceSubmit: (text: string) => void })
         )}
       </button>
 
-      {/* Status + backend toggle row */}
+      {/* Status + auto-detected backend indicator */}
       <div className="flex items-center gap-2 mt-2 mb-1">
         <p className="text-[10px] text-alexa-muted">
           {isProcessing ? 'Processing...' : isRecording ? 'Listening — tap to stop' : 'Tap to speak'}
         </p>
-        <button
-          onClick={() => setBackendMode((v) => !v)}
-          className="flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[8px] font-bold transition-all"
+        <span
+          className="flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[8px] font-bold"
           style={{
-            background: backendMode ? '#0A2A14' : '#1A1A1A',
-            border: `1px solid ${backendMode ? '#4ADE80' : '#383838'}`,
-            color: backendMode ? '#4ADE80' : '#555',
+            background: backendSource === 'cloud' ? '#0A2A14' : backendSource === 'local' ? '#0A1A2A' : backendSource === 'detecting' ? '#1A1A0A' : '#1A0A0A',
+            border: `1px solid ${backendSource === 'cloud' ? '#4ADE80' : backendSource === 'local' ? '#60A5FA' : backendSource === 'detecting' ? '#888830' : '#F87171'}`,
+            color: backendSource === 'cloud' ? '#4ADE80' : backendSource === 'local' ? '#60A5FA' : backendSource === 'detecting' ? '#AAAA44' : '#F87171',
           }}
         >
-          <span className="w-1 h-1 rounded-full" style={{ background: backendMode ? '#4ADE80' : '#555' }} />
-          {backendMode ? 'Backend' : 'Local'}
-        </button>
+          <span className={`w-1 h-1 rounded-full ${backendSource === 'detecting' ? 'animate-pulse' : ''}`}
+            style={{ background: backendSource === 'cloud' ? '#4ADE80' : backendSource === 'local' ? '#60A5FA' : backendSource === 'detecting' ? '#AAAA44' : '#F87171' }} />
+          {backendSource === 'cloud' ? '☁ Cloud' : backendSource === 'local' ? '🏠 Local' : backendSource === 'detecting' ? '⟳ Detecting' : '⚠ Offline'}
+        </span>
       </div>
 
       {/* Mic error */}

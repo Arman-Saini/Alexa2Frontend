@@ -1,6 +1,6 @@
 // WebSocket hook — connects to the backend WS and dispatches events to the store.
 import { useEffect, useRef, useCallback } from 'react';
-import { env } from '../config/env';
+import { backendState } from '../config/backendState';
 import { useAppStore } from '../store/store';
 
 export type WsMessageType =
@@ -25,7 +25,7 @@ export function useWebSocket() {
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
-    const wsUrl = env.BACKEND_URL.replace(/^http/, 'ws') + `/ws?home_id=${env.HOME_ID}`;
+    const wsUrl = backendState.url.replace(/^http/, 'ws') + `/ws?home_id=${import.meta.env.VITE_HOME_ID ?? 'home_001'}`;
 
     try {
       const ws = new WebSocket(wsUrl);
