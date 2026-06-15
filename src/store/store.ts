@@ -1,5 +1,8 @@
 import { create } from 'zustand';
 import { devtools, persist, createJSONStorage } from 'zustand/middleware';
+import { processCommand } from './commandProcessor';
+import type { CommandResult } from './commandProcessor';
+export type { CommandResult } from './commandProcessor';
 import type {
   PlacedObject,
   Room,
@@ -66,7 +69,7 @@ interface AppState {
   toggleRoutine: (id: string) => void;
 
   // Voice commands
-  executeVoiceCommand: (text: string) => string;
+  executeVoiceCommand: (text: string) => CommandResult;
 
   // Simulation
   tickSimulation: () => void;
@@ -342,91 +345,31 @@ export const useAppStore = create<AppState>()(
             ),
           })),
 
-        executeVoiceCommand: (text: string): string => {
-          const lower = text.toLowerCase().trim();
-          const { placedObjects, rooms } = get();
+        executeVoiceCommand: (text: string): CommandResult => {
+          const result = processCommand(text, get().placedObjects);
 
-          if (/turn (on|off) (all |the )?lights?/.test(lower)) {
-            const isOn = lower.includes('turn on');
-            let count = 0;
+          // Apply device updates
+          if (result.updates.length > 0) {
             set((s) => ({
               placedObjects: s.placedObjects.map((o) => {
-                if (o.type === 'smart-bulb' || (o.type === 'smart-plug' && o.alexaDeviceState.isOn !== isOn)) {
-                  count++;
-                  return { ...o, alexaDeviceState: { ...o.alexaDeviceState, isOn } };
-                }
-                return o;
+                const upd = result.updates.find((u) => u.id === o.id);
+                return upd ? { ...o, alexaDeviceState: { ...o.alexaDeviceState, ...upd.changes } } : o;
               }),
             }));
-            get().addNotification(`Lights turned ${isOn ? 'on' : 'off'}.`, isOn ? 'success' : 'info');
-            return `Turning ${isOn ? 'on' : 'off'} ${count} light${count !== 1 ? 's' : ''}.`;
           }
 
-          if (/good morning/.test(lower)) { get().triggerScene('morning'); return 'Good morning! Turning on the lights and setting the temperature.'; }
-          if (/good night|bedtime/.test(lower)) { get().triggerScene('night'); return 'Good night! Turning off devices and locking the doors.'; }
-          if (/movie time|movie night/.test(lower)) { get().triggerScene('movie'); return 'Enjoy the movie! Dimming the lights and turning on the TV.'; }
-          if (/away mode|leaving|i.m leaving/.test(lower)) { get().triggerScene('away'); return 'Away mode activated. Securing your home.'; }
-
-          for (const room of rooms) {
-            if (lower.includes(room.name.toLowerCase())) {
-              get().setActiveRoom(room.id);
-              return `Showing ${room.name}.`;
-            }
+          // Handle room focus
+          if (result.roomFocus !== undefined) {
+            get().setActiveRoom(result.roomFocus);
           }
 
-          const brightnessMatch = lower.match(/set brightness (?:to )?(\d+)/);
-          if (brightnessMatch) {
-            const val = Math.min(100, Math.max(0, parseInt(brightnessMatch[1])));
-            let count = 0;
-            set((s) => ({
-              placedObjects: s.placedObjects.map((o) => {
-                if (o.type === 'smart-bulb') { count++; return { ...o, alexaDeviceState: { ...o.alexaDeviceState, brightness: val } }; }
-                return o;
-              }),
-            }));
-            get().addNotification(`Brightness set to ${val}%.`, 'info');
-            return `Setting brightness to ${val}% for ${count} bulb${count !== 1 ? 's' : ''}.`;
+          // Notification
+          if (result.matched) {
+            const badge = result.tier === 'T0_LOCAL' ? '⚡' : '🧠';
+            get().addNotification(`${badge} "${text}" — ${result.tier === 'T0_LOCAL' ? 'instant local' : 'local NLU'}`, 'success');
           }
 
-          const tempMatch = lower.match(/set (?:the )?temperature (?:to )?(\d+)/);
-          if (tempMatch) {
-            const val = Math.min(30, Math.max(16, parseInt(tempMatch[1])));
-            set((s) => ({
-              placedObjects: s.placedObjects.map((o) =>
-                o.type === 'thermostat' ? { ...o, alexaDeviceState: { ...o.alexaDeviceState, temperature: val } } : o
-              ),
-            }));
-            get().addNotification(`Temperature set to ${val}°C.`, 'info');
-            return `Setting temperature to ${val}°C.`;
-          }
-
-          if (/lock|unlock/.test(lower)) {
-            const isLocked = lower.includes('lock') && !lower.includes('unlock');
-            set((s) => ({
-              placedObjects: s.placedObjects.map((o) =>
-                o.type === 'smart-lock' ? { ...o, alexaDeviceState: { ...o.alexaDeviceState, isLocked } } : o
-              ),
-            }));
-            get().addNotification(`Door ${isLocked ? 'locked' : 'unlocked'}.`, isLocked ? 'success' : 'warning');
-            return `${isLocked ? 'Locking' : 'Unlocking'} the door.`;
-          }
-
-          for (const obj of placedObjects) {
-            if (obj.isAlexaDevice && lower.includes(obj.deviceName.toLowerCase())) {
-              const isOn = lower.includes('turn on') || (!lower.includes('turn off') && !obj.alexaDeviceState.isOn);
-              get().updateAlexaState(obj.id, { isOn });
-              const def = ASSET_MAP.get(obj.type);
-              get().addNotification(`${def?.emoji ?? ''} ${obj.deviceName} turned ${isOn ? 'on' : 'off'}.`, 'success', obj.id);
-              return `Turning ${isOn ? 'on' : 'off'} ${obj.deviceName}.`;
-            }
-          }
-
-          if (/show (?:the )?house|home view|all rooms/.test(lower)) {
-            get().setActiveRoom(null);
-            return 'Showing full house view.';
-          }
-
-          return "Sorry, I didn't understand that. Try \"turn on the lights\" or \"good morning\".";
+          return result;
         },
 
         tickSimulation: () => {

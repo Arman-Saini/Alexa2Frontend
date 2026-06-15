@@ -8,6 +8,8 @@ import { ApiError } from '../api';
 import { env } from '../config/env';
 import { useAppStore } from '../store/store';
 
+export type ProcessingTier = 'T0_LOCAL' | 'T1_LOCAL' | 'BACKEND' | null;
+
 // Re-export types so existing consumers don't need to change imports
 export type { Anticipation, DigitalTwinResponse as DigitalTwinData };
 
@@ -70,53 +72,48 @@ export function useDigitalTwin() {
 export function useBackendVoice() {
   const [isProcessing, setIsProcessing] = useState(false);
   const addNotification = useAppStore((s) => s.addNotification);
-  const executeVoiceCommand = useAppStore((s) => s.executeVoiceCommand);
 
-  const sendMockText = useCallback(
+  // Sends text to the backend T0→T1→T3 pipeline.
+  // Returns the transcript + backend-generated response text.
+  // Caller is responsible for local NLU routing — this only does the network call.
+  const sendToBackend = useCallback(
     async (text: string): Promise<{ transcript: string; response: string } | null> => {
       setIsProcessing(true);
       try {
         const data = await voiceApi.transcribeMockText(text, true);
-        const localResponse = executeVoiceCommand(data.transcript ?? text);
-        addNotification(`🎤 "${data.transcript ?? text}" → routed via backend`, 'success');
-        return { transcript: data.transcript ?? text, response: localResponse };
+        const transcript = data.transcript ?? text;
+        // Extract human-readable response from event_result
+        const er = data.event_result as any;
+        let response = '';
+        if (er?.tier === 'T3' || er?.tier === 'CACHED') {
+          const tc = (er?.result?.tool_calls ?? [])[0];
+          if (tc?.tool_name === 'order_amazon_now') {
+            const item = tc.tool_input?.items?.[0];
+            response = item ? `Ordered ${item.quantity} ${item.unit} of ${item.name}.` : 'Order placed.';
+          } else {
+            response = (er?.result?.reasoning ?? '').split('.')[0] + '.';
+          }
+        } else if (er?.tier === 'T0' || er?.tier === 'T1') {
+          response = (er?.result?.explanation ?? '').split('.')[0] + '.';
+        } else if (er?.tier === 'LOGGED') {
+          response = "I can help control your home devices. Try: \"bedroom fan on\" or \"dim the lights\".";
+        }
+        addNotification(`🌐 "${transcript}" — backend processed`, 'success');
+        return { transcript, response: response.trim() || '' };
       } catch (err) {
         const detail = err instanceof ApiError
-          ? `${err.status} ${err.statusText} — ${String(err.url).split('/').slice(-2).join('/')}`
-          : 'backend offline';
-        addNotification(`🎤 Transcribe failed (${detail}) — using local NLU`, 'warning');
-        const response = executeVoiceCommand(text);
-        return { transcript: text, response };
-      } finally {
-        setIsProcessing(false);
-      }
-    },
-    [executeVoiceCommand, addNotification]
-  );
-
-  const sendAudio = useCallback(
-    async (audioBlob: Blob): Promise<{ transcript: string; response: string } | null> => {
-      setIsProcessing(true);
-      try {
-        const data = await voiceApi.transcribeAudio(audioBlob, true);
-        if (!data.transcript) return null;
-        const localResponse = executeVoiceCommand(data.transcript);
-        addNotification(`🎤 "${data.transcript}"`, 'success');
-        return { transcript: data.transcript, response: localResponse };
-      } catch (err) {
-        addNotification(
-          `Audio transcription failed: ${err instanceof ApiError ? err.message : 'Unknown error'}`,
-          'alert'
-        );
+          ? `${err.status} ${err.statusText}`
+          : 'offline';
+        addNotification(`⚠️ Backend (${detail}) — local only`, 'warning');
         return null;
       } finally {
         setIsProcessing(false);
       }
     },
-    [executeVoiceCommand, addNotification]
+    [addNotification]
   );
 
-  return { sendMockText, sendAudio, isProcessing };
+  return { sendToBackend, isProcessing };
 }
 
 // ── Simulate Events ───────────────────────────────────────────────────────────

@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { useAppStore } from '../../store/store';
 import { ASSET_MAP } from '../../constants/assets';
 import { useBackendVoice } from '../../hooks/useBackendApi';
+import type { ProcessingTier } from '../../hooks/useBackendApi';
 import { voiceApi, ApiError } from '../../api';
 import type { PlacedObject, AlexaNotification } from '../../types';
 
@@ -33,13 +34,14 @@ function AlexaRing({ onVoiceSubmit }: { onVoiceSubmit: (text: string) => void })
   const { ui, setListeningVoice } = useAppStore();
   const [inputText, setInputText] = useState('');
   const [response, setResponse] = useState('');
+  const [tier, setTier] = useState<ProcessingTier>(null);
   const [backendMode, setBackendMode] = useState(true);
   const [isRecording, setIsRecording] = useState(false);
   const [micError, setMicError] = useState<string | null>(null);
   const [interimText, setInterimText] = useState('');
   const executeVoiceCommand = useAppStore((s) => s.executeVoiceCommand);
   const addNotification = useAppStore((s) => s.addNotification);
-  const { sendMockText, isProcessing } = useBackendVoice();
+  const { sendToBackend, isProcessing } = useBackendVoice();
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Cross-browser speechSynthesis: Firefox loads voices async via onvoiceschanged
@@ -139,19 +141,8 @@ function AlexaRing({ onVoiceSubmit }: { onVoiceSubmit: (text: string) => void })
         setIsRecording(false);
         setListeningVoice(false);
         setInterimText('');
-        if (backendMode) {
-          // Browser STT transcript → backend T0/T1/T3 pipeline
-          const result = await sendMockText(cleaned);
-          const resp = result?.response ?? cleaned;
-          speakBackend(resp);
-          setResponse(resp);
-          onVoiceSubmit(cleaned);
-        } else {
-          const result = executeVoiceCommand(cleaned);
-          speak(result);
-          setResponse(result);
-          onVoiceSubmit(cleaned);
-        }
+        await handleCommand(cleaned);
+        onVoiceSubmit(cleaned);
       }
     };
 
@@ -209,23 +200,41 @@ function AlexaRing({ onVoiceSubmit }: { onVoiceSubmit: (text: string) => void })
     }
   };
 
+  // Central command handler — local NLU first, backend only if unmatched
+  const handleCommand = async (text: string) => {
+    const localResult = executeVoiceCommand(text);
+
+    if (localResult.matched) {
+      // Deterministic command handled entirely offline
+      setResponse(localResult.response);
+      setTier(localResult.tier as ProcessingTier);
+      speakBackend(localResult.response);
+      return;
+    }
+
+    if (backendMode) {
+      // Not recognised locally — escalate to backend T0→T1→T3
+      setTier('BACKEND');
+      const backendResult = await sendToBackend(text);
+      const resp = backendResult?.response || "I can mainly help with controlling your home devices.";
+      setResponse(resp);
+      speakBackend(resp);
+    } else {
+      // Offline mode with no match
+      const msg = "Try: \"bedroom fan on\", \"dim the lights\", \"good night\", or \"geyser on\".";
+      setResponse(msg);
+      setTier('T1_LOCAL');
+      speak(msg);
+    }
+  };
+
   // Text input fallback submit
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputText.trim()) return;
     const text = inputText.trim();
     setInputText('');
-
-    if (backendMode) {
-      const result = await sendMockText(text);
-      const resp = result?.response ?? 'Sent to backend.';
-      speakBackend(resp);
-      setResponse(resp);
-    } else {
-      const result = executeVoiceCommand(text);
-      speak(result);
-      setResponse(result);
-    }
+    await handleCommand(text);
     onVoiceSubmit(text);
     setListeningVoice(false);
   };
@@ -351,10 +360,27 @@ function AlexaRing({ onVoiceSubmit }: { onVoiceSubmit: (text: string) => void })
         </form>
       )}
 
-      {/* Response bubble */}
+      {/* Response bubble + processing tier badge */}
       {response && (
-        <div className="mx-4 mt-2 px-3 py-2 bg-alexa-accent rounded-xl text-xs text-alexa-ring panel-slide-in text-center leading-relaxed">
-          {response}
+        <div className="mx-4 mt-2 panel-slide-in w-full px-4">
+          <div className="px-3 py-2 bg-alexa-accent rounded-xl text-xs text-alexa-ring text-center leading-relaxed">
+            {response}
+          </div>
+          {tier && (
+            <div className="flex justify-center mt-1">
+              <span className={`text-[9px] font-semibold px-2 py-0.5 rounded-full ${
+                tier === 'T0_LOCAL'
+                  ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                  : tier === 'T1_LOCAL'
+                  ? 'bg-blue-500/15 text-blue-400 border border-blue-500/30'
+                  : 'bg-purple-500/15 text-purple-400 border border-purple-500/30'
+              }`}>
+                {tier === 'T0_LOCAL' ? '⚡ Instant · Local'
+                  : tier === 'T1_LOCAL' ? '🧠 NLU · Local'
+                  : '🌐 Backend · T3'}
+              </span>
+            </div>
+          )}
         </div>
       )}
     </div>
