@@ -16,12 +16,15 @@ export interface WsMessage {
   payload?: Record<string, unknown>;
 }
 
+const MAX_RETRIES = 5;
+
 export function useWebSocket() {
   const wsRef = useRef<WebSocket | null>(null);
   const addNotification = useAppStore((s) => s.addNotification);
   const reconnectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wsCallbacksRef = useRef<Array<(msg: WsMessage) => void>>([]);
   const mountedRef = useRef(true);
+  const retryCountRef = useRef(0);
 
   const connect = useCallback(() => {
     if (!mountedRef.current) return;
@@ -33,8 +36,11 @@ export function useWebSocket() {
       return;
     }
 
-    // If backend is unreachable, don't spam connection attempts
+    // If backend is unreachable, don't attempt WS
     if (backendState.source === 'offline') return;
+
+    // Circuit breaker: stop after MAX_RETRIES consecutive failures
+    if (retryCountRef.current >= MAX_RETRIES) return;
 
     const wsUrl = backendState.url.replace(/^http/, 'ws') + `/ws?home_id=${env.HOME_ID}`;
 
@@ -43,6 +49,7 @@ export function useWebSocket() {
       wsRef.current = ws;
 
       ws.onopen = () => {
+        retryCountRef.current = 0;
         console.info('[WS] Connected to backend');
       };
 
@@ -74,8 +81,11 @@ export function useWebSocket() {
       ws.onclose = () => {
         wsRef.current = null;
         if (!mountedRef.current) return;
-        // Reconnect after 8s — longer gap to reduce noise when server is down
-        reconnectRef.current = setTimeout(connect, 8000);
+        retryCountRef.current++;
+        if (retryCountRef.current >= MAX_RETRIES) return; // circuit open
+        // Exponential backoff: 8s → 16s → 32s → 64s → 128s (cap 120s)
+        const delay = Math.min(8000 * Math.pow(2, retryCountRef.current - 1), 120000);
+        reconnectRef.current = setTimeout(connect, delay);
       };
 
       ws.onerror = () => {

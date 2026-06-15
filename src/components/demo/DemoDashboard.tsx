@@ -23,9 +23,9 @@ const C = {
   cardHover:    '#151829',
   border:       '#1B1E36',
   borderHover:  '#252845',
-  text:         '#DDE0EF',    // primary text — soft white
-  text2:        '#6A7490',    // secondary
-  text3:        '#30344C',    // muted
+  text:         '#DDE0EF',    // primary text
+  text2:        '#8B95B5',    // secondary — was #6A7490 (too dark)
+  text3:        '#5A6280',    // muted — was #30344C (near-invisible)
   cyan:         '#00A8E0',
   cyanDim:      '#003855',
   cyanBg:       '#001A28',
@@ -122,52 +122,52 @@ const SCENARIOS: Scenario[] = [
   },
   {
     id: 'inventory',
-    tag: 'CLOUD', category: 'Cloud AI',
+    tag: 'COMMERCE', category: 'Cloud AI',
     title: 'Milk Running Low',
-    desc: 'AI orders from Amazon Now',
-    tier: 'T3', ms: '1.2s', cost: '$0.00004',
+    desc: 'Supervisor routes to Commerce agent',
+    tier: 'T3', ms: '1.2s', cost: '$0.00006',
     overlayTitle: 'Milk ordered on Amazon Now',
-    overlayDetail: "Alexa's 4-agent cloud AI reasoned:",
+    overlayDetail: 'Supervisor → COMMERCE specialist:',
     steps: [
-      '⟳ Checking your inventory',
-      '✓ Milk: 0.2L remaining',
-      '⟳ Searching Amazon Now',
-      '✓ Best price: ₹58 for 2L',
-      '✓ Order placed! Delivery in 2 hours',
+      '⟳ Supervisor triage call',
+      '✓ Routed to: COMMERCE agent',
+      '⟳ Ordering 2L milk via Amazon Now',
+      '✓ Best price: ₹58 · ₹120 budget',
+      '✓ Order confirmed! 2hr delivery',
     ],
     fn: () => backendApi.simulateInventoryDrop(),
   },
   {
     id: 'sound',
-    tag: 'CLOUD', category: 'Cloud AI',
+    tag: 'KNOWLEDGE', category: 'Cloud AI',
     title: 'Strange Sound',
-    desc: 'AI identifies what it heard',
-    tier: 'T3', ms: '1.5s', cost: '$0.00004',
-    overlayTitle: 'Unknown sound identified',
-    overlayDetail: "Alexa's audio AI classified the cluster:",
+    desc: 'Supervisor routes to Knowledge agent',
+    tier: 'T3', ms: '1.5s', cost: '$0.00006',
+    overlayTitle: 'Unknown sound cluster logged',
+    overlayDetail: 'Supervisor → KNOWLEDGE specialist:',
     steps: [
-      '⟳ Analysing sound cluster',
-      '✓ Frequency: 800–2000 Hz pattern',
-      '⟳ Matching against known sounds',
-      '✓ Identified: pressure cooker whistle',
-      '✓ Alert sent — cooker overdue',
+      '⟳ Supervisor triage call',
+      '✓ Routed to: KNOWLEDGE agent',
+      '⟳ Logging sound: 800–2000 Hz',
+      '✓ Cluster saved — ID assigned',
+      '✓ User alerted: "What is this sound?"',
     ],
     fn: () => backendApi.simulateUnknownSound(),
   },
   {
     id: 'voice',
-    tag: 'CLOUD', category: 'Cloud AI',
-    title: 'Complex Request',
-    desc: 'AI thinks deeper for this one',
-    tier: 'T3', ms: '2.1s', cost: '$0.00004',
-    overlayTitle: 'Complex voice request handled',
-    overlayDetail: 'Bedrock Nova Micro with tool use:',
+    tag: 'HOME CTRL', category: 'Cloud AI',
+    title: 'Complex Voice Request',
+    desc: 'Supervisor routes to Home-Control agent',
+    tier: 'T3', ms: '2.1s', cost: '$0.00006',
+    overlayTitle: 'Multi-device command executed',
+    overlayDetail: 'Supervisor → HOME_CONTROL specialist:',
     steps: [
-      '⟳ Parsing multi-step intent',
-      '✓ Intent: fan + thermostat change',
-      '⟳ Resolving device targets',
-      '✓ Living room fan + main thermostat',
-      '✓ Both commands executed',
+      '⟳ Supervisor triage call',
+      '✓ Routed to: HOME_CONTROL agent',
+      '⟳ Resolving: fan + thermostat',
+      '✓ Living room fan: ON',
+      '✓ Thermostat: 24°C — done',
     ],
     fn: () => backendApi.simulateVoiceCommand(undefined, 'turn on the living room fan and set thermostat to 24'),
   },
@@ -571,6 +571,157 @@ function AiDecisionOverlay({ overlay, onDismiss }: { overlay: OverlayInfo; onDis
   );
 }
 
+// ── Create Routine Modal ───────────────────────────────────────────────────────
+
+const DEMO_ROUTINES = [
+  {
+    title: 'Morning Energize',
+    desc: 'Geyser on at 6:30 AM for 15 min · lights to 80% · playlist starts',
+    example: 'Every morning at 6:30, turn on geyser for 15 minutes and set living room lights to 80%',
+    speak: 'Morning Energize: geyser at 6:30, lights to 80 percent, morning playlist.',
+  },
+  {
+    title: 'Study Time',
+    desc: 'Lights bright · TV muted · fan on low — weekdays at 5 PM',
+    example: 'Weekdays at 5 PM, mute the TV, set bedroom lights bright, turn fan to low',
+    speak: 'Study Time: mute TV, bright lights, fan on low at 5 PM.',
+  },
+  {
+    title: 'Night Safety',
+    desc: 'LPG off · AC 24°C · doors locked — at 10:30 PM',
+    example: 'At 10:30 PM, turn off LPG, set AC to 24 degrees, lock front door',
+    speak: 'Night Safety: LPG off, AC at 24, lock doors at 10:30 PM.',
+  },
+  {
+    title: 'Leave Home',
+    desc: 'Cut non-essential devices · security on — when everyone leaves',
+    example: 'When I leave home, turn off all lights, cut AC, activate security cameras',
+    speak: 'Leave Home: all lights off, AC off, security cameras on.',
+  },
+];
+
+function CreateRoutineModal({ onClose }: { onClose: () => void }) {
+  const [description, setDescription] = useState('');
+  const [selected, setSelected] = useState(0);
+  const [created, setCreated] = useState(false);
+  const addNotification = useAppStore(s => s.addNotification);
+
+  // Speak the selected suggestion whenever it changes
+  useEffect(() => {
+    if (!('speechSynthesis' in window)) return;
+    window.speechSynthesis.cancel();
+    const utter = new SpeechSynthesisUtterance(`Suggested: ${DEMO_ROUTINES[selected].speak}`);
+    utter.rate = 0.92;
+    utter.pitch = 1.05;
+    window.speechSynthesis.speak(utter);
+    return () => { window.speechSynthesis.cancel(); };
+  }, [selected]);
+
+  // Auto-cycle every 4 seconds
+  useEffect(() => {
+    const id = setInterval(() => setSelected(p => (p + 1) % DEMO_ROUTINES.length), 4000);
+    return () => clearInterval(id);
+  }, []);
+
+  const handleCreate = () => {
+    window.speechSynthesis.cancel();
+    const routine = DEMO_ROUTINES[selected];
+    const utter = new SpeechSynthesisUtterance(`Routine added: ${routine.title}`);
+    window.speechSynthesis.speak(utter);
+    addNotification(`Routine created: "${routine.title}"`, 'success');
+    setCreated(true);
+    setTimeout(onClose, 1400);
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center"
+      style={{ background: 'rgba(5,6,14,0.88)' }}
+      onClick={onClose}
+    >
+      <div
+        className="w-[440px] max-w-[94vw] rounded-2xl border shadow-2xl overflow-hidden"
+        style={{
+          background: C.surface,
+          borderColor: C.borderHover,
+          boxShadow: `0 0 80px ${C.cyan}18, 0 32px 80px rgba(0,0,0,0.7)`,
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="px-6 py-4 border-b flex items-center justify-between" style={{ borderColor: C.border }}>
+          <div>
+            <p className="text-[9px] font-bold uppercase tracking-widest mb-0.5" style={{ color: C.cyan }}>Alexa+ AI Routine Builder</p>
+            <h3 className="text-sm font-bold" style={{ color: C.text }}>Create a Routine</h3>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-7 h-7 rounded-full border flex items-center justify-center text-xs transition-colors"
+            style={{ color: C.text2, borderColor: C.border, background: C.card }}
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="p-6">
+          {/* Suggestions */}
+          <div className="flex items-center gap-2 mb-3">
+            <span className="w-1.5 h-1.5 rounded-full animate-pulse shrink-0" style={{ background: C.cyan }} />
+            <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: C.text3 }}>Alexa suggests · speaking now</p>
+          </div>
+          <div className="space-y-1.5 mb-5">
+            {DEMO_ROUTINES.map((r, i) => (
+              <button
+                key={i}
+                onClick={() => setSelected(i)}
+                className="w-full text-left px-3.5 py-3 rounded-xl border transition-all"
+                style={{
+                  borderColor: i === selected ? C.cyan : C.border,
+                  background: i === selected ? C.cyanBg : C.card,
+                }}
+              >
+                <p className="text-xs font-semibold" style={{ color: i === selected ? C.cyan : C.text }}>{r.title}</p>
+                <p className="text-[10px] mt-0.5" style={{ color: i === selected ? C.text2 : C.text3 }}>{r.desc}</p>
+              </button>
+            ))}
+          </div>
+
+          {/* Custom description */}
+          <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: C.text3 }}>Or describe your own</p>
+          <textarea
+            value={description}
+            onChange={e => setDescription(e.target.value)}
+            placeholder={DEMO_ROUTINES[selected].example}
+            rows={2}
+            className="w-full px-3.5 py-2.5 rounded-xl border text-xs resize-none outline-none transition-colors"
+            style={{
+              background: C.card,
+              borderColor: C.border,
+              color: C.text,
+              fontFamily: 'inherit',
+            }}
+            onFocus={e => { (e.currentTarget as HTMLTextAreaElement).style.borderColor = C.cyanDim; }}
+            onBlur={e => { (e.currentTarget as HTMLTextAreaElement).style.borderColor = C.border; }}
+          />
+
+          <button
+            onClick={handleCreate}
+            disabled={created}
+            className="w-full mt-4 py-2.5 rounded-xl text-sm font-semibold transition-all"
+            style={{
+              background: created ? C.greenDim : C.cyan,
+              color: created ? C.green : '#000',
+              border: created ? `1px solid ${C.green}60` : 'none',
+            }}
+          >
+            {created ? '✓ Routine added to Alexa!' : 'Add Routine →'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Compact Alexa View (left column) ──────────────────────────────────────────
 
 const QUICK_SCENES = [
@@ -583,6 +734,7 @@ const QUICK_SCENES = [
 function CompactAlexaView({ events, onOpenFullApp }: { events: LiveEvent[]; onOpenFullApp: () => void }) {
   const addNotification = useAppStore(s => s.addNotification);
   const [tapped, setTapped] = useState(false);
+  const [showRoutineModal, setShowRoutineModal] = useState(false);
 
   const handleScene = async (regime: string) => {
     try {
@@ -697,15 +849,25 @@ function CompactAlexaView({ events, onOpenFullApp }: { events: LiveEvent[]; onOp
           ))}
         </div>
         <button
+          onClick={() => setShowRoutineModal(true)}
+          className="w-full mt-2 py-2 text-xs border rounded-lg transition-colors flex items-center justify-center gap-1.5"
+          style={{ color: C.cyan, borderColor: C.cyanDim, background: C.cyanBg }}
+          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#002035'; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = C.cyanBg; }}
+        >
+          + Create a Routine
+        </button>
+        <button
           onClick={onOpenFullApp}
-          className="w-full mt-2.5 py-2 text-xs border rounded-lg transition-colors"
+          className="w-full mt-1.5 py-2 text-xs border rounded-lg transition-colors"
           style={{ color: C.text3, borderColor: C.border }}
-          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = C.cyan; }}
+          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = C.text; }}
           onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = C.text3; }}
         >
           Open Full Alexa App →
         </button>
       </div>
+      {showRoutineModal && <CreateRoutineModal onClose={() => setShowRoutineModal(false)} />}
     </div>
   );
 }
