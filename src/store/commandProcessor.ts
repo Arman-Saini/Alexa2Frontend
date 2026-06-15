@@ -17,7 +17,7 @@ function normalize(raw: string): string {
     .toLowerCase()
     .replace(/['']/g, "'")
     .replace(/[,;:!?.]+/g, ' ')
-    .replace(/\b(please|alexa|hey alexa|okay alexa|ok alexa|bhai|yaar)\b/g, '')
+    .replace(/\b(please|alexa|hey alexa|okay alexa|ok alexa|bhai|yaar|can\s+you|could\s+you|will\s+you|would\s+you|i\s+want\s+(you\s+to\s+)?|i\s+need\s+(you\s+to\s+)?|for\s+me)\b/g, '')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -204,6 +204,27 @@ export function processCommand(raw: string, objects: PlacedObject[]): CommandRes
         ...applyTo(objects, 'smart-bulb', { isOn: true, brightness: 40 }),
       ],
     };
+  }
+
+  // ─── ROOM + ALL DEVICES ON/OFF (T1) — must come before global all-off ───────
+
+  if (room !== null && action !== null) {
+    const allDevices = /\b(everything|all\s+(the\s+)?(devices?|appliances?|things?|stuff|electronics?))\b/.test(q);
+    const noDeviceType = !allDevices &&
+      !/\b(light|bulb|lamp|tubelight|fan|tv|television|telly|geyser|water|lock|door|thermostat|ac|purifier|plug|heater|screen)\b/.test(q);
+    if (allDevices || noDeviceType) {
+      const controllable = objects.filter(o =>
+        o.isAlexaDevice && o.parentRoomId === room &&
+        !['camera', 'smoke-detector', 'motion-sensor', 'doorbell'].includes(o.type)
+      );
+      const label = ROOM_LABEL[room];
+      return {
+        matched: true, tier: 'T1_LOCAL',
+        response: `All ${label} devices ${action ? 'on' : 'off'}.`,
+        roomFocus: room,
+        updates: controllable.map(o => ({ id: o.id, changes: { isOn: action } as Partial<AlexaDeviceState> })),
+      };
+    }
   }
 
   // ─── EVERYTHING ON / OFF (T0) ─────────────────────────────────────────────
