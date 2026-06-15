@@ -1,1547 +1,577 @@
-import { Suspense, lazy, useState, useEffect, useCallback } from 'react';
+import { Suspense, lazy, useState, useCallback, useEffect, useRef } from 'react';
+import { C, F, SCENARIOS } from './ScenarioDefs';
+import { ChainBuilder }           from './ChainBuilder';
+import { EventFeed }              from './EventFeed';
+import { AppStorePanel }          from './AppStorePanel';
+import { GuidedTour, shouldShowTour } from './GuidedTour';
+import { useLiveBackend }         from '../../hooks/useLiveBackend';
+import { usePollyTTS }            from '../../hooks/usePollyTTS';
+import { useMic }                 from '../../hooks/useMic';
+import { interpretCommand }       from '../../hooks/useVoiceCommands';
+import { askGroq }                from '../../hooks/useGroqLLM';
+import { fetchWeather }           from '../../hooks/useWeather';
+import type { WeatherInfo }       from '../../hooks/useWeather';
+import type { ActiveScenario, TierKey, RoomTarget, IntelTab, CartItem } from './ScenarioDefs';
+import { AlexaMomentCard } from './AlexaMomentCard';
 import { AlexaAppSimView } from '../panels/AlexaAppSimView';
-import { useDigitalTwin, useAnticipations } from '../../hooks/useBackendApi';
-import { backendApi, homeApi } from '../../api';
-import type { RegimeState, T0Rule, ProposedRule } from '../../api';
-import { useAppStore } from '../../store/store';
-import { useSimulation } from '../../hooks/useSimulation';
-import { useWebSocket } from '../../hooks/useWebSocket';
-import { backendState, onBackendResolved } from '../../config/backendState';
-import type { BackendSource } from '../../config/backendState';
+import { ColB_RoomGlows }         from './ColB_RoomGlows';
+import { ColB_IntelligenceLayer } from './ColB_IntelligenceLayer';
+import type { TierCounts, LiveEvent } from './ColB_IntelligenceLayer';
+import { ColC_EcosystemPayoff }   from './ColC_EcosystemPayoff';
+import { PrivacyDrawer }          from './PrivacyDrawer';
+import { useAppStore }            from '../../store/store';
+import { useSimulation }          from '../../hooks/useSimulation';
+import { useWebSocket }           from '../../hooks/useWebSocket';
+import { backendState } from '../../config/backendState';
+import { voiceApi }               from '../../api';
+import { env }                    from '../../config/env';
 
 const DigitalTwinCanvas = lazy(() =>
-  import('../canvas/DigitalTwinCanvas').then((m) => ({ default: m.DigitalTwinCanvas }))
+  import('../canvas/DigitalTwinCanvas').then(m => ({ default: m.DigitalTwinCanvas }))
 );
 
-// ── Design tokens ─────────────────────────────────────────────────────────────
-// Soft dark palette — not pure black, not pure white
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
-const C = {
-  bg:           '#090A13',
-  surface:      '#0C0E1C',
-  card:         '#101326',
-  cardHover:    '#151829',
-  border:       '#1B1E36',
-  borderHover:  '#252845',
-  text:         '#DDE0EF',    // primary text
-  text2:        '#8B95B5',    // secondary — was #6A7490 (too dark)
-  text3:        '#5A6280',    // muted — was #30344C (near-invisible)
-  cyan:         '#00A8E0',
-  cyanDim:      '#003855',
-  cyanBg:       '#001A28',
-  green:        '#22D3A4',
-  greenDim:     '#0F3028',
-  amber:        '#F59E0B',
-  amberDim:     '#2C1E05',
-  red:          '#E87272',
-  redDim:       '#2C1010',
-} as const;
-
-// ── Types ──────────────────────────────────────────────────────────────────────
-
-interface TierCounts { T0: number; T1: number; T3: number; }
-interface LiveEvent { id: string; time: string; tier: string; description: string; }
-interface OverlayInfo {
-  scenarioId: string;
-  tier: 'T0' | 'T3';
-  tag: string;
-  ms: string;
-  cost: string;
-  overlayTitle: string;
-  overlayDetail: string;
-  steps?: string[];
+function getAmbientTone(): { bg: string; greeting: string } {
+  const h = new Date().getHours();
+  if (h >= 5  && h < 8)  return { bg: '#141414', greeting: 'Good morning' };
+  if (h >= 8  && h < 12) return { bg: '#111111', greeting: 'Good morning' };
+  if (h >= 12 && h < 17) return { bg: '#111111', greeting: 'Good afternoon' };
+  if (h >= 17 && h < 21) return { bg: '#0E0E0E', greeting: 'Good evening' };
+  return { bg: '#0A0A0A', greeting: 'Good night' };
 }
 
-interface Scenario {
-  id: string;
-  tag: string;
-  category: string;
-  title: string;
-  desc: string;
-  tier: 'T0' | 'T3';
-  ms: string;
-  cost: string;
-  overlayTitle: string;
-  overlayDetail: string;
-  steps?: string[];
-  fn: () => Promise<unknown>;
-}
-
-// ── Scenarios ─────────────────────────────────────────────────────────────────
-
-const SCENARIOS: Scenario[] = [
-  {
-    id: 'geyser',
-    tag: 'SAFETY', category: 'Local Rule',
-    title: 'Geyser Left On',
-    desc: 'AI turns it off — no cloud needed',
-    tier: 'T0', ms: '8ms', cost: '$0.00',
-    overlayTitle: 'Geyser turned off',
-    overlayDetail: 'Used a saved home pattern — no internet needed',
-    fn: () => backendApi.simulateGeyser(),
-  },
-  {
-    id: 'study',
-    tag: 'ROUTINE', category: 'Local Rule',
-    title: 'Evening Tuition',
-    desc: 'AI quiets the house at 6 PM',
-    tier: 'T0', ms: '8ms', cost: '$0.00',
-    overlayTitle: 'Study mode activated',
-    overlayDetail: 'Lights on, TV muted — pattern matched in 8ms',
-    fn: () => backendApi.simulateStudyMode(),
-  },
-  {
-    id: 'night',
-    tag: 'SAFETY', category: 'Local Rule',
-    title: 'Bedtime Check',
-    desc: 'AI secures LPG, TV, motor',
-    tier: 'T0', ms: '8ms', cost: '$0.00',
-    overlayTitle: 'Home secured for sleep',
-    overlayDetail: 'LPG off, TV off, motor off — instant local check',
-    fn: () => backendApi.simulateNightSafety(),
-  },
-  {
-    id: 'power',
-    tag: 'SAFETY', category: 'Local Rule',
-    title: 'Power Outage',
-    desc: 'AI switches to inverter mode',
-    tier: 'T0', ms: '8ms', cost: '$0.00',
-    overlayTitle: 'Switched to inverter mode',
-    overlayDetail: 'AC load shed, critical devices kept on — <10ms',
-    fn: () => backendApi.simulatePowerCut(),
-  },
-  {
-    id: 'motor',
-    tag: 'SAFETY', category: 'Local Rule',
-    title: 'Pump Overrun',
-    desc: 'AI stops the pump automatically',
-    tier: 'T0', ms: '8ms', cost: '$0.00',
-    overlayTitle: 'Water pump stopped',
-    overlayDetail: 'Dead-man timer triggered — overflow prevented',
-    fn: () => backendApi.simulateMotorSafety(),
-  },
-  {
-    id: 'inventory',
-    tag: 'COMMERCE', category: 'Cloud AI',
-    title: 'Milk Running Low',
-    desc: 'Supervisor routes to Commerce agent',
-    tier: 'T3', ms: '1.2s', cost: '$0.00006',
-    overlayTitle: 'Milk ordered on Amazon Now',
-    overlayDetail: 'Supervisor → COMMERCE specialist:',
-    steps: [
-      '⟳ Supervisor triage call',
-      '✓ Routed to: COMMERCE agent',
-      '⟳ Ordering 2L milk via Amazon Now',
-      '✓ Best price: ₹58 · ₹120 budget',
-      '✓ Order confirmed! 2hr delivery',
-    ],
-    fn: () => backendApi.simulateInventoryDrop(),
-  },
-  {
-    id: 'sound',
-    tag: 'KNOWLEDGE', category: 'Cloud AI',
-    title: 'Strange Sound',
-    desc: 'Supervisor routes to Knowledge agent',
-    tier: 'T3', ms: '1.5s', cost: '$0.00006',
-    overlayTitle: 'Unknown sound cluster logged',
-    overlayDetail: 'Supervisor → KNOWLEDGE specialist:',
-    steps: [
-      '⟳ Supervisor triage call',
-      '✓ Routed to: KNOWLEDGE agent',
-      '⟳ Logging sound: 800–2000 Hz',
-      '✓ Cluster saved — ID assigned',
-      '✓ User alerted: "What is this sound?"',
-    ],
-    fn: () => backendApi.simulateUnknownSound(),
-  },
-  {
-    id: 'voice',
-    tag: 'HOME CTRL', category: 'Cloud AI',
-    title: 'Complex Voice Request',
-    desc: 'Supervisor routes to Home-Control agent',
-    tier: 'T3', ms: '2.1s', cost: '$0.00006',
-    overlayTitle: 'Multi-device command executed',
-    overlayDetail: 'Supervisor → HOME_CONTROL specialist:',
-    steps: [
-      '⟳ Supervisor triage call',
-      '✓ Routed to: HOME_CONTROL agent',
-      '⟳ Resolving: fan + thermostat',
-      '✓ Living room fan: ON',
-      '✓ Thermostat: 24°C — done',
-    ],
-    fn: () => backendApi.simulateVoiceCommand(undefined, 'turn on the living room fan and set thermostat to 24'),
-  },
+const REGIME_OPTIONS = [
+  { value: 'normal',   label: 'Normal',   color: C.green  },
+  { value: 'festival', label: 'Festival', color: C.amber  },
+  { value: 'guest',    label: 'Guest',    color: C.cyan   },
+  { value: 'sleep',    label: 'Sleep',    color: C.violet },
+  { value: 'away',     label: 'Away',     color: C.red    },
 ];
 
-// ── Clock ──────────────────────────────────────────────────────────────────────
+// ── Mic overlay ───────────────────────────────────────────────────────────────
 
-function useCurrentTime() {
-  const [time, setTime] = useState(() =>
-    new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-  );
-  useEffect(() => {
-    const id = setInterval(
-      () => setTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })),
-      10000
-    );
-    return () => clearInterval(id);
-  }, []);
-  return time;
+interface VoiceState {
+  liveText:   string;
+  response:   string;
+  tier:       string;
+  isListening: boolean;
+  isThinking: boolean;
 }
 
-// ── Header ─────────────────────────────────────────────────────────────────────
 
-const BACKEND_LABEL: Record<BackendSource, { label: string; dotColor: string; bg: string; border: string; textColor: string }> = {
-  detecting: { label: 'Connecting',  dotColor: '#888833',  bg: C.card,    border: C.border,  textColor: '#AAAA44' },
-  cloud:     { label: 'Cloud AI',    dotColor: C.green,    bg: C.greenDim,border: '#1A3828',  textColor: C.green  },
-  local:     { label: 'Local AI',    dotColor: C.cyan,     bg: C.cyanBg,  border: C.cyanDim, textColor: C.cyan   },
-  offline:   { label: 'Offline',     dotColor: C.red,      bg: C.redDim,  border: '#3A1A1A',  textColor: C.red   },
-};
+// ── Header ────────────────────────────────────────────────────────────────────
 
-function DemoHeader({ tierCounts, costSaved, onTour }: { tierCounts: TierCounts; costSaved: number; onTour: () => void }) {
-  const time = useCurrentTime();
-  const instantCount = tierCounts.T0 + tierCounts.T1;
-  const [backendSource, setBackendSource] = useState<BackendSource>(backendState.source);
-
-  useEffect(() => {
-    setBackendSource(backendState.source);
-    onBackendResolved(() => setBackendSource(backendState.source));
-  }, []);
-
-  const bk = BACKEND_LABEL[backendSource];
-
-  return (
-    <div
-      className="shrink-0 flex items-center gap-4 px-5 border-b"
-      style={{ background: C.surface, borderColor: C.border, height: 52 }}
-    >
-      {/* Brand */}
-      <div className="shrink-0 flex items-center gap-2">
-        <div className="w-1.5 h-1.5 rounded-full" style={{ background: C.cyan, boxShadow: `0 0 8px ${C.cyan}` }} />
-        <span className="text-sm font-bold" style={{ color: C.text }}>Alexa<span style={{ color: C.cyan }}>+ India</span></span>
-        <span
-          className="text-[9px] font-semibold px-1.5 py-0.5 rounded border ml-1"
-          style={{ color: C.text3, borderColor: C.border, background: C.card }}
-        >
-          HackOn S6
-        </span>
-      </div>
-
-      <div className="w-px h-5 shrink-0" style={{ background: C.border }} />
-
-      {/* Center label */}
-      <p className="flex-1 text-center text-xs" style={{ color: C.text3 }}>
-        Arjun's Home · {time}
-      </p>
-
-      {/* Status chips */}
-      <div className="flex items-center gap-2 shrink-0">
-        {/* Backend status */}
-        <div
-          className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border"
-          style={{ color: bk.textColor, background: bk.bg, borderColor: bk.border }}
-        >
-          <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: bk.dotColor }} />
-          {bk.label}
-        </div>
-
-        {/* Instant count */}
-        <div
-          className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border"
-          style={{ color: C.green, background: C.greenDim, borderColor: '#1A3828' }}
-        >
-          <span className="font-bold">{instantCount}</span>
-          <span style={{ color: C.text2 }}>instant</span>
-        </div>
-
-        {/* Cost saved */}
-        <div
-          className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border"
-          style={{ color: C.text2, background: C.card, borderColor: C.border }}
-        >
-          <span style={{ color: C.green }}>${costSaved.toFixed(4)}</span>
-          <span>saved</span>
-        </div>
-
-        <button
-          onClick={onTour}
-          className="text-xs px-2.5 py-1 rounded-full border transition-colors"
-          style={{ color: C.text3, borderColor: C.border, background: C.card }}
-          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = C.text; }}
-          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = C.text3; }}
-          title="Guided tour"
-        >
-          Tour
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ── Demo Tour ──────────────────────────────────────────────────────────────────
-
-const TOUR_STEPS = [
-  {
-    id: 'welcome',
-    title: 'Welcome to Alexa+ India',
-    body: "A live demo of an AI that solves problems standard Alexa can't — geysers left running, power cuts, water motor overflows, and more. It acts in 8ms locally, only calling the cloud when it truly needs to.",
-    highlight: null,
-    tip: 'Click Next to take a 60-second tour',
-  },
-  {
-    id: 'home3d',
-    title: 'Your Live 3D Home',
-    body: "The center panel shows Arjun's home as a live 3D model. Devices glow when on, dim when off. Click any room to zoom in and see what's running inside.",
-    highlight: 'center',
-    tip: 'After this tour, click any room to explore it.',
-  },
-  {
-    id: 'scenarios',
-    title: 'Trigger an AI Scenario',
-    body: "The right panel has 8 real scenarios. Click \"Geyser Left On\" to see the AI act instantly — no cloud, no internet, just a saved pattern firing in 8ms. Then try \"Milk Running Low\" to see the cloud AI think through 5 steps.",
-    highlight: 'right',
-    tip: 'Instant = local rule  ·  Cloud AI = Bedrock reasoning',
-  },
-  {
-    id: 'overlay',
-    title: 'The AI Decision Card',
-    body: "After clicking a scenario, a card floats over the 3D home showing exactly what the AI did, how fast it responded, and what it cost. For Cloud AI scenarios, watch the steps animate — this is the 4-agent reasoning chain.",
-    highlight: 'center',
-    tip: 'Try a scenario now, then come back and click Next.',
-  },
-  {
-    id: 'voice',
-    title: 'Speak to Alexa',
-    body: "Tap the Alexa ring on the left to speak. Try: \"Turn on the lights\" or \"Set the thermostat to 24 degrees\". When the cloud backend is connected, your voice routes through the full T0→T1→T3 cascade automatically.",
-    highlight: 'left',
-    tip: 'The status chip next to the ring shows Cloud or Local — auto-detected.',
-  },
-  {
-    id: 'learning',
-    title: 'AI That Gets Smarter',
-    body: "Scroll down the right panel to \"AI Learning\". Click Step 1 to load a week of home history, then Step 2 to find patterns. The AI will suggest rules like \"Heat geyser at 6:30 AM daily\" — confirm one and it fires instantly next time.",
-    highlight: 'right',
-    tip: 'This is the loop that makes the system faster over time.',
-  },
-  {
-    id: 'analytics',
-    title: 'Technical Analytics',
-    body: "For a deeper look, click \"Analytics\" in the top-right of the 3D panel. You'll see the tier cascade chart, the live event log, and room status. This is the view for technical judges.",
-    highlight: 'center',
-    tip: "You're ready — close this tour and explore the demo.",
-  },
-];
-
-function DemoTour({ onClose }: { onClose: () => void }) {
-  const [step, setStep] = useState(0);
-  const current = TOUR_STEPS[step];
-  const isLast = step === TOUR_STEPS.length - 1;
-
-  return (
-    <div className="fixed inset-0 z-50 pointer-events-none">
-      <div className="pointer-events-auto absolute bottom-6 left-1/2 -translate-x-1/2 w-[500px] max-w-[92vw]">
-        <div
-          className="rounded-2xl border shadow-2xl overflow-hidden"
-          style={{
-            background: C.surface,
-            borderColor: C.borderHover,
-            boxShadow: `0 0 80px ${C.cyan}18, 0 24px 64px rgba(0,0,0,0.6)`,
-          }}
-        >
-          {/* Progress bar */}
-          <div className="h-0.5" style={{ background: C.border }}>
-            <div
-              className="h-full transition-all duration-500"
-              style={{ width: `${((step + 1) / TOUR_STEPS.length) * 100}%`, background: C.cyan }}
-            />
-          </div>
-
-          <div className="p-6">
-            <div className="flex items-start justify-between mb-3">
-              <div>
-                <p className="text-[9px] font-bold uppercase tracking-widest mb-1" style={{ color: C.cyan }}>
-                  Step {step + 1} of {TOUR_STEPS.length}
-                </p>
-                <h3 className="text-sm font-bold" style={{ color: C.text }}>{current.title}</h3>
-              </div>
-              <button
-                onClick={onClose}
-                className="text-xs px-2.5 py-1 rounded-lg border ml-4 transition-colors shrink-0"
-                style={{ color: C.text3, borderColor: C.border }}
-              >
-                Skip
-              </button>
-            </div>
-
-            <p className="text-xs leading-relaxed mb-4" style={{ color: C.text2 }}>{current.body}</p>
-
-            <div
-              className="rounded-lg px-3 py-2 mb-5 text-xs leading-snug border"
-              style={{ color: C.cyan, background: C.cyanBg, borderColor: C.cyanDim }}
-            >
-              {current.tip}
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div className="flex gap-1.5">
-                {TOUR_STEPS.map((_, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setStep(i)}
-                    className="rounded-full transition-all"
-                    style={{
-                      width: i === step ? 20 : 8,
-                      height: 8,
-                      background: i === step ? C.cyan : C.border,
-                    }}
-                  />
-                ))}
-              </div>
-
-              <div className="flex gap-2">
-                {step > 0 && (
-                  <button
-                    onClick={() => setStep(s => s - 1)}
-                    className="px-3 py-1.5 text-xs border rounded-lg transition-colors"
-                    style={{ color: C.text2, borderColor: C.border }}
-                  >
-                    Back
-                  </button>
-                )}
-                {isLast ? (
-                  <button
-                    onClick={onClose}
-                    className="px-4 py-1.5 text-xs font-semibold text-white rounded-lg"
-                    style={{ background: C.cyan }}
-                  >
-                    Start exploring →
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => setStep(s => s + 1)}
-                    className="px-4 py-1.5 text-xs font-semibold text-white rounded-lg"
-                    style={{ background: C.cyan }}
-                  >
-                    Next →
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Column arrows */}
-      {current.highlight === 'left' && (
-        <div className="pointer-events-none fixed left-[110px] bottom-[230px] text-2xl animate-bounce" style={{ color: C.cyan, opacity: 0.8 }}>←</div>
-      )}
-      {current.highlight === 'right' && (
-        <div className="pointer-events-none fixed right-[140px] bottom-[230px] text-2xl animate-bounce" style={{ color: C.cyan, opacity: 0.8 }}>→</div>
-      )}
-    </div>
-  );
-}
-
-// ── Onboarding Banner ──────────────────────────────────────────────────────────
-
-function OnboardingBanner({ onDismiss }: { onDismiss: () => void }) {
-  return (
-    <div
-      className="shrink-0 flex items-center gap-3 px-5 py-2.5 border-b"
-      style={{ background: C.cyanBg, borderColor: C.cyanDim }}
-    >
-      <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: C.cyan }} />
-      <p className="flex-1 text-xs" style={{ color: C.text2 }}>
-        <span className="font-semibold" style={{ color: C.text }}>Alexa+ India</span>
-        {' '}solves what standard Alexa can't: geysers, power cuts, water motors and more.
-        AI acts in <span className="font-semibold" style={{ color: C.green }}>8ms locally</span> — only calls cloud when truly needed.
-        <span style={{ color: C.text3 }}> Click any scenario on the right to see it in action.</span>
-      </p>
-      <button
-        onClick={onDismiss}
-        className="shrink-0 text-xs border rounded-lg px-2.5 py-1 transition-colors"
-        style={{ color: C.text3, borderColor: C.border }}
-      >
-        Got it
-      </button>
-    </div>
-  );
-}
-
-// ── AI Decision Overlay ────────────────────────────────────────────────────────
-
-function AiDecisionOverlay({ overlay, onDismiss }: { overlay: OverlayInfo; onDismiss: () => void }) {
-  const [visibleSteps, setVisibleSteps] = useState(0);
-  const isDone = !overlay.steps || visibleSteps >= overlay.steps.length;
-  const isT3 = overlay.tier === 'T3';
-  const accentColor = isT3 ? C.amber : C.green;
-  const accentBg    = isT3 ? C.amberDim : C.greenDim;
-
-  useEffect(() => {
-    setVisibleSteps(0);
-    if (!overlay.steps) return;
-    let i = 0;
-    const id = setInterval(() => {
-      i++;
-      setVisibleSteps(i);
-      if (i >= (overlay.steps?.length ?? 0)) clearInterval(id);
-    }, 400);
-    return () => clearInterval(id);
-  }, [overlay.scenarioId]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    if (overlay.tier !== 'T0') return;
-    const id = setTimeout(onDismiss, 5000);
-    return () => clearTimeout(id);
-  }, [overlay.scenarioId, overlay.tier, onDismiss]);
-
-  useEffect(() => {
-    if (!isDone || overlay.tier !== 'T3') return;
-    const id = setTimeout(onDismiss, 3000);
-    return () => clearTimeout(id);
-  }, [isDone, overlay.tier, onDismiss]);
-
-  return (
-    <div
-      className="absolute top-4 left-1/2 -translate-x-1/2 z-30 w-76 rounded-2xl border shadow-2xl"
-      style={{
-        background: C.surface,
-        borderColor: accentColor,
-        boxShadow: `0 0 40px ${accentColor}28`,
-        minWidth: 290,
-        maxWidth: 320,
-      }}
-    >
-      <div className="p-4">
-        <div className="flex items-start justify-between mb-3">
-          <div className="flex items-center gap-2.5">
-            <span
-              className="text-[9px] font-bold px-2 py-0.5 rounded border shrink-0"
-              style={{ color: accentColor, background: accentBg, borderColor: accentColor + '40' }}
-            >
-              {overlay.tag}
-            </span>
-            <div>
-              <p className="text-sm font-bold leading-tight" style={{ color: C.text }}>{overlay.overlayTitle}</p>
-              <p className="text-[10px] mt-0.5 font-semibold" style={{ color: accentColor }}>
-                {isT3 ? 'Cloud AI' : 'Instant'} · {overlay.ms} · {overlay.cost === '$0.00' ? 'No cloud cost' : overlay.cost}
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={onDismiss}
-            className="text-xs ml-2 shrink-0 transition-colors"
-            style={{ color: C.text3 }}
-          >
-            ✕
-          </button>
-        </div>
-
-        {overlay.steps ? (
-          <div>
-            <p className="text-[10px] mb-2" style={{ color: C.text3 }}>{overlay.overlayDetail}</p>
-            <div className="space-y-1.5">
-              {overlay.steps.slice(0, visibleSteps).map((step, i) => (
-                <p key={i} className="text-xs font-mono" style={{ color: step.startsWith('✓') ? C.green : C.amber }}>
-                  {step}
-                </p>
-              ))}
-            </div>
-            {!isDone && (
-              <div className="flex items-center gap-2 mt-3">
-                <div
-                  className="w-3 h-3 rounded-full border-2 animate-spin"
-                  style={{ borderColor: C.amber, borderTopColor: 'transparent' }}
-                />
-                <span className="text-[10px]" style={{ color: C.amber }}>Alexa is thinking...</span>
-              </div>
-            )}
-          </div>
-        ) : (
-          <p className="text-xs leading-snug" style={{ color: C.text2 }}>{overlay.overlayDetail}</p>
-        )}
-
-        {isDone && (
-          <p className="text-[10px] mt-3 pt-2 border-t" style={{ color: C.text3, borderColor: C.border }}>
-            ✓ Your home stayed safe — closes shortly
-          </p>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ── Create Routine Modal ───────────────────────────────────────────────────────
-
-const DEMO_ROUTINES = [
-  {
-    title: 'Morning Energize',
-    desc: 'Geyser on at 6:30 AM for 15 min · lights to 80% · playlist starts',
-    example: 'Every morning at 6:30, turn on geyser for 15 minutes and set living room lights to 80%',
-    speak: 'Morning Energize: geyser at 6:30, lights to 80 percent, morning playlist.',
-  },
-  {
-    title: 'Study Time',
-    desc: 'Lights bright · TV muted · fan on low — weekdays at 5 PM',
-    example: 'Weekdays at 5 PM, mute the TV, set bedroom lights bright, turn fan to low',
-    speak: 'Study Time: mute TV, bright lights, fan on low at 5 PM.',
-  },
-  {
-    title: 'Night Safety',
-    desc: 'LPG off · AC 24°C · doors locked — at 10:30 PM',
-    example: 'At 10:30 PM, turn off LPG, set AC to 24 degrees, lock front door',
-    speak: 'Night Safety: LPG off, AC at 24, lock doors at 10:30 PM.',
-  },
-  {
-    title: 'Leave Home',
-    desc: 'Cut non-essential devices · security on — when everyone leaves',
-    example: 'When I leave home, turn off all lights, cut AC, activate security cameras',
-    speak: 'Leave Home: all lights off, AC off, security cameras on.',
-  },
-];
-
-function CreateRoutineModal({ onClose }: { onClose: () => void }) {
-  const [description, setDescription] = useState('');
-  const [selected, setSelected] = useState(0);
-  const [created, setCreated] = useState(false);
-  const addNotification = useAppStore(s => s.addNotification);
-
-  // Speak the selected suggestion whenever it changes
-  useEffect(() => {
-    if (!('speechSynthesis' in window)) return;
-    window.speechSynthesis.cancel();
-    const utter = new SpeechSynthesisUtterance(`Suggested: ${DEMO_ROUTINES[selected].speak}`);
-    utter.rate = 0.92;
-    utter.pitch = 1.05;
-    window.speechSynthesis.speak(utter);
-    return () => { window.speechSynthesis.cancel(); };
-  }, [selected]);
-
-  // Auto-cycle every 4 seconds
-  useEffect(() => {
-    const id = setInterval(() => setSelected(p => (p + 1) % DEMO_ROUTINES.length), 4000);
-    return () => clearInterval(id);
-  }, []);
-
-  const handleCreate = () => {
-    window.speechSynthesis.cancel();
-    const routine = DEMO_ROUTINES[selected];
-    const utter = new SpeechSynthesisUtterance(`Routine added: ${routine.title}`);
-    window.speechSynthesis.speak(utter);
-    addNotification(`Routine created: "${routine.title}"`, 'success');
-    setCreated(true);
-    setTimeout(onClose, 1400);
-  };
-
-  return (
-    <div
-      className="fixed inset-0 z-[60] flex items-center justify-center"
-      style={{ background: 'rgba(5,6,14,0.88)' }}
-      onClick={onClose}
-    >
-      <div
-        className="w-[440px] max-w-[94vw] rounded-2xl border shadow-2xl overflow-hidden"
-        style={{
-          background: C.surface,
-          borderColor: C.borderHover,
-          boxShadow: `0 0 80px ${C.cyan}18, 0 32px 80px rgba(0,0,0,0.7)`,
-        }}
-        onClick={e => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="px-6 py-4 border-b flex items-center justify-between" style={{ borderColor: C.border }}>
-          <div>
-            <p className="text-[9px] font-bold uppercase tracking-widest mb-0.5" style={{ color: C.cyan }}>Alexa+ AI Routine Builder</p>
-            <h3 className="text-sm font-bold" style={{ color: C.text }}>Create a Routine</h3>
-          </div>
-          <button
-            onClick={onClose}
-            className="w-7 h-7 rounded-full border flex items-center justify-center text-xs transition-colors"
-            style={{ color: C.text2, borderColor: C.border, background: C.card }}
-          >
-            ✕
-          </button>
-        </div>
-
-        <div className="p-6">
-          {/* Suggestions */}
-          <div className="flex items-center gap-2 mb-3">
-            <span className="w-1.5 h-1.5 rounded-full animate-pulse shrink-0" style={{ background: C.cyan }} />
-            <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: C.text3 }}>Alexa suggests · speaking now</p>
-          </div>
-          <div className="space-y-1.5 mb-5">
-            {DEMO_ROUTINES.map((r, i) => (
-              <button
-                key={i}
-                onClick={() => setSelected(i)}
-                className="w-full text-left px-3.5 py-3 rounded-xl border transition-all"
-                style={{
-                  borderColor: i === selected ? C.cyan : C.border,
-                  background: i === selected ? C.cyanBg : C.card,
-                }}
-              >
-                <p className="text-xs font-semibold" style={{ color: i === selected ? C.cyan : C.text }}>{r.title}</p>
-                <p className="text-[10px] mt-0.5" style={{ color: i === selected ? C.text2 : C.text3 }}>{r.desc}</p>
-              </button>
-            ))}
-          </div>
-
-          {/* Custom description */}
-          <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: C.text3 }}>Or describe your own</p>
-          <textarea
-            value={description}
-            onChange={e => setDescription(e.target.value)}
-            placeholder={DEMO_ROUTINES[selected].example}
-            rows={2}
-            className="w-full px-3.5 py-2.5 rounded-xl border text-xs resize-none outline-none transition-colors"
-            style={{
-              background: C.card,
-              borderColor: C.border,
-              color: C.text,
-              fontFamily: 'inherit',
-            }}
-            onFocus={e => { (e.currentTarget as HTMLTextAreaElement).style.borderColor = C.cyanDim; }}
-            onBlur={e => { (e.currentTarget as HTMLTextAreaElement).style.borderColor = C.border; }}
-          />
-
-          <button
-            onClick={handleCreate}
-            disabled={created}
-            className="w-full mt-4 py-2.5 rounded-xl text-sm font-semibold transition-all"
-            style={{
-              background: created ? C.greenDim : C.cyan,
-              color: created ? C.green : '#000',
-              border: created ? `1px solid ${C.green}60` : 'none',
-            }}
-          >
-            {created ? '✓ Routine added to Alexa!' : 'Add Routine →'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Compact Alexa View (left column) ──────────────────────────────────────────
-
-const QUICK_SCENES = [
-  { label: 'Morning', regime: 'normal'   },
-  { label: 'Movie',   regime: 'festival' },
-  { label: 'Sleep',   regime: 'sleep'    },
-  { label: 'Away',    regime: 'away'     },
-];
-
-function CompactAlexaView({ events, onOpenFullApp }: { events: LiveEvent[]; onOpenFullApp: () => void }) {
-  const addNotification = useAppStore(s => s.addNotification);
-  const [tapped, setTapped] = useState(false);
-  const [showRoutineModal, setShowRoutineModal] = useState(false);
-
-  const handleScene = async (regime: string) => {
-    try {
-      await backendApi.forceRegime(undefined, regime);
-      const s = QUICK_SCENES.find(x => x.regime === regime);
-      addNotification(`${s?.label} mode activated`, 'success');
-    } catch {
-      addNotification('Backend offline', 'warning');
-    }
-  };
-
-  const handleRingTap = () => {
-    setTapped(true);
-    setTimeout(() => setTapped(false), 600);
-    onOpenFullApp();
-  };
-
-  const recentEvents = events.slice(0, 5);
-
-  return (
-    <div className="flex flex-col h-full" style={{ background: C.bg }}>
-
-      {/* Alexa ring */}
-      <div className="flex flex-col items-center py-7 border-b" style={{ borderColor: C.border }}>
-        <button
-          onClick={handleRingTap}
-          className="relative w-28 h-28 rounded-full flex items-center justify-center transition-transform active:scale-95"
-          style={{ background: `radial-gradient(circle, ${C.cyanBg} 60%, ${C.bg} 100%)` }}
-        >
-          {/* Outer ring */}
-          <div
-            className={`absolute inset-0 rounded-full border-4 transition-opacity ${tapped ? 'animate-ping opacity-70' : 'opacity-70'}`}
-            style={{ borderColor: C.cyan }}
-          />
-          {/* Middle ring */}
-          <div className="absolute inset-2 rounded-full border-2 opacity-30" style={{ borderColor: C.cyan }} />
-          {/* Glow */}
-          <div
-            className="absolute inset-3 rounded-full animate-pulse"
-            style={{ background: `radial-gradient(circle, ${C.cyan}20 0%, transparent 70%)` }}
-          />
-          {/* Center dot */}
-          <div
-            className="w-4 h-4 rounded-full"
-            style={{ background: C.cyan, boxShadow: `0 0 16px ${C.cyan}` }}
-          />
-        </button>
-        <p className="text-[11px] mt-3" style={{ color: C.text3 }}>Tap to speak to Alexa</p>
-      </div>
-
-      {/* AI action log */}
-      <div className="flex-1 flex flex-col px-4 py-4 border-b min-h-0" style={{ borderColor: C.border }}>
-        <div className="flex items-center gap-2 mb-3">
-          <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: C.green }} />
-          <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: C.text3 }}>AI just did this</p>
-        </div>
-        {recentEvents.length === 0 ? (
-          <p className="text-xs text-center leading-snug py-6" style={{ color: C.text3 }}>
-            Try a scenario<br />
-            <span style={{ color: C.text3 }}>AI actions appear here</span>
-          </p>
-        ) : (
-          <div className="space-y-2.5 overflow-y-auto">
-            {recentEvents.map(e => (
-              <div key={e.id} className="flex items-start gap-2">
-                <span
-                  className="text-[8px] font-bold px-1.5 py-0.5 rounded mt-0.5 shrink-0"
-                  style={{
-                    color: e.tier === 'T3' ? C.amber : C.green,
-                    background: e.tier === 'T3' ? C.amberDim : C.greenDim,
-                  }}
-                >
-                  {e.tier}
-                </span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs leading-snug" style={{ color: C.text2 }}>{e.description}</p>
-                  <p className="text-[10px] mt-0.5" style={{ color: C.text3 }}>
-                    {e.time} · {e.tier === 'T3' ? 'Cloud AI' : 'Instant'}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Quick scenes */}
-      <div className="px-4 py-4">
-        <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: C.text3 }}>Quick scenes</p>
-        <div className="grid grid-cols-2 gap-2">
-          {QUICK_SCENES.map(s => (
-            <button
-              key={s.regime}
-              onClick={() => handleScene(s.regime)}
-              className="py-2.5 rounded-xl border transition-all text-center text-xs font-medium"
-              style={{
-                color: C.text2,
-                borderColor: C.border,
-                background: C.card,
-              }}
-              onMouseEnter={e => {
-                (e.currentTarget as HTMLButtonElement).style.borderColor = C.cyanDim;
-                (e.currentTarget as HTMLButtonElement).style.color = C.text;
-              }}
-              onMouseLeave={e => {
-                (e.currentTarget as HTMLButtonElement).style.borderColor = C.border;
-                (e.currentTarget as HTMLButtonElement).style.color = C.text2;
-              }}
-            >
-              {s.label}
-            </button>
-          ))}
-        </div>
-        <button
-          onClick={() => setShowRoutineModal(true)}
-          className="w-full mt-2 py-2 text-xs border rounded-lg transition-colors flex items-center justify-center gap-1.5"
-          style={{ color: C.cyan, borderColor: C.cyanDim, background: C.cyanBg }}
-          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#002035'; }}
-          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = C.cyanBg; }}
-        >
-          + Create a Routine
-        </button>
-        <button
-          onClick={onOpenFullApp}
-          className="w-full mt-1.5 py-2 text-xs border rounded-lg transition-colors"
-          style={{ color: C.text3, borderColor: C.border }}
-          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = C.text; }}
-          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = C.text3; }}
-        >
-          Open Full Alexa App →
-        </button>
-      </div>
-      {showRoutineModal && <CreateRoutineModal onClose={() => setShowRoutineModal(false)} />}
-    </div>
-  );
-}
-
-// ── Scenario Panel (right column) ─────────────────────────────────────────────
-
-function ScenarioPanel({ onRun, onOverlay }: {
-  onRun: (tier: string, desc: string) => void;
-  onOverlay: (info: OverlayInfo) => void;
+function DashHeader({ regime, connected, ambientGreeting, onOpenConstruct }: {
+  regime: { current_regime?: string } | null;
+  connected: boolean;
+  ambientGreeting: string;
+  onOpenConstruct?: () => void;
 }) {
-  const [running, setRunning] = useState<string | null>(null);
-  const [flash, setFlash] = useState<{ id: string; ok: boolean } | null>(null);
-  const addNotification = useAppStore(s => s.addNotification);
-
-  const run = async (s: Scenario) => {
-    if (running) return;
-    setRunning(s.id);
-    onOverlay({
-      scenarioId: s.id, tier: s.tier, tag: s.tag,
-      ms: s.ms, cost: s.cost,
-      overlayTitle: s.overlayTitle, overlayDetail: s.overlayDetail,
-      steps: s.steps,
-    });
-    try {
-      const data = await s.fn() as { message?: string };
-      const msg = data.message ?? `${s.title} triggered`;
-      addNotification(msg, 'success');
-      onRun(s.tier, `${s.title}: ${msg.substring(0, 60)}`);
-      setFlash({ id: s.id, ok: true });
-    } catch {
-      addNotification(`${s.title} — backend offline`, 'warning');
-      setFlash({ id: s.id, ok: false });
-    } finally {
-      setRunning(null);
-      setTimeout(() => setFlash(null), 2000);
-    }
-  };
-
-  const instant = SCENARIOS.filter(s => s.tier === 'T0');
-  const cloud   = SCENARIOS.filter(s => s.tier === 'T3');
-
-  const renderScenario = (s: Scenario) => {
-    const isRunning = running === s.id;
-    const flashState = flash?.id === s.id;
-    const isInstant = s.tier === 'T0';
-    const accentColor = isInstant ? C.green : C.amber;
-
-    let borderColor: string = C.border;
-    let bgColor: string = C.card;
-    if (flashState) {
-      borderColor = flash!.ok ? C.green : C.red;
-      bgColor = flash!.ok ? C.greenDim : C.redDim;
-    } else if (isRunning) {
-      borderColor = C.cyan;
-      bgColor = C.cyanBg;
-    }
-
-    return (
-      <button
-        key={s.id}
-        onClick={() => run(s)}
-        disabled={!!running}
-        className="w-full flex items-center gap-3 px-3.5 py-3 rounded-xl border text-left transition-all duration-150 disabled:opacity-50"
-        style={{ borderColor, background: bgColor }}
-        onMouseEnter={e => {
-          if (running || flashState) return;
-          (e.currentTarget as HTMLButtonElement).style.borderColor = C.borderHover;
-          (e.currentTarget as HTMLButtonElement).style.background = C.cardHover;
-        }}
-        onMouseLeave={e => {
-          if (running || flashState) return;
-          (e.currentTarget as HTMLButtonElement).style.borderColor = borderColor;
-          (e.currentTarget as HTMLButtonElement).style.background = bgColor;
-        }}
-      >
-        <div className="flex-1 min-w-0">
-          <p className="text-xs font-semibold leading-tight" style={{ color: C.text }}>{s.title}</p>
-          <p className="text-[10px] mt-0.5 truncate" style={{ color: C.text3 }}>{s.desc}</p>
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '12px 24px', background: C.surface, borderBottom: `1px solid ${C.border}`,
+      flexShrink: 0, minHeight: 58,
+    }}>
+      {/* Left: Home identity */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        {/* Alexa ring */}
+        <div style={{
+          width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
+          border: '2.5px solid #00BFFF',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: '0 0 10px #00BFFF44',
+        }}>
+          <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#00BFFF' }} />
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <span className="text-[10px] font-mono" style={{ color: C.text3 }}>{s.ms}</span>
-          <span
-            className="text-[9px] font-bold px-1.5 py-0.5 rounded"
-            style={{ color: accentColor, background: isInstant ? C.greenDim : C.amberDim }}
-          >
-            {isInstant ? 'T0' : 'T3'}
+        <div>
+          <div style={{ fontFamily: 'Encode Sans, var(--font-display)', fontSize: 18, color: C.text, fontWeight: 600, lineHeight: 1.2, letterSpacing: '0.02em' }}>
+            Sharma Residence
+          </div>
+          <div style={{ fontSize: F.badge, color: C.text3, letterSpacing: '0.04em', marginTop: 2, fontFamily: 'Work Sans, sans-serif' }}>1 BHK · Pune</div>
+        </div>
+      </div>
+
+      {/* Center: Greeting */}
+      <div style={{
+        fontFamily: 'var(--font-display)', fontSize: 22, color: C.text2,
+        letterSpacing: '0.03em', lineHeight: 1.2,
+      }}>
+        {ambientGreeting}, Sharma Ji
+      </div>
+
+      {/* Right: Status + Build button */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{
+            width: 8, height: 8, borderRadius: '50%',
+            background: connected ? C.green : C.red,
+            boxShadow: connected ? `0 0 6px ${C.green}` : 'none',
+          }} />
+          <span style={{ fontSize: F.badge, color: C.text3 }}>
+            {connected ? 'Home is online' : 'Demo mode'}
           </span>
         </div>
-      </button>
-    );
-  };
-
-  return (
-    <div className="px-4 py-4 border-b" style={{ borderColor: C.border }}>
-      {/* Instant scenarios */}
-      <div className="mb-4">
-        <div className="flex items-center gap-2 mb-2.5">
-          <span
-            className="text-[9px] font-bold px-2 py-0.5 rounded"
-            style={{ color: C.green, background: C.greenDim }}
-          >
-            INSTANT
-          </span>
-          <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: C.text3 }}>Local rules · 8ms · $0.00</p>
-        </div>
-        <div className="space-y-1.5">
-          {instant.map(renderScenario)}
-        </div>
-      </div>
-
-      {/* Cloud scenarios */}
-      <div>
-        <div className="flex items-center gap-2 mb-2.5">
-          <span
-            className="text-[9px] font-bold px-2 py-0.5 rounded"
-            style={{ color: C.amber, background: C.amberDim }}
-          >
-            CLOUD AI
-          </span>
-          <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: C.text3 }}>Bedrock · 4-agent chain</p>
-        </div>
-        <div className="space-y-1.5">
-          {cloud.map(renderScenario)}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Home Mode Panel ────────────────────────────────────────────────────────────
-
-const HOME_MODES = [
-  { id: 'normal',   label: 'Normal',  desc: 'Standard home automation rules are active' },
-  { id: 'festival', label: 'Party',   desc: 'Party lights, louder alerts, festive mode' },
-  { id: 'guest',    label: 'Guests',  desc: 'Privacy mode — AI is polite and discreet' },
-  { id: 'sleep',    label: 'Sleep',   desc: 'Quiet mode — only safety alerts get through' },
-  { id: 'away',     label: 'Away',    desc: 'Security + energy save — nobody is home' },
-];
-
-function HomeModePanel() {
-  const [regime, setRegime] = useState<RegimeState | null>(null);
-  const [busy, setBusy] = useState(false);
-  const addNotification = useAppStore(s => s.addNotification);
-
-  useEffect(() => { backendApi.getRegime().then(setRegime).catch(() => {}); }, []);
-
-  const force = async (id: string) => {
-    setBusy(true);
-    try {
-      await backendApi.forceRegime(undefined, id);
-      const updated = await backendApi.getRegime();
-      setRegime(updated);
-      const mode = HOME_MODES.find(m => m.id === id);
-      addNotification(`Home mode → ${mode?.label}`, 'success');
-    } catch {
-      addNotification('Mode change failed — backend offline', 'warning');
-    } finally { setBusy(false); }
-  };
-
-  const currentMode = HOME_MODES.find(m => m.id === regime?.current_regime);
-
-  return (
-    <div className="px-4 py-4 border-b" style={{ borderColor: C.border }}>
-      <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: C.text3 }}>Home mode</p>
-      <div className="flex flex-wrap gap-1.5 mb-2.5">
-        {HOME_MODES.map(m => {
-          const active = regime?.current_regime === m.id;
-          return (
-            <button
-              key={m.id}
-              onClick={() => force(m.id)}
-              disabled={busy}
-              title={m.desc}
-              className="px-2.5 py-1 rounded-lg text-xs font-medium border transition-all disabled:opacity-40"
-              style={{
-                borderColor: active ? C.cyan : C.border,
-                background: active ? C.cyanBg : C.card,
-                color: active ? C.cyan : C.text2,
-              }}
-            >
-              {m.label}
-            </button>
-          );
-        })}
-      </div>
-      {currentMode && (
-        <p className="text-[10px] leading-snug" style={{ color: C.text3 }}>{currentMode.desc}</p>
-      )}
-    </div>
-  );
-}
-
-// ── AI Predictions Panel ───────────────────────────────────────────────────────
-
-function AiComingUpPanel() {
-  const { anticipations, loading, error } = useAnticipations();
-
-  return (
-    <div className="px-4 py-4 border-b" style={{ borderColor: C.border }}>
-      <div className="flex items-center gap-2 mb-3">
-        <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: C.text3 }}>AI predicts next</p>
-        {loading && <span className="text-[9px]" style={{ color: C.text3 }}>refreshing...</span>}
-      </div>
-
-      {error ? (
-        <p className="text-[10px] leading-snug" style={{ color: C.red }}>
-          {error}
-        </p>
-      ) : anticipations.length === 0 && !loading ? (
-        <p className="text-[10px] leading-snug" style={{ color: C.text3 }}>
-          No predictions yet — backend offline or loading
-        </p>
-      ) : (
-        <div className="space-y-2">
-          {anticipations.slice(0, 4).map((a, i) => {
-            const conf = Math.round(a.confidence * 100);
-            const confColor = conf >= 90 ? C.green : conf >= 80 ? C.amber : C.text2;
-            return (
-              <div key={i} className="p-2.5 rounded-xl border" style={{ background: C.card, borderColor: C.border }}>
-                <div className="flex items-start justify-between gap-2 mb-1">
-                  <p className="text-xs font-medium leading-snug flex-1" style={{ color: C.text }}>{a.action}</p>
-                  <span
-                    className="text-[8px] font-bold px-1.5 py-0.5 rounded shrink-0"
-                    style={{ color: confColor, background: confColor + '18' }}
-                  >
-                    {conf}%
-                  </span>
-                </div>
-                {a.trigger_window && (
-                  <p className="text-[10px] font-semibold mb-0.5" style={{ color: C.cyan }}>
-                    {a.trigger_window}
-                  </p>
-                )}
-                <p className="text-[10px] leading-snug" style={{ color: C.text3 }}>
-                  {a.reason}
-                </p>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── AI Learning Panel ──────────────────────────────────────────────────────────
-
-function AiLearningPanel() {
-  const [rules, setRules] = useState<T0Rule[]>([]);
-  const [proposed, setProposed] = useState<ProposedRule[]>([]);
-  const [seeding, setSeeding] = useState(false);
-  const [mining, setMining] = useState(false);
-  const [seeded, setSeeded] = useState(false);
-  const addNotification = useAppStore(s => s.addNotification);
-
-  const loadRules = useCallback(async () => {
-    try {
-      const [r, p] = await Promise.all([backendApi.listT0Rules(), backendApi.listProposedRules()]);
-      setRules(r.rules ?? []);
-      setProposed(p.proposed ?? []);
-    } catch {}
-  }, []);
-
-  useEffect(() => { loadRules(); }, [loadRules]);
-
-  const seed = async () => {
-    setSeeding(true);
-    try {
-      const data = await homeApi.seedLearningHistory();
-      addNotification(`Loaded ${data.days_seeded} days of home history`, 'success');
-      setSeeded(true);
-      await loadRules();
-    } catch {
-      addNotification('Backend offline', 'warning');
-    } finally { setSeeding(false); }
-  };
-
-  const mine = async () => {
-    setMining(true);
-    try {
-      const data = await backendApi.runRuleMiner() as { proposed?: number };
-      addNotification(`Found ${data.proposed ?? 0} pattern(s) in your home history`, 'success');
-      await loadRules();
-    } catch {
-      addNotification('Backend offline', 'warning');
-    } finally { setMining(false); }
-  };
-
-  const confirm = async (id: string) => {
-    try {
-      await backendApi.confirmRule(undefined, id);
-      addNotification('Pattern added — now fires in 8ms, no cloud', 'success');
-      await loadRules();
-    } catch {}
-  };
-
-  const reject = async (id: string) => {
-    try {
-      await backendApi.rejectRule(undefined, id);
-      await loadRules();
-    } catch {}
-  };
-
-  const pending = proposed.filter(p => p.status === 'pending');
-  const activeCount = rules.filter(r => r.enabled).length;
-
-  return (
-    <div className="px-4 py-4">
-      <div className="flex items-center justify-between mb-3">
-        <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: C.text3 }}>AI learning</p>
-        {activeCount > 0 && (
-          <span
-            className="text-[9px] font-bold px-1.5 py-0.5 rounded"
-            style={{ color: C.green, background: C.greenDim }}
-          >
-            {activeCount} instant rules
+        {regime?.current_regime && (
+          <span style={{
+            fontSize: F.badge, color: C.gold, fontWeight: 600,
+            padding: '2px 8px', background: C.goldBg, borderRadius: 4,
+            border: `1px solid ${C.goldDim}`,
+          }}>
+            {regime.current_regime}
           </span>
         )}
-      </div>
-
-      <button
-        onClick={seed}
-        disabled={seeding || mining}
-        className="w-full py-2 mb-2 rounded-lg text-xs font-semibold border transition-colors disabled:opacity-40"
-        style={{
-          borderColor: seeded ? C.green + '60' : C.border,
-          color: seeded ? C.green : C.text2,
-          background: seeded ? C.greenDim : C.card,
-        }}
-      >
-        {seeding ? 'Loading history...' : seeded ? '✓ Step 1: Home history loaded' : 'Step 1: Load a sample week'}
-      </button>
-
-      {seeded && (
-        <button
-          onClick={mine}
-          disabled={mining || seeding}
-          className="w-full py-2 mb-2 rounded-lg text-xs font-semibold border transition-colors disabled:opacity-40"
-          style={{ borderColor: C.border, color: C.text2, background: C.card }}
-        >
-          {mining ? 'Finding patterns...' : 'Step 2: Find patterns'}
-        </button>
-      )}
-
-      {pending.length > 0 && (
-        <div className="space-y-2 mt-2">
-          <p className="text-[10px] font-semibold" style={{ color: C.amber }}>
-            Step 3 · AI found {pending.length} pattern(s):
-          </p>
-          {pending.slice(0, 3).map(p => (
-            <div key={p.proposal_id} className="p-3 rounded-xl border" style={{ background: C.card, borderColor: C.amberDim + '80' }}>
-              <p className="text-xs leading-snug mb-1" style={{ color: C.text }}>{p.description}</p>
-              {p.confidence != null && (
-                <p className="text-[10px] mb-2.5" style={{ color: C.text3 }}>
-                  {Math.round(p.confidence * 100)}% confident · based on your history
-                </p>
-              )}
-              <div className="flex gap-1.5">
-                <button
-                  onClick={() => confirm(p.proposal_id)}
-                  className="flex-1 py-1.5 rounded text-[10px] font-bold border transition-colors"
-                  style={{ background: C.greenDim, borderColor: C.green + '40', color: C.green }}
-                >
-                  ✓ Add to instant rules
-                </button>
-                <button
-                  onClick={() => reject(p.proposal_id)}
-                  className="flex-1 py-1.5 rounded text-[10px] font-bold border transition-colors"
-                  style={{ background: C.redDim, borderColor: C.red + '40', color: C.red }}
-                >
-                  ✕ Skip
-                </button>
-              </div>
-            </div>
-          ))}
-          <p className="text-[10px] text-center pt-1" style={{ color: C.text3 }}>
-            Once added — fires instantly · No cloud · $0.00
-          </p>
-        </div>
-      )}
-
-      {pending.length === 0 && activeCount === 0 && !seeded && (
-        <p className="text-[10px] text-center leading-snug py-1" style={{ color: C.text3 }}>
-          AI learns your patterns and turns them into instant reactions
-        </p>
-      )}
-    </div>
-  );
-}
-
-// ── Analytics View ─────────────────────────────────────────────────────────────
-
-function TierCascadePanel({ tierCounts }: { tierCounts: TierCounts }) {
-  const total = tierCounts.T0 + tierCounts.T1 + tierCounts.T3 || 1;
-  const tiers = [
-    { key: 'T0' as const, label: 'Instant — local rules',  color: C.green,  desc: 'commandProcessor.ts',  detail: '<10ms · $0.00 · no model inference' },
-    { key: 'T1' as const, label: 'Quick — on-device AI',   color: C.cyan,   desc: 'on-device intent regex', detail: '<100ms · $0.00 · no cloud call' },
-    { key: 'T3' as const, label: 'Deep AI — cloud',        color: C.amber,  desc: 'Bedrock Nova Micro',    detail: '0.5–3s · ~$0.00004 · 4-agent chain' },
-  ];
-
-  return (
-    <div className="p-5 border-b" style={{ borderColor: C.border }}>
-      <p className="text-[10px] font-bold uppercase tracking-widest mb-5" style={{ color: C.text3 }}>How AI decides</p>
-      <div className="space-y-5">
-        {tiers.map(t => {
-          const pct = Math.round((tierCounts[t.key] / total) * 100);
-          return (
-            <div key={t.key}>
-              <div className="flex items-center justify-between mb-1.5">
-                <div className="flex items-center gap-2">
-                  <span
-                    className="text-[9px] font-bold px-2 py-0.5 rounded"
-                    style={{ color: t.color, background: t.color + '18' }}
-                  >
-                    {t.key}
-                  </span>
-                  <span className="text-sm font-semibold" style={{ color: C.text }}>{t.label}</span>
-                  <span className="text-xs hidden xl:inline" style={{ color: C.text3 }}>{t.desc}</span>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-sm font-bold" style={{ color: t.color }}>{pct}%</span>
-                  <span className="text-xs" style={{ color: C.text3 }}>({tierCounts[t.key]})</span>
-                </div>
-              </div>
-              <div className="h-2 rounded-full overflow-hidden" style={{ background: C.border }}>
-                <div
-                  className="h-full rounded-full transition-all duration-700"
-                  style={{ width: `${pct}%`, background: `linear-gradient(90deg, ${t.color}60, ${t.color})` }}
-                />
-              </div>
-              <p className="text-[10px] mt-1" style={{ color: C.text3 }}>{t.detail}</p>
-            </div>
-          );
-        })}
+        {onOpenConstruct && (
+          <button
+            onClick={onOpenConstruct}
+            style={{
+              fontSize: F.badge, fontWeight: 700, padding: '4px 10px', borderRadius: 4,
+              background: C.violetBg, border: `1px solid ${C.violetDim}`, color: C.violet,
+              cursor: 'pointer',
+            }}
+          >
+            Build Scenario
+          </button>
+        )}
       </div>
     </div>
   );
 }
 
-function EventFeedPanel({ events }: { events: LiveEvent[] }) {
-  return (
-    <div className="p-5 border-b" style={{ borderColor: C.border }}>
-      <div className="flex items-center justify-between mb-4">
-        <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: C.text3 }}>AI Action Log</p>
-        <div className="flex items-center gap-1.5">
-          <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: C.green }} />
-          <span className="text-xs" style={{ color: C.green }}>Live</span>
-        </div>
-      </div>
-      {events.length === 0 ? (
-        <div className="py-6 text-center border border-dashed rounded-xl" style={{ borderColor: C.border }}>
-          <p className="text-xs" style={{ color: C.text3 }}>No events yet</p>
-          <p className="text-[10px] mt-1" style={{ color: C.text3 }}>Run a scenario to see the AI in action</p>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-1.5 max-h-48 overflow-y-auto">
-          {events.map(e => (
-            <div
-              key={e.id}
-              className="flex items-center gap-2.5 px-3 py-2 rounded-lg border"
-              style={{ background: C.card, borderColor: C.border }}
-            >
-              <p className="flex-1 text-xs truncate" style={{ color: C.text2 }}>{e.description}</p>
-              <span className="text-[10px] shrink-0" style={{ color: C.text3 }}>{e.time}</span>
-              <span
-                className="text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0"
-                style={{
-                  color: e.tier === 'T3' ? C.amber : C.green,
-                  background: e.tier === 'T3' ? C.amberDim : C.greenDim,
-                }}
-              >
-                {e.tier}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
+// ── Canvas HUD ────────────────────────────────────────────────────────────────
 
-function RoomStatusGrid() {
-  const { twinData } = useDigitalTwin();
-  return (
-    <div className="p-5">
-      <div className="flex items-center justify-between mb-4">
-        <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: C.text3 }}>Room status</p>
-        {twinData && <span className="text-xs" style={{ color: C.text3 }}>{twinData.current_mode} mode</span>}
-      </div>
-      {!twinData?.rooms?.length ? (
-        <p className="text-xs" style={{ color: C.text3 }}>Backend offline — start backend to see live room status</p>
-      ) : (
-        <div className="grid grid-cols-2 gap-2.5">
-          {twinData.rooms.map(room => {
-            const pct = room.device_count > 0 ? Math.round((room.on_count / room.device_count) * 100) : 0;
-            return (
-              <div key={room.id} className="p-3 rounded-xl border" style={{ background: C.card, borderColor: C.border }}>
-                <p className="text-xs font-semibold truncate mb-1.5" style={{ color: C.text }}>{room.name}</p>
-                <div className="flex items-center justify-between text-[10px] mb-2">
-                  <span style={{ color: C.text3 }}>{room.on_count}/{room.device_count} on</span>
-                  <span style={{ color: pct > 0 ? C.green : C.text3 }}>{pct}%</span>
-                </div>
-                <div className="h-1.5 rounded-full overflow-hidden" style={{ background: C.border }}>
-                  <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: C.green }} />
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
+// ── Right tab types ───────────────────────────────────────────────────────────
 
-// ── Main Dashboard ─────────────────────────────────────────────────────────────
+type RightTab = 'ecosystem' | 'chain' | 'events' | 'store';
+const RIGHT_TABS: { key: RightTab; label: string }[] = [
+  { key: 'ecosystem', label: 'Ecosystem' },
+  { key: 'chain',     label: 'T0 Chain'  },
+  { key: 'events',    label: 'Events'    },
+  { key: 'store',     label: 'Store'     },
+];
 
-export function DemoDashboard() {
+// ── Main component ────────────────────────────────────────────────────────────
+
+export function DemoDashboard({ onOpenConstruct }: { onOpenConstruct?: () => void } = {}) {
   useSimulation(2000);
-  const { subscribe } = useWebSocket();
+  const { subscribe }       = useWebSocket();
+  const addNotification     = useAppStore(s => s.addNotification);
+  const setActiveScenarioId = useAppStore(s => s.setActiveScenarioId);
+  const setActiveRoom       = useAppStore(s => s.setActiveRoom);
+  const lastCloudCommand    = useAppStore(s => s.lastCloudCommand);
 
-  const [view, setView] = useState<'3d' | 'analytics'>('3d');
-  const [tierCounts, setTierCounts] = useState<TierCounts>({ T0: 8, T1: 3, T3: 1 });
-  const [costSaved, setCostSaved] = useState(0.00044);
-  const [events, setEvents] = useState<LiveEvent[]>([]);
-  const [showBanner, setShowBanner] = useState(false);
-  const [overlay, setOverlay] = useState<OverlayInfo | null>(null);
-  const [showFullAlexa, setShowFullAlexa] = useState(false);
-  const [showTour, setShowTour] = useState(true);
+  const tts  = usePollyTTS();
+  const live = useLiveBackend();
+
+  // Sync backend device states into the 3D canvas store
+  useEffect(() => {
+    if (!live.devices.length) return;
+    const store = useAppStore.getState();
+    for (const dev of live.devices) {
+      const match = store.placedObjects.find(o =>
+        (o.alexaDeviceId && o.alexaDeviceId === dev.id) ||
+        (o.deviceName && dev.friendly_name && o.deviceName.toLowerCase() === dev.friendly_name.toLowerCase())
+      );
+      if (!match) continue;
+      const devState: Record<string, unknown> | undefined = dev.state;
+      if (!devState) continue;
+      const patch: Partial<import('../../types').AlexaDeviceState> = {};
+      if (devState.is_on       !== undefined) patch.isOn        = devState.is_on as boolean;
+      if (devState.brightness  !== undefined) patch.brightness  = devState.brightness as number;
+      if (devState.temperature !== undefined) patch.temperature = devState.temperature as number;
+      if (devState.volume      !== undefined) patch.volume      = devState.volume as number;
+      if (devState.speed       !== undefined) patch.speed       = devState.speed as number;
+      if (devState.is_locked   !== undefined) patch.isLocked    = devState.is_locked as boolean;
+      if (Object.keys(patch).length) store.updateAlexaState(match.id, patch);
+    }
+  }, [live.devices]);
+
+  // ── Weather ───────────────────────────────────────────────────────────────────
+  const weatherRef = useRef<WeatherInfo | null>(null);
+  useEffect(() => { fetchWeather().then(w => { weatherRef.current = w; }).catch(() => {}); }, []);
+
+  // ── Auto-seed on first connect ────────────────────────────────────────────────
+  const seededRef = useRef(false);
+  useEffect(() => {
+    if (!live.connected || seededRef.current) return;
+    if (live.devices.length > 0) { seededRef.current = true; return; }
+    seededRef.current = true;
+    live.seedHome().then(() => live.seedHistory()).catch(() => {});
+  }, [live.connected, live.devices.length]); // eslint-disable-line
+
+  // ── Interactive rule confirmation ─────────────────────────────────────────────
+  const [pendingConfirm, setPendingConfirm] = useState<{
+    question: string;
+    onYes: () => void;
+    onNo: () => void;
+  } | null>(null);
+
+  // ── Voice state ──────────────────────────────────────────────────────────────
+  const [_voiceState, setVoiceState] = useState<VoiceState>({
+    liveText: '', response: '', tier: 'T0', isListening: false, isThinking: false,
+  });
+  const runScenarioRef = useRef<((s: ActiveScenario, voiceTriggered?: boolean) => void) | null>(null);
+  const forceRegimeRef = useRef<((r: string) => void) | null>(null);
+
+  // Called by AlexaAppSimView after it has already handled backend + TTS
+  // DemoDashboard only updates UI state — no extra backend or TTS calls here
+  const handleTranscript = useCallback(async (text: string) => {
+    if (!text.trim()) return;
+    setVoiceState(vs => ({ ...vs, liveText: text, isListening: false, isThinking: false }));
+
+    // Local NLU for UI state only (scenario triggers, momentCard, etc.)
+    const localResult = interpretCommand(text);
+    const finalTier = localResult.tier as TierKey;
+    const action = localResult.action;
+
+    // Weather injection for "I'm back"
+    let finalResponse = localResult.response;
+    if (/i('?m| am) back|coming home/i.test(text) && weatherRef.current) {
+      const { temp_c, desc } = weatherRef.current;
+      const suggestion = temp_c > 32 ? 'AC is on at 24°C for you.' : temp_c < 20 ? 'Geyser is warming up.' : 'Home temperature is comfortable.';
+      finalResponse = `Welcome home, Sharma Ji! It's ${temp_c}°C and ${desc} outside. ${suggestion}`;
+    }
+
+    setVoiceState(vs => ({ ...vs, response: finalResponse, tier: finalTier }));
+    setMomentCard({ message: finalResponse, tier: finalTier as TierKey, room: null });
+
+    // Execute local action if any
+    if (action) {
+      if (action.type === 'scenario') {
+        const sc = SCENARIOS.find(s => s.id === action.id);
+        if (sc) setTimeout(() => runScenarioRef.current?.(sc, true), 600);
+      } else if (action.type === 'regime') {
+        setTimeout(() => forceRegimeRef.current?.(action.value), 300);
+      }
+    }
+
+    // Add to event feed
+    setEvents(prev => [{
+      id: `voice-${Date.now()}`,
+      time: new Date().toLocaleTimeString(),
+      tier: finalTier,
+      description: `Voice: "${text.substring(0, 50)}"`,
+    }, ...prev.slice(0, 19)]);
+    setTierCounts(prev => ({ ...prev, [finalTier]: (prev[finalTier as TierKey] ?? 0) + 1 }));
+  }, [tts]);
+
+  const mic = useMic(handleTranscript);
+
+  const handleMicToggle = useCallback(() => {
+    if (mic.listening) {
+      mic.stop(true);
+    } else {
+      tts.stop();
+      setVoiceState({ liveText: '', response: '', tier: 'T0', isListening: true, isThinking: false });
+      mic.start();
+    }
+  }, [mic, tts]);
+  void handleMicToggle;
+
+  // Keep live text in sync with mic
+  useEffect(() => {
+    setVoiceState(vs => ({
+      ...vs,
+      liveText:    mic.liveText || vs.liveText,
+      isListening: mic.listening,
+    }));
+  }, [mic.liveText, mic.listening]);
+
+  // ── Dashboard state ──────────────────────────────────────────────────────────
+  const [activeScenario, setActiveScenario] = useState<ActiveScenario | null>(null);
+  const [persona,        setPersona]        = useState<'dadi' | 'parent' | 'child'>('dadi');
+  const [awayBranch,     setAwayBranch]     = useState<'empty' | 'pet'>('pet');
+  const [intelTab,       setIntelTab]       = useState<IntelTab>('cascade');
+  const [tierCounts,     setTierCounts]     = useState<TierCounts>({ T0: 8, T1: 3, T2: 1, T3: 0 });
+  const [events,         setEvents]         = useState<LiveEvent[]>([]);
+  const [cartItems,      setCartItems]      = useState<CartItem[]>([]);
+  const [whistleCount,   setWhistleCount]   = useState(0);
+  const [running,        setRunning]        = useState<string | null>(null);
+  const [glowActive,     setGlowActive]     = useState(false);
+  const [momentCard,     setMomentCard]     = useState<{ message: string; tier: TierKey; room: RoomTarget } | null>(null);
+  const [showTour,       setShowTour]       = useState(() => shouldShowTour());
+  const [rightTab,       setRightTab]       = useState<RightTab>('ecosystem');
+
+  const [ambientTone, setAmbientTone] = useState(getAmbientTone);
 
   useEffect(() => {
-    const unsub = subscribe(msg => {
+    const id = setInterval(() => setAmbientTone(getAmbientTone()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+
+  // NOTE: auto-play intro scenario removed , Alexa must only speak / show moments when the
+  // user actively triggers something (no "creepy" voice firing on its own).
+
+  useEffect(() => {
+    if (!activeScenario) return;
+    const id = setTimeout(() => { setActiveScenario(null); setActiveScenarioId(null); }, 14000);
+    return () => clearTimeout(id);
+  }, [activeScenario?.id, setActiveScenarioId]);
+
+  useEffect(() => {
+    if (whistleCount === 0) return;
+    const id = setTimeout(() => setWhistleCount(0), 8000);
+    return () => clearTimeout(id);
+  }, [whistleCount]);
+
+  useEffect(() => {
+    if (!glowActive) return;
+    const id = setTimeout(() => setGlowActive(false), 6500);
+    return () => clearTimeout(id);
+  }, [glowActive, activeScenario?.id]);
+
+  useEffect(() => {
+    return subscribe(msg => {
       if (msg.type === 'event_result' && msg.payload) {
         const tier = (msg.payload.tier as string) ?? 'T0';
-        const desc = ((msg.payload.description as string) ?? (msg.payload.message as string) ?? 'Event processed').substring(0, 80);
-        const id = `${Date.now()}-${Math.random()}`;
-        setEvents(prev => [
-          { id, time: new Date().toLocaleTimeString(), tier, description: desc },
-          ...prev.slice(0, 19),
-        ]);
-        setTierCounts(prev => ({ ...prev, [tier]: (prev[tier as keyof TierCounts] ?? 0) + 1 }));
-        if (tier !== 'T3') setCostSaved(prev => prev + 0.00004);
+        if (tier === 'SYSTEM') return; // connection/handshake messages, not real events
+        const desc = ((msg.payload.description as string) ?? (msg.payload.message as string) ?? 'Event').substring(0, 80);
+        setEvents(prev => [{ id: `ws-${Date.now()}`, time: new Date().toLocaleTimeString(), tier, description: desc }, ...prev.slice(0, 19)]);
+        setTierCounts(prev => ({ ...prev, [tier]: (prev[tier as TierKey] ?? 0) + 1 }));
       }
     });
-    return unsub;
   }, [subscribe]);
 
-  const handleScenarioRun = useCallback((tier: string, description: string) => {
-    const k = tier as keyof TierCounts;
-    setTierCounts(prev => ({ ...prev, [k]: (prev[k] ?? 0) + 1 }));
-    if (tier !== 'T3') setCostSaved(prev => prev + 0.00004);
-    setEvents(prev => [
-      { id: `${Date.now()}-${Math.random()}`, time: new Date().toLocaleTimeString(), tier, description },
-      ...prev.slice(0, 19),
-    ]);
-  }, []);
+  const runScenario = useCallback(async (scenario: ActiveScenario, voiceTriggered = false) => {
+    if (running) return;
+    setRunning(scenario.id);
+    if (scenario.id === 'pressure') setWhistleCount(p => p + 1);
 
-  const handleOverlay = useCallback((info: OverlayInfo) => setOverlay(info), []);
-  const dismissOverlay = useCallback(() => setOverlay(null), []);
+    const personaMsg = scenario.alexaMessage?.[persona] ?? scenario.narration;
 
+    setActiveScenario(scenario);
+    setActiveScenarioId(scenario.id);
+    const ROOM_FOCUS: Record<string, string | null> = {
+      kitchen: 'kitchen', bathroom: 'bathroom', living: 'living-room',
+      office: 'office', pooja: 'master-bedroom', all: null,
+    };
+    const focus = scenario.roomGlow ? ROOM_FOCUS[scenario.roomGlow] : null;
+    if (focus !== undefined) setActiveRoom(focus);
+    setMomentCard({ message: personaMsg, tier: scenario.tier, room: scenario.roomGlow });
+    setIntelTab(scenario.intelTab);
+    setGlowActive(true);
+
+    // Only speak if not voice-triggered — AlexaAppSimView already handled TTS for voice commands
+    if (!voiceTriggered) setTimeout(() => tts.speak(personaMsg), 400);
+
+    // Interactive rule confirmation , ask after narration plays
+    setTimeout(() => {
+      setPendingConfirm({
+        question: `Should I ${scenario.alertCard.primaryAction.toLowerCase()}?`,
+        onYes: () => {
+          tts.speak(`Done. ${scenario.alertCard.primaryAction} applied.`);
+          setPendingConfirm(null);
+        },
+        onNo: () => {
+          tts.speak('Understood. I will wait for your instruction.');
+          setPendingConfirm(null);
+        },
+      });
+    }, 3500);
+
+    if (scenario.cartItems?.length) {
+      setCartItems(prev => {
+        const incoming = scenario.cartItems!.filter(ni => !prev.some(p => p.name === ni.name));
+        return [...incoming, ...prev];
+      });
+    }
+    setTierCounts(prev => ({ ...prev, [scenario.tier]: (prev[scenario.tier] ?? 0) + 1 }));
+
+    try {
+      const data   = await scenario.apiFn() as { message?: string };
+      const notice = data.message ?? `${scenario.title} triggered`;
+      addNotification(notice, 'success');
+      setEvents(prev => [{
+        id: `sc-${Date.now()}`, time: new Date().toLocaleTimeString(),
+        tier: scenario.tier, description: `${scenario.title}: ${notice.substring(0, 60)}`,
+      }, ...prev.slice(0, 19)]);
+    } catch {
+      addNotification(`${scenario.title} , backend offline (demo mode)`, 'warning');
+    } finally {
+      setRunning(null);
+    }
+  }, [running, addNotification, tts, setActiveScenarioId, setActiveRoom, persona]);
+
+  runScenarioRef.current = runScenario;
+
+  const handleRegimeChange = useCallback(async (regime: string) => {
+    try {
+      await live.forceRegime(regime);
+      const opt = REGIME_OPTIONS.find(r => r.value === regime);
+      addNotification(`Regime: ${opt?.label ?? regime}`, 'success');
+    } catch {
+      addNotification('Could not change regime , backend offline', 'warning');
+    }
+  }, [live, addNotification]);
+
+  forceRegimeRef.current = handleRegimeChange;
+
+  const switchIntelTab = useCallback((t: IntelTab) => setIntelTab(t), []);
+
+  // ── Render ────────────────────────────────────────────────────────────────────
   return (
-    <div className="flex flex-col w-full h-full" style={{ background: C.bg }}>
-      {showBanner && <OnboardingBanner onDismiss={() => setShowBanner(false)} />}
-      <DemoHeader tierCounts={tierCounts} costSaved={costSaved} onTour={() => setShowTour(true)} />
+    <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', background: ambientTone.bg }}>
+      <DashHeader
+        regime={live.regime}
+        connected={live.connected}
+        ambientGreeting={ambientTone.greeting}
+        onOpenConstruct={onOpenConstruct}
+      />
 
-      <div className="flex flex-1 overflow-hidden">
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
 
-        {/* Left column — Alexa panel */}
-        <div className="w-[252px] shrink-0 border-r overflow-y-auto" style={{ borderColor: C.border }}>
-          <CompactAlexaView events={events} onOpenFullApp={() => setShowFullAlexa(true)} />
+        {/* ── Column A ──────────────────────────────────────────────────────── */}
+        <div style={{ width: 280, flexShrink: 0, borderRight: `1px solid ${C.border}`, overflow: 'hidden' }}>
+          <AlexaAppSimView
+            demoSections={{
+              isListening: mic.listening,
+              activeScenarioName: activeScenario?.roomName,
+              persona,
+              personas: [
+                { key: 'dadi',   name: 'Grandparent', lang: 'Hindi'    },
+                { key: 'parent', name: 'Parent',      lang: 'Hinglish' },
+                { key: 'child',  name: 'Son',         lang: 'English'  },
+              ],
+              onPersonaChange: (k) => setPersona(k as typeof persona),
+              scenarios: SCENARIOS.map(sc => ({
+                id: sc.id,
+                humanTitle: sc.humanTitle,
+                roomName: sc.roomName,
+                humanTier: sc.humanTier,
+              })),
+              filteredScenarioIds: SCENARIOS
+                .filter(sc => {
+                  const SCENARIO_PERSONAS: Record<string, string[]> = {
+                    pooja: ['dadi'], chai: ['dadi'], pressure: ['dadi'], milk_overflow: ['dadi'],
+                    geyser: ['dadi','parent'], jeera: ['parent'], grid: ['parent','child'],
+                    away: ['parent','child'], guest_doorbell: ['parent','child'],
+                    son_study: ['child'], night_check: ['child'],
+                  };
+                  return (SCENARIO_PERSONAS[sc.id] ?? ['dadi','parent','child']).includes(persona);
+                })
+                .map(sc => sc.id),
+              onScenarioRun: (id) => { const sc = SCENARIOS.find(s => s.id === id); if (sc) runScenario(sc); },
+              running,
+            }}
+          />
         </div>
 
-        {/* Center — 3D twin or Analytics */}
-        <div className="flex-1 overflow-hidden relative">
-          {view === '3d' ? (
-            <div className="w-full h-full relative" style={{ background: '#07080F' }}>
-              <Suspense fallback={
-                <div className="w-full h-full flex items-center justify-center">
-                  <div className="text-center">
-                    <div
-                      className="w-12 h-12 rounded-full border-2 border-t-transparent animate-spin mx-auto mb-4"
-                      style={{ borderColor: C.cyan, borderTopColor: 'transparent' }}
-                    />
-                    <p className="text-xs" style={{ color: C.text3 }}>Loading 3D Twin...</p>
-                  </div>
-                </div>
-              }>
-                <DigitalTwinCanvas />
-              </Suspense>
-              {overlay && <AiDecisionOverlay overlay={overlay} onDismiss={dismissOverlay} />}
-              <button
-                onClick={() => setView('analytics')}
-                className="absolute top-3 right-3 z-30 flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs transition-colors backdrop-blur-sm"
-                style={{
-                  background: 'rgba(9,10,19,0.75)',
-                  borderColor: C.border,
-                  color: C.text3,
-                }}
-                onMouseEnter={e => {
-                  (e.currentTarget as HTMLButtonElement).style.color = C.text;
-                  (e.currentTarget as HTMLButtonElement).style.borderColor = C.borderHover;
-                }}
-                onMouseLeave={e => {
-                  (e.currentTarget as HTMLButtonElement).style.color = C.text3;
-                  (e.currentTarget as HTMLButtonElement).style.borderColor = C.border;
-                }}
-              >
-                Analytics →
-              </button>
-            </div>
-          ) : (
-            <div className="w-full h-full overflow-y-auto" style={{ background: C.surface }}>
-              <div
-                className="px-5 py-3.5 border-b flex items-center gap-4 sticky top-0 z-10"
-                style={{ background: C.surface, borderColor: C.border }}
-              >
-                <button
-                  onClick={() => setView('3d')}
-                  className="flex items-center gap-1.5 text-xs transition-colors"
-                  style={{ color: C.text2 }}
-                >
-                  ← Back to Home
-                </button>
-                <div className="h-3 w-px" style={{ background: C.border }} />
-                <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: C.text3 }}>Technical Analytics</p>
-                <p className="text-[10px] ml-auto" style={{ color: C.text3 }}>For Amazon SDE judges</p>
+        {/* ── Column B ──────────────────────────────────────────────────────── */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div data-tour-id="tour-canvas" style={{ flex: 1, position: 'relative', overflow: 'hidden', background: '#0A0A0A' }}>
+            <Suspense fallback={
+              <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ width: 32, height: 32, borderRadius: '50%', border: `2px solid ${C.cyan}`, borderTopColor: 'transparent', animation: 'spin .8s linear infinite' }} />
+                <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
               </div>
-              <TierCascadePanel tierCounts={tierCounts} />
-              <EventFeedPanel events={events} />
-              <RoomStatusGrid />
-            </div>
-          )}
+            }>
+              <DigitalTwinCanvas />
+            </Suspense>
+            {activeScenario && glowActive && <ColB_RoomGlows scenario={activeScenario} />}
+            {momentCard && (
+              <AlexaMomentCard
+                message={momentCard.message}
+                tier={momentCard.tier}
+                room={momentCard.room}
+                onDismiss={() => setMomentCard(null)}
+              />
+            )}
+          </div>
+          <div data-tour-id="tour-intelligence">
+            <ColB_IntelligenceLayer
+              activeScenario={activeScenario}
+              activeTab={intelTab}
+              onTabChange={switchIntelTab}
+              tierCounts={tierCounts}
+              events={events}
+            />
+          </div>
         </div>
 
-        {/* Right column — scenarios + AI panels */}
-        <div
-          className="w-[288px] shrink-0 border-l flex flex-col overflow-y-auto"
-          style={{ borderColor: C.border, background: C.bg }}
-        >
-          <ScenarioPanel onRun={handleScenarioRun} onOverlay={handleOverlay} />
-          <HomeModePanel />
-          <AiComingUpPanel />
-          <AiLearningPanel />
+        {/* ── Column C ──────────────────────────────────────────────────────── */}
+        <div data-tour-id="tour-right-panel" style={{
+          width: 300, flexShrink: 0, borderLeft: `1px solid ${C.border}`,
+          display: 'flex', flexDirection: 'column', overflow: 'hidden',
+        }}>
+          <div style={{ display: 'flex', borderBottom: `1px solid ${C.border}`, background: C.surface, flexShrink: 0, overflowX: 'auto' }}>
+            {RIGHT_TABS.map(({ key, label }) => (
+              <button key={key} onClick={() => setRightTab(key)} style={{
+                flex: '1 0 auto', fontSize: F.badge, fontWeight: 600, padding: '10px 6px',
+                background: 'none', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' as const,
+                letterSpacing: '0.05em',
+                color: rightTab === key ? C.gold : C.text3,
+                borderBottom: rightTab === key ? `2px solid ${C.gold}` : '2px solid transparent',
+              }}>{label}</button>
+            ))}
+          </div>
+          <div style={{ flex: 1, overflowY: 'auto' }}>
+            {rightTab === 'ecosystem' && (
+              <ColC_EcosystemPayoff
+                activeScenario={activeScenario} persona={persona}
+                awayBranch={awayBranch} onAwayBranchChange={setAwayBranch}
+                cartItems={cartItems} onIntelTabChange={switchIntelTab}
+              />
+            )}
+            {rightTab === 'chain' && (
+              <ChainBuilder
+                t0Rules={live.t0Rules} proposedRules={live.proposedRules}
+                connected={live.connected} onMine={live.mineRules}
+                onConfirm={live.confirmRule} onReject={live.rejectRule}
+              />
+            )}
+            {rightTab === 'events' && (
+              <EventFeed
+                events={live.eventHistory} anticipations={live.anticipations}
+                onSeedHistory={live.seedHistory} connected={live.connected}
+              />
+            )}
+            {rightTab === 'store' && (
+              <AppStorePanel
+                modules={live.storeModules} onInstall={live.installModule}
+                connected={live.connected}
+              />
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Guided tour overlay */}
-      {showTour && <DemoTour onClose={() => setShowTour(false)} />}
+      <PrivacyDrawer activeScenario={activeScenario} lastVoiceCommand={lastCloudCommand?.text} />
 
-      {/* Full Alexa App modal */}
-      {showFullAlexa && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center"
-          style={{ background: 'rgba(5,6,14,0.92)' }}
-          onClick={() => setShowFullAlexa(false)}
-        >
-          <div
-            className="w-80 h-[640px] rounded-2xl overflow-hidden relative border shadow-2xl"
-            onClick={e => e.stopPropagation()}
-            style={{
-              borderColor: C.borderHover,
-              boxShadow: `0 0 80px ${C.cyan}18, 0 32px 80px rgba(0,0,0,0.7)`,
-            }}
-          >
+      {/* Interactive rule confirmation overlay */}
+      {pendingConfirm && (
+        <div style={{
+          position: 'absolute', bottom: 60, left: '50%', transform: 'translateX(-50%)',
+          zIndex: 8500, background: C.surface, border: `1px solid ${C.border2}`,
+          borderRadius: 12, padding: '16px 20px', width: 400,
+          boxShadow: '0 20px 60px rgba(0,0,0,0.8)',
+        }}>
+          <div style={{ fontSize: F.sm, color: C.text, marginBottom: 12 }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ width: 14, height: 14, borderRadius: '50%', border: '1.5px solid #00BFFF', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <span style={{ width: 4, height: 4, borderRadius: '50%', background: '#00BFFF', display: 'block' }} />
+              </span>
+              <span style={{ fontWeight: 700, color: '#00BFFF', fontSize: F.badge }}>Alexa:</span>
+            </span>{' '}{pendingConfirm.question}
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
             <button
-              onClick={() => setShowFullAlexa(false)}
-              className="absolute top-2.5 right-2.5 z-10 w-7 h-7 rounded-full border flex items-center justify-center text-xs transition-colors"
-              style={{ background: C.card, borderColor: C.borderHover, color: C.text2 }}
+              onClick={pendingConfirm.onYes}
+              style={{ flex: 1, padding: '8px', background: C.greenBg, border: `1px solid ${C.greenDim}`, color: C.green, borderRadius: 6, cursor: 'pointer', fontWeight: 700 }}
             >
-              ✕
+              Yes, do it
             </button>
-            <AlexaAppSimView />
+            <button
+              onClick={pendingConfirm.onNo}
+              style={{ flex: 1, padding: '8px', background: C.surface, border: `1px solid ${C.border}`, color: C.text2, borderRadius: 6, cursor: 'pointer' }}
+            >
+              Not now
+            </button>
           </div>
         </div>
       )}
+
+      {showTour && <GuidedTour onClose={() => setShowTour(false)} />}
     </div>
   );
 }
