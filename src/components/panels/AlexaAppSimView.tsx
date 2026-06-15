@@ -44,19 +44,33 @@ function AlexaRing({ onVoiceSubmit }: { onVoiceSubmit: (text: string) => void })
   const { sendToBackend, isProcessing } = useBackendVoice();
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Cross-browser speechSynthesis: Firefox loads voices async via onvoiceschanged
+  // Pick the best available voice: neural/online > Google > any English
+  const pickVoice = (voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | undefined => {
+    const en = voices.filter(v => v.lang.startsWith('en'));
+    return (
+      en.find(v => /aria.*natural|natural.*aria/i.test(v.name)) ??       // MS Aria Neural (Edge/Win)
+      en.find(v => /jenny.*natural|natural.*jenny/i.test(v.name)) ??     // MS Jenny Neural
+      en.find(v => /zira.*natural|natural.*zira/i.test(v.name)) ??
+      en.find(v => v.name.toLowerCase().includes('online')) ??            // any online neural
+      en.find(v => v.name === 'Google UK English Female') ??
+      en.find(v => v.name === 'Google US English') ??
+      en.find(v => v.lang === 'en-US') ??
+      en[0]
+    );
+  };
+
+  // Cross-browser speechSynthesis with neural voice selection
   const speak = (text: string) => {
     if (!window.speechSynthesis) return;
     const utt = new SpeechSynthesisUtterance(text);
-    utt.lang = 'en-IN';
-    utt.rate = 0.88;
-    utt.pitch = 1.1;
-    utt.volume = 0.92;
+    utt.lang = 'en-US';
+    utt.rate = 1.05;
+    utt.pitch = 1.0;
+    utt.volume = 1.0;
 
     const doSpeak = () => {
-      const voices = window.speechSynthesis.getVoices();
-      const preferred = voices.find(v => v.lang === 'en-IN') ?? voices.find(v => v.lang.startsWith('en'));
-      if (preferred) utt.voice = preferred;
+      const voice = pickVoice(window.speechSynthesis.getVoices());
+      if (voice) utt.voice = voice;
       window.speechSynthesis.cancel();
       window.speechSynthesis.speak(utt);
     };
@@ -205,10 +219,10 @@ function AlexaRing({ onVoiceSubmit }: { onVoiceSubmit: (text: string) => void })
     const localResult = executeVoiceCommand(text);
 
     if (localResult.matched) {
-      // Deterministic command handled entirely offline
+      // Deterministic command — speak instantly with browser neural voice (no backend round-trip)
       setResponse(localResult.response);
       setTier(localResult.tier as ProcessingTier);
-      speakBackend(localResult.response);
+      speak(localResult.response);
       return;
     }
 
