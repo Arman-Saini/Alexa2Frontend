@@ -2,21 +2,10 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { C, F } from './ScenarioDefs';
 import { useMic }      from '../../hooks/useMic';
 import { useTTSBest }  from '../../hooks/useTTSBest';
-import { askGroq }     from '../../hooks/useGroqLLM';
-import { fetchWeather } from '../../hooks/useWeather';
-import type { WeatherInfo } from '../../hooks/useWeather';
+import { apiClient }   from '../../api';
 import { DigitalTwinCanvas } from '../canvas/DigitalTwinCanvas';
 import { backendApi } from '../../api';
 
-const CONSTRUCTION_SYSTEM_HINT = `
-You are Alexa+ in Scenario Builder mode.
-The user will describe a home automation scenario or situation.
-Your job: IMMEDIATELY extract a T0 automation rule from their input — fill in any gaps with sensible defaults.
-Never ask clarifying questions. Never say you need more info. Always produce the JSON rule.
-Respond with ONLY valid JSON on one line (no other text):
-{"description":"...","trigger_event":"...","action":"...","confidence":0.9}
-Indian home context: LPG, geyser, pressure cooker, inverter, pooja room, water motor, ceiling fan.
-If unsure, make a reasonable assumption and set confidence lower (0.7). Never use markdown.`;
 
 interface Message {
   role: 'user' | 'alexa';
@@ -109,12 +98,10 @@ export function ConstructionMode({ onBack }: Props) {
   const [applied, setApplied]       = useState(false);
   const [thinking, setThinking]     = useState(false);
   const [awaitingRefinement, setAwaitingRefinement] = useState(false);
-  const weatherRef = useRef<WeatherInfo | null>(null);
   const listRef    = useRef<HTMLDivElement>(null);
   const tts = useTTSBest();
 
   useEffect(() => {
-    fetchWeather().then(w => { weatherRef.current = w; }).catch(() => {});
     tts.speak(ALEXA_GREETING);
   }, []); // eslint-disable-line
 
@@ -148,44 +135,30 @@ export function ConstructionMode({ onBack }: Props) {
     addMessage('user', trimmed);
     setThinking(true);
 
-    const augmented = `[CONSTRUCTION MODE]\nUser: ${trimmed}\n${CONSTRUCTION_SYSTEM_HINT}`;
-    const groq = await askGroq(augmented, weatherRef.current);
-    setThinking(false);
-
-    const responseText = groq.response ?? '';
-
-    // Try to parse JSON rule from the response
+    let rule: PendingRule | null = null;
     try {
-      const jsonMatch = responseText.match(/\{[\s\S]*?\}/);
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]) as PendingRule;
-        if (parsed.trigger_event && parsed.action) {
-          setPendingRule(parsed);
-          setApplied(false);
-          const ruleMsg = 'Got it! Here\'s your T0 rule. Would you like to add more detail, or is this good to go?';
-          setAwaitingRefinement(true);
-          addMessage('alexa', ruleMsg);
-          tts.speak(ruleMsg);
-          return;
-        }
+      const data = await apiClient.post<{ ok: boolean; rule: PendingRule }>(
+        '/scenario-builder/rule',
+        { text: trimmed },
+      );
+      if (data.ok && data.rule?.trigger_event && data.rule?.action) {
+        rule = data.rule;
       }
     } catch {
-      // not JSON
+      // backend unreachable — fall through to fallback
+    }
+    setThinking(false);
+
+    if (!rule) {
+      rule = { description: trimmed, trigger_event: trimmed, action: 'notify user', confidence: 0.6 };
     }
 
-    // Fallback: LLM didn't produce JSON — generate a rule from the raw input anyway
-    const fallbackRule: PendingRule = {
-      description: trimmed,
-      trigger_event: trimmed,
-      action: 'notify user',
-      confidence: 0.6,
-    };
-    setPendingRule(fallbackRule);
+    setPendingRule(rule);
     setApplied(false);
     setAwaitingRefinement(true);
-    const fallbackMsg = 'I\'ve built a basic rule from your description. Would you like to add more detail, or is this good to go?';
-    addMessage('alexa', fallbackMsg);
-    tts.speak(fallbackMsg);
+    const ruleMsg = 'Got it! Here\'s your T0 rule. Would you like to add more detail, or is this good to go?';
+    addMessage('alexa', ruleMsg);
+    tts.speak(ruleMsg);
   }, [addMessage, tts, awaitingRefinement]);
 
   const handleApplyRule = useCallback(async () => {
