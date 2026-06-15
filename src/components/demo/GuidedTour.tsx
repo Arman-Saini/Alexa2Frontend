@@ -22,7 +22,7 @@ const STEPS: TourStep[] = [
     id: 'welcome',
     title: 'Alexa+ India',
     body: 'Over 600 million Alexa devices have been sold worldwide, yet most households use only a fraction of capabilities. The average user sticks to music, alarms, and weather.\n\nThe core problem is device connection. Every vendor speaks a different protocol, making integration hard for both developers and users. We solve this with an MCP-style integration framework where any device is registered once and immediately available as a standardised capability across all automations.\n\nOn top of that: a three-tier compute model runs most decisions locally, cultural awareness built for Indian households, and a privacy-first design where every automation is explainable and user-controlled.\n\nClick Next to see how each part works.',
-    badge: 'AMAZON HACKATHON 2025',
+    badge: 'AMAZON HACKON 2026',
     badgeColor: C.cyan,
   },
   {
@@ -126,13 +126,17 @@ function cardPosition(rect: TargetRect | null): React.CSSProperties {
     };
   }
 
+  // Cap top so the card (≈82vh tall) always fits within viewport
+  const maxTop = Math.floor(vh * 0.40);
+  const clampTop = (t: number) => Math.min(Math.max(t, MARGIN), maxTop);
+
   // Try right of target
   const rightLeft = rect.left + rect.width + MARGIN;
   if (rightLeft + CARD_W < vw - MARGIN) {
     return {
       position: 'fixed',
       left: rightLeft,
-      top: Math.min(Math.max(rect.top, MARGIN), vh - 380),
+      top: clampTop(rect.top),
       width: CARD_W,
     };
   }
@@ -143,17 +147,16 @@ function cardPosition(rect: TargetRect | null): React.CSSProperties {
     return {
       position: 'fixed',
       left: leftLeft,
-      top: Math.min(Math.max(rect.top, MARGIN), vh - 380),
+      top: clampTop(rect.top),
       width: CARD_W,
     };
   }
 
-  // Fall back: center horizontally, below target
-  const top = Math.min(rect.top + rect.height + MARGIN, vh - 380);
+  // Fall back: center horizontally, pin near top
   return {
     position: 'fixed',
     left: Math.max(MARGIN, (vw - CARD_W) / 2),
-    top: Math.max(MARGIN, top),
+    top: clampTop(rect.top),
     width: Math.min(CARD_W, vw - MARGIN * 2),
   };
 }

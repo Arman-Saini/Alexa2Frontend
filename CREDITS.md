@@ -14,4 +14,4 @@ This demo uses the following third-party 3D assets and environment maps.
 
 ## Notes
 - CC-BY assets require attribution; CC0 assets do not but are credited for goodwill.
-- All meshes are loaded locally from `public/models/`; no asset is hot-linked at runtime
+- All meshes are loaded locally from `public/models/`; no asset is hot-linked at runtime.
