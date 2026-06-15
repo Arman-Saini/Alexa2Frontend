@@ -647,7 +647,7 @@ export interface DemoSectionProps {
   running: string | null;
 }
 
-function DemoSections({ isListening, activeScenarioName, persona, personas, onPersonaChange, scenarios, filteredScenarioIds, onScenarioRun, running }: DemoSectionProps) {
+function DemoSections({ persona, personas, onPersonaChange, scenarios, filteredScenarioIds, onScenarioRun, running }: DemoSectionProps) {
   const visible = scenarios.filter(s => filteredScenarioIds.includes(s.id));
   const currentPersona = personas.find(p => p.key === persona);
 
