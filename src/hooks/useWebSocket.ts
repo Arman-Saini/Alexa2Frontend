@@ -30,6 +30,9 @@ export function useWebSocket() {
     if (!mountedRef.current) return;
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
+    // Skip WebSocket entirely when disabled via env (e.g. nginx not configured for WS upgrade)
+    if (!env.WS_ENABLED) return;
+
     // Wait until the backend probe completes before attempting WS
     if (!backendState.isResolved) {
       onBackendResolved(() => { if (mountedRef.current) connect(); });

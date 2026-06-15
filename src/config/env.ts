@@ -17,4 +17,7 @@ export const env = {
 
   // Enable verbose request/response logging
   API_DEBUG: optional('VITE_API_DEBUG', 'false') === 'true',
+
+  // Set to false in production when nginx WebSocket proxy is not configured
+  WS_ENABLED: optional('VITE_WS_ENABLED', 'true') === 'true',
 } as const;
