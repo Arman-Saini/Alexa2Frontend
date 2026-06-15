@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 import { useAppStore } from '../../store/store';
 import { ASSET_MAP } from '../../constants/assets';
 import { useBackendVoice } from '../../hooks/useBackendApi';
-import { voiceApi } from '../../api';
+import { voiceApi, ApiError } from '../../api';
 import type { PlacedObject, AlexaNotification } from '../../types';
 
 // ── Top Status Bar ────────────────────────────────────────────────────────────
@@ -80,8 +80,11 @@ function AlexaRing({ onVoiceSubmit }: { onVoiceSubmit: (text: string) => void })
         audio.play().catch(() => speak(text));
         return;
       }
-    } catch {
-      // backend offline — degrade to browser TTS
+    } catch (err) {
+      const detail = err instanceof ApiError
+        ? `${err.status} ${err.statusText}`
+        : 'backend offline';
+      addNotification(`🔊 Polly TTS failed (${detail}) — using browser voice`, 'warning');
     }
     speak(text);
   };

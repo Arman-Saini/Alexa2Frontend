@@ -77,14 +77,15 @@ export function useBackendVoice() {
       setIsProcessing(true);
       try {
         const data = await voiceApi.transcribeMockText(text, true);
-        // Mirror the backend action in local state so the 3D scene updates immediately
         const localResponse = executeVoiceCommand(data.transcript ?? text);
         addNotification(`🎤 "${data.transcript ?? text}" → routed via backend`, 'success');
         return { transcript: data.transcript ?? text, response: localResponse };
-      } catch {
-        // Backend offline — degrade gracefully to local NLU
+      } catch (err) {
+        const detail = err instanceof ApiError
+          ? `${err.status} ${err.statusText} — ${String(err.url).split('/').slice(-2).join('/')}`
+          : 'backend offline';
+        addNotification(`🎤 Transcribe failed (${detail}) — using local NLU`, 'warning');
         const response = executeVoiceCommand(text);
-        addNotification(`🎤 "${text}" → local NLU (backend offline)`, 'info');
         return { transcript: text, response };
       } finally {
         setIsProcessing(false);
