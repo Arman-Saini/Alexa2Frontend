@@ -50,13 +50,6 @@ const ROOM_ALIASES: [RegExp, string][] = [
   [/\b(home\s*office|office|study|work\s*room|study\s*room)\b/, 'office'],
 ];
 
-function extractRoom(q: string): string | null {
-  for (const [re, id] of ROOM_ALIASES) {
-    if (re.test(q)) return id;
-  }
-  return null;
-}
-
 // Extract ALL rooms mentioned (for multi-room commands)
 function extractAllRooms(q: string): string[] {
   const found: string[] = [];

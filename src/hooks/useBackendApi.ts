@@ -93,7 +93,8 @@ export function useBackendVoice() {
           er?.message;
         const response = backendResponse ?? executeVoiceCommand(transcript);
         setLastCloudCommand(transcript);
-        const specialist = (er?.result?.routing?.specialist ?? er?.result?.specialist) as string | undefined;
+        const erResult = er?.result as { routing?: { specialist?: string }; specialist?: string } | undefined;
+        const specialist = erResult?.routing?.specialist ?? erResult?.specialist;
         if (specialist) setLastSpecialist(specialist);
 
         // Detect ask-before-lookup marker

@@ -8,7 +8,6 @@ import { useLiveBackend }         from '../../hooks/useLiveBackend';
 import { usePollyTTS }            from '../../hooks/usePollyTTS';
 import { useMic }                 from '../../hooks/useMic';
 import { interpretCommand }       from '../../hooks/useVoiceCommands';
-import { askGroq }                from '../../hooks/useGroqLLM';
 import { fetchWeather }           from '../../hooks/useWeather';
 import type { WeatherInfo }       from '../../hooks/useWeather';
 import type { ActiveScenario, TierKey, RoomTarget, IntelTab, CartItem } from './ScenarioDefs';
@@ -22,9 +21,6 @@ import { PrivacyDrawer }          from './PrivacyDrawer';
 import { useAppStore }            from '../../store/store';
 import { useSimulation }          from '../../hooks/useSimulation';
 import { useWebSocket }           from '../../hooks/useWebSocket';
-import { backendState } from '../../config/backendState';
-import { voiceApi }               from '../../api';
-import { env }                    from '../../config/env';
 
 const DigitalTwinCanvas = lazy(() =>
   import('../canvas/DigitalTwinCanvas').then(m => ({ default: m.DigitalTwinCanvas }))

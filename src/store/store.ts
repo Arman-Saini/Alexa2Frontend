@@ -285,7 +285,7 @@ export const useAppStore = create<AppState>()(
                 name: obj.deviceName,
                 type: obj.type,
                 room_id: roomId ?? undefined,
-                state: obj.alexaDeviceState as Record<string, unknown>,
+                state: obj.alexaDeviceState as unknown as Record<string, unknown>,
               }).catch(() => {/* backend offline — local state still intact */});
             });
           }

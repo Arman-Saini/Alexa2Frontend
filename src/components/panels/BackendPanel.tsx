@@ -124,11 +124,11 @@ const ALEXA_DEVICES = ASSET_DEFINITIONS.filter(d => d.isAlexaDevice);
 function AddDeviceCatalog() {
   const [open, setOpen] = useState(false);
   const [added, setAdded] = useState<string | null>(null);
-  const { addObject, rooms, ui } = useAppStore();
+  const { addPlacedObject, rooms, ui } = useAppStore();
 
   const handleAdd = (type: string) => {
     const room = rooms.find(r => r.id === ui.activeRoomId) ?? rooms[0];
-    addObject(type as never, room?.id ?? 'living-room', { x: 0, y: 0, z: 0 });
+    addPlacedObject(type as never, { x: 0, y: 0, z: 0 }, room?.id ?? 'living-room');
     setAdded(type);
     setTimeout(() => setAdded(null), 1500);
   };
@@ -175,7 +175,6 @@ function HomePanel() {
   const { run: runStats, result: statsRes, ok: statsOk } = useApiCall(() => backendApi.getHomeStats());
   const { run: runReset, result: resetRes, ok: resetOk } = useApiCall(() => backendApi.resetHome());
   const { run: runEvents, result: eventsRes, ok: eventsOk } = useApiCall(() => backendApi.getEventHistory());
-  const { run: runSeed, result: seedRes, ok: seedOk } = useApiCall(() => homeApi.seedHome());
   const { run: runSeedHist, result: seedHistRes, ok: seedHistOk } = useApiCall(() => homeApi.seedLearningHistory());
   const [invItems, setInvItems] = useState('{"milk": 2, "bread": 1}');
   const [invRes, setInvRes] = useState<unknown>(null); const [invOk, setInvOk] = useState<boolean | null>(null);

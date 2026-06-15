@@ -14,7 +14,7 @@ const _hmrListeners = new Set<() => void>();
 
 if (import.meta.hot) {
   import.meta.hot.accept('../../constants/anchorLayout.json', (mod) => {
-    _layout = (mod as { default: typeof _layoutInit }).default;
+    _layout = (mod as unknown as { default: typeof _layoutInit }).default;
     _hmrListeners.forEach(fn => fn());
   });
 }

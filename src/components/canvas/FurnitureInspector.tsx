@@ -6,7 +6,7 @@ import type { AnchorDef } from '../../utils/anchorResolver';
 let _layout = _layoutInit;
 if (import.meta.hot) {
   import.meta.hot.accept('../../constants/anchorLayout.json', (mod) => {
-    _layout = (mod as { default: typeof _layoutInit }).default;
+    _layout = (mod as unknown as { default: typeof _layoutInit }).default;
   });
 }
 
