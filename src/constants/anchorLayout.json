@@ -1,0 +1,1011 @@
+{
+  "rooms": {
+    "livingRoom": {
+      "furniture": [
+        {
+          "id": "lr-rug",
+          "model": "quat:Rug",
+          "anchor": {
+            "type": "center"
+          },
+          "rot": 0,
+          "size": 6.5
+        },
+        {
+          "id": "lr-tvconsole",
+          "model": "furn:cabinetTelevision",
+          "anchor": {
+            "type": "wall",
+            "wall": "W1",
+            "along": 0.43
+          },
+          "rot": 0,
+          "size": 2.4,
+          "distFromWall": 0.85
+        },
+        {
+          "id": "lr-tv",
+          "model": "furn:televisionModern",
+          "anchor": {
+            "type": "object",
+            "parentId": "lr-tvconsole"
+          },
+          "rot": 0,
+          "size": 2.2,
+          "objectOffset": [
+            1.2,
+            0.9,
+            -0.3
+          ]
+        },
+        {
+          "id": "lr-echo",
+          "model": "furn:speakerSmall",
+          "anchor": {
+            "type": "object",
+            "parentId": "lr-tvconsole"
+          },
+          "rot": 0.4,
+          "size": 0.22,
+          "objectOffset": [
+            -0.9,
+            0,
+            0
+          ]
+        },
+        {
+          "id": "lr-echo-r",
+          "model": "furn:speakerSmall",
+          "anchor": {
+            "type": "object",
+            "parentId": "lr-tvconsole"
+          },
+          "rot": 5.883,
+          "size": 0.22,
+          "objectOffset": [
+            3.14,
+            0,
+            0
+          ]
+        },
+        {
+          "id": "lr-sofa",
+          "model": "quat:LCouch",
+          "anchor": {
+            "type": "wall",
+            "wall": "W3",
+            "along": 0.42
+          },
+          "rot": 3.14159,
+          "size": 5.0,
+          "distFromWall": 3.8
+        },
+        {
+          "id": "lr-coffee",
+          "model": "quat:TableRoundLarge",
+          "anchor": {
+            "type": "center"
+          },
+          "rot": 0,
+          "size": 1.5
+        },
+        {
+          "id": "lr-chair",
+          "model": "quat:Chair1",
+          "anchor": {
+            "type": "wall",
+            "wall": "W2",
+            "along": 0.565
+          },
+          "rot": -2.0595,
+          "size": 0.9,
+          "distFromWall": 4.55
+        },
+        {
+          "id": "lr-stool",
+          "model": "quat:Stool",
+          "anchor": {
+            "type": "wall",
+            "wall": "W2",
+            "along": 0.41
+          },
+          "rot": -1.5,
+          "size": 0.4,
+          "distFromWall": 5.7
+        },
+        {
+          "id": "lr-lamp",
+          "model": "quat:LightFloor1",
+          "anchor": {
+            "type": "corner",
+            "corner": "NE"
+          },
+          "rot": 0,
+          "size": 0.6
+        },
+        {
+          "id": "lr-shelf",
+          "model": "quat:ShelfLarge",
+          "anchor": {
+            "type": "wall",
+            "wall": "W2",
+            "along": 0.2
+          },
+          "rot": 1.5708,
+          "size": 2.3,
+          "distFromWall": 0.25
+        },
+        {
+          "id": "lr-plant1",
+          "model": "quat:Houseplant1",
+          "anchor": {
+            "type": "corner",
+            "corner": "NW"
+          },
+          "rot": 0,
+          "size": 1.0
+        },
+        {
+          "id": "lr-plant2",
+          "model": "quat:Houseplant2",
+          "anchor": {
+            "type": "corner",
+            "corner": "SE"
+          },
+          "rot": 0,
+          "size": 1.0
+        },
+        {
+          "id": "lr-fireplace",
+          "model": "quat:Fireplace",
+          "anchor": {
+            "type": "wall",
+            "wall": "W4",
+            "along": 0.25
+          },
+          "rot": 1.5708,
+          "size": 1.8,
+          "distFromWall": 0.4
+        },
+        {
+          "id": "lr-deadplant",
+          "model": "quat:DeadHouseplant",
+          "anchor": {
+            "type": "wall",
+            "wall": "W2",
+            "along": 0.95
+          },
+          "rot": 0.3,
+          "size": 0.7,
+          "distFromWall": 0.4
+        },
+        {
+          "id": "lr-sidetable",
+          "model": "quat:TableRoundSmall1",
+          "anchor": {
+            "type": "wall",
+            "wall": "W4",
+            "along": 0.7
+          },
+          "rot": 0,
+          "size": 1,
+          "distFromWall": 10.7
+        },
+        {
+          "id": "lr-chandelier",
+          "model": "quat:LightChandelier",
+          "anchor": {
+            "type": "ceiling"
+          },
+          "rot": 0,
+          "size": 1.2
+        },
+        {
+          "id": "lr-dog",
+          "model": "easter:dog",
+          "anchor": {
+            "type": "wall",
+            "wall": "W3",
+            "along": 0.215
+          },
+          "rot": -2.3911,
+          "size": 0.62,
+          "distFromWall": 6.5
+        }
+      ],
+      "windows": [
+        {
+          "id": "lr-win-n",
+          "model": "WindowLarge",
+          "anchor": {
+            "type": "wall",
+            "wall": "W1",
+            "along": 0.1
+          },
+          "size": 2,
+          "rot": 0
+        },
+        {
+          "id": "lr-win-e",
+          "model": "WindowLarge",
+          "anchor": {
+            "type": "wall",
+            "wall": "W2",
+            "along": 0.6
+          },
+          "rot": 1.5708
+        }
+      ],
+      "doors": [
+        {
+          "id": "lr-door",
+          "model": "Door1",
+          "anchor": {
+            "type": "wall",
+            "wall": "W4",
+            "along": 0.5
+          },
+          "swingDir": 1,
+          "distFromWall": 0.07,
+          "size": 1,
+          "maskWidth": 0.99,
+          "maskHeight": 2.31,
+          "maskAlong": 0.5
+        }
+      ]
+    },
+    "masterBedroom": {
+      "furniture": [
+        {
+          "id": "mb-bed",
+          "model": "quat:BedKing",
+          "anchor": {
+            "type": "wall",
+            "wall": "W1",
+            "along": 0.5
+          },
+          "rot": 0,
+          "size": 4,
+          "distFromWall": 2.2
+        },
+        {
+          "id": "mb-ns-left",
+          "model": "quat:NightStand1",
+          "anchor": {
+            "type": "object",
+            "parentId": "mb-bed"
+          },
+          "rot": 0,
+          "size": 0.7,
+          "objectOffset": [
+            -1.7,
+            0,
+            -2
+          ]
+        },
+        {
+          "id": "bedroom-rug",
+          "model": "quat:RoundRug",
+          "anchor": {
+            "type": "wall",
+            "wall": "W3",
+            "along": 0.505
+          },
+          "rot": 0,
+          "size": 4.15,
+          "distFromWall": 5.3,
+          "yOffset": 0.35
+        },
+        {
+          "id": "mb-ns-right",
+          "model": "quat:NightStand2",
+          "anchor": {
+            "type": "object",
+            "parentId": "mb-bed"
+          },
+          "rot": 0,
+          "size": 0.7,
+          "objectOffset": [
+            1.7,
+            0,
+            -2
+          ]
+        },
+        {
+          "id": "mb-tablelamp-l",
+          "model": "quat:TableLamp",
+          "anchor": {
+            "type": "object",
+            "parentId": "mb-ns-left"
+          },
+          "rot": 0,
+          "size": 0.32,
+          "objectOffset": [
+            0,
+            0.6,
+            0
+          ]
+        },
+        {
+          "id": "mb-echo",
+          "model": "furn:computerScreen",
+          "anchor": {
+            "type": "object",
+            "parentId": "mb-ns-right"
+          },
+          "rot": 0,
+          "size": 0.28,
+          "objectOffset": [
+            0,
+            0.55,
+            0
+          ]
+        },
+        {
+          "id": "mb-wardrobe",
+          "model": "quat:Drawer4",
+          "anchor": {
+            "type": "wall",
+            "wall": "W4",
+            "along": 0.68
+          },
+          "rot": 1.5708,
+          "size": 1.8,
+          "distFromWall": 0.5
+        },
+        {
+          "id": "mb-dresser",
+          "model": "quat:Drawer3",
+          "anchor": {
+            "type": "wall",
+            "wall": "W2",
+            "along": 0.35
+          },
+          "rot": -1.5708,
+          "size": 1.2,
+          "distFromWall": 0.25
+        },
+        {
+          "id": "mb-lamp",
+          "model": "quat:LightFloor2",
+          "anchor": {
+            "type": "wall",
+            "wall": "W1",
+            "along": 0.775
+          },
+          "rot": 0,
+          "size": 0.55,
+          "distFromWall": 0.5
+        },
+        {
+          "id": "mb-plant",
+          "model": "quat:Houseplant3",
+          "anchor": {
+            "type": "corner",
+            "corner": "SW"
+          },
+          "rot": 0,
+          "size": 0.9
+        },
+        {
+          "id": "mb-cactus",
+          "model": "quat:Cactus",
+          "anchor": {
+            "type": "corner",
+            "corner": "SE"
+          },
+          "rot": 0.7,
+          "size": 0.6
+        },
+        {
+          "id": "mb-fan",
+          "model": "furn:ceilingFan",
+          "anchor": {
+            "type": "ceiling"
+          },
+          "rot": 0,
+          "size": 1.4
+        },
+        {
+          "id": "mb-cat",
+          "model": "easter:cat",
+          "anchor": {
+            "type": "wall",
+            "wall": "W1",
+            "along": 0.5
+          },
+          "rot": 0,
+          "size": 0.5,
+          "distFromWall": 3.5,
+          "yOffset": 0.6
+        }
+      ],
+      "windows": [
+        {
+          "id": "mb-win-w",
+          "model": "WindowLarge",
+          "anchor": {
+            "type": "wall",
+            "wall": "W4",
+            "along": 0.5
+          },
+          "rot": 0
+        }
+      ]
+    },
+    "bathroom": {
+      "furniture": [
+        {
+          "id": "ba-bathtub",
+          "model": "quat:Bathtub",
+          "anchor": {
+            "type": "wall",
+            "wall": "W2",
+            "along": 0.5
+          },
+          "rot": 1.5708,
+          "size": 2,
+          "distFromWall": 1
+        },
+        {
+          "id": "ba-toilet",
+          "model": "quat:Toilet",
+          "anchor": {
+            "type": "wall",
+            "wall": "W4",
+            "along": 0.7
+          },
+          "rot": 1.5708,
+          "size": 0.8,
+          "distFromWall": 0.3
+        },
+        {
+          "id": "ba-sink",
+          "model": "quat:BathroomSink",
+          "anchor": {
+            "type": "wall",
+            "wall": "W1",
+            "along": 0.25
+          },
+          "rot": 0,
+          "size": 0.7,
+          "distFromWall": 0.3
+        },
+        {
+          "id": "ba-towelrack",
+          "model": "quat:TowelRack",
+          "anchor": {
+            "type": "wall",
+            "wall": "W1",
+            "along": 0.65
+          },
+          "rot": 0,
+          "size": 0.7,
+          "distFromWall": 0.1,
+          "yOffset": 1.1
+        },
+        {
+          "id": "ba-toiletpaper",
+          "model": "quat:ToiletPaperStack",
+          "anchor": {
+            "type": "wall",
+            "wall": "W4",
+            "along": 0.5
+          },
+          "rot": 0,
+          "size": 0.3,
+          "distFromWall": 0.2
+        },
+        {
+          "id": "ba-washingmachine",
+          "model": "quat:WashingMachine",
+          "anchor": {
+            "type": "wall",
+            "wall": "W3",
+            "along": 0.3
+          },
+          "rot": 3.1415,
+          "size": 1.0,
+          "distFromWall": 0.4
+        },
+        {
+          "id": "ba-trashcan",
+          "model": "quat:TrashcanSmall1",
+          "anchor": {
+            "type": "corner",
+            "corner": "NW"
+          },
+          "rot": 0,
+          "size": 0.4
+        }
+      ],
+      "windows": [],
+      "doors": [
+        {
+          "id": "ba-door-n",
+          "model": "Door3",
+          "anchor": {
+            "type": "wall",
+            "wall": "W1",
+            "along": 0.5
+          },
+          "swingDir": -1,
+          "distFromWall": 0.07,
+          "size": 0.9,
+          "maskWidth": 0,
+          "maskHeight": 0,
+          "maskAlong": 0.5
+        },
+        {
+          "id": "ba-door-s",
+          "model": "Door4",
+          "anchor": {
+            "type": "wall",
+            "wall": "W3",
+            "along": 0.5
+          },
+          "swingDir": 1,
+          "distFromWall": 0.07,
+          "size": 0.9,
+          "maskWidth": 0.82,
+          "maskHeight": 2.26,
+          "maskAlong": 0.595
+        }
+      ]
+    },
+    "homeOffice": {
+      "furniture": [
+        {
+          "id": "of-desk",
+          "model": "furn:desk",
+          "anchor": {
+            "type": "wall",
+            "wall": "W1",
+            "along": 0.5
+          },
+          "rot": -1.57,
+          "size": 2,
+          "distFromWall": 1.8
+        },
+        {
+          "id": "of-monitor",
+          "model": "furn:computerScreen",
+          "anchor": {
+            "type": "object",
+            "parentId": "of-desk"
+          },
+          "rot": -1.57,
+          "size": 1,
+          "objectOffset": [
+            0.5,
+            1.1,
+            0.7
+          ]
+        },
+        {
+          "id": "of-bookshelf",
+          "model": "furn:bookcaseOpen",
+          "anchor": {
+            "type": "wall",
+            "wall": "W4",
+            "along": 0.1
+          },
+          "rot": -1.57,
+          "size": 1.0,
+          "distFromWall": 0.3
+        },
+        {
+          "id": "of-whiteboard",
+          "model": "whiteboard",
+          "anchor": {
+            "type": "wall",
+            "wall": "W3",
+            "along": 0.5
+          },
+          "rot": 3.14159,
+          "size": 2.0,
+          "distFromWall": 0.1
+        },
+        {
+          "id": "of-shelf-small",
+          "model": "quat:ShelfSmall1",
+          "anchor": {
+            "type": "wall",
+            "wall": "W1",
+            "along": 0.8
+          },
+          "rot": 0,
+          "size": 2,
+          "distFromWall": 0.4,
+          "yOffset": 2.4
+        },
+        {
+          "id": "of-chair",
+          "model": "quat:Chair2",
+          "anchor": {
+            "type": "wall",
+            "wall": "W1",
+            "along": 0.5
+          },
+          "rot": 1.5708,
+          "size": 0.7,
+          "distFromWall": 3.0
+        },
+        {
+          "id": "of-trashcan",
+          "model": "quat:Trashcan1",
+          "anchor": {
+            "type": "corner",
+            "corner": "SW"
+          },
+          "rot": 0,
+          "size": 0.45
+        },
+        {
+          "id": "of-plant",
+          "model": "quat:Houseplant4",
+          "anchor": {
+            "type": "corner",
+            "corner": "NE"
+          },
+          "rot": 0,
+          "size": 0.4
+        },
+        {
+          "id": "of-fan",
+          "model": "furn:ceilingFan",
+          "anchor": {
+            "type": "ceiling"
+          },
+          "rot": 0,
+          "size": 1.2
+        }
+      ],
+      "windows": [
+        {
+          "id": "of-win-w",
+          "model": "WindowLarge",
+          "anchor": {
+            "type": "wall",
+            "wall": "W4",
+            "along": 0.7
+          },
+          "rot": 1.5708
+        }
+      ],
+      "doors": [
+        {
+          "id": "of-door",
+          "model": "Door5",
+          "anchor": {
+            "type": "wall",
+            "wall": "W2",
+            "along": 0.3
+          },
+          "swingDir": 1,
+          "distFromWall": 0.07,
+          "size": 0.9,
+          "maskWidth": 0.89,
+          "maskHeight": 2.23,
+          "maskAlong": 0.295
+        }
+      ]
+    },
+    "kitchenDining": {
+      "furniture": [
+        {
+          "id": "kt-cabinet-l",
+          "model": "furn:kitchenCabinet",
+          "anchor": {
+            "type": "wall",
+            "wall": "W1",
+            "along": 0.15
+          },
+          "rot": 0,
+          "size": 0.975,
+          "distFromWall": 1.0
+        },
+        {
+          "id": "kt-cabinet1",
+          "model": "furn:kitchenCabinet",
+          "anchor": {
+            "type": "wall",
+            "wall": "W1",
+            "along": 0.2475
+          },
+          "rot": 0,
+          "size": 0.975,
+          "distFromWall": 1.0
+        },
+        {
+          "id": "kt-sink",
+          "model": "furn:kitchenSink",
+          "anchor": {
+            "type": "wall",
+            "wall": "W1",
+            "along": 0.345
+          },
+          "rot": 0,
+          "size": 0.975,
+          "distFromWall": 1.0
+        },
+        {
+          "id": "kt-stove",
+          "model": "furn:kitchenStove",
+          "anchor": {
+            "type": "wall",
+            "wall": "W1",
+            "along": 0.4425
+          },
+          "rot": 0,
+          "size": 0.975,
+          "distFromWall": 1.0
+        },
+        {
+          "id": "kt-cabinet2",
+          "model": "furn:kitchenCabinet",
+          "anchor": {
+            "type": "wall",
+            "wall": "W1",
+            "along": 0.54
+          },
+          "rot": 0,
+          "size": 0.975,
+          "distFromWall": 1.0
+        },
+        {
+          "id": "kt-cabinet-r",
+          "model": "furn:kitchenCabinet",
+          "anchor": {
+            "type": "wall",
+            "wall": "W1",
+            "along": 0.6375
+          },
+          "rot": 0,
+          "size": 0.975,
+          "distFromWall": 1.0
+        },
+        {
+          "id": "kt-microwave",
+          "model": "furn:kitchenMicrowave",
+          "anchor": {
+            "type": "object",
+            "parentId": "kt-cabinet2"
+          },
+          "rot": 0,
+          "size": 0.85,
+          "objectOffset": [
+            0.5,
+            0.9,
+            -0.3
+          ]
+        },
+        {
+          "id": "kt-echo",
+          "model": "furn:speakerSmall",
+          "anchor": {
+            "type": "wall",
+            "wall": "W4",
+            "along": 0.25
+          },
+          "rot": 1.5708,
+          "size": 0.22,
+          "distFromWall": 0.4,
+          "yOffset": 1.6
+        },
+        {
+          "id": "kt-dining",
+          "model": "quat:TableRoundLarge",
+          "anchor": {
+            "type": "wall",
+            "wall": "W3",
+            "along": "0.3"
+          },
+          "rot": 0,
+          "size": 3,
+          "distFromWall": 4
+        },
+        {
+          "id": "kt-chair-n",
+          "model": "quat:Chair1",
+          "anchor": {
+            "type": "object",
+            "parentId": "kt-dining"
+          },
+          "rot": 0,
+          "size": 0.7,
+          "objectOffset": [
+            0,
+            0,
+            -1.1
+          ]
+        },
+        {
+          "id": "kt-chair-s",
+          "model": "quat:Chair1",
+          "anchor": {
+            "type": "object",
+            "parentId": "kt-dining"
+          },
+          "rot": 3.14159,
+          "size": 0.7,
+          "objectOffset": [
+            0,
+            0,
+            1.2
+          ]
+        },
+        {
+          "id": "kt-chair-w",
+          "model": "quat:Chair1",
+          "anchor": {
+            "type": "object",
+            "parentId": "kt-dining"
+          },
+          "rot": 1.5708,
+          "size": 0.7,
+          "objectOffset": [
+            -1.25,
+            0,
+            0
+          ]
+        },
+        {
+          "id": "kt-chair-e",
+          "model": "quat:Chair1",
+          "anchor": {
+            "type": "object",
+            "parentId": "kt-dining"
+          },
+          "rot": -1.5708,
+          "size": 0.7,
+          "objectOffset": [
+            1.75,
+            0,
+            0
+          ]
+        },
+        {
+          "id": "kt-cactus",
+          "model": "quat:Cactus",
+          "anchor": {
+            "type": "corner",
+            "corner": "SW"
+          },
+          "rot": 1.2,
+          "size": 0.8
+        },
+        {
+          "id": "kt-plant",
+          "model": "quat:Houseplant5",
+          "anchor": {
+            "type": "corner",
+            "corner": "NW"
+          },
+          "rot": 0,
+          "size": 0.9
+        },
+        {
+          "id": "kt-trashcan",
+          "model": "quat:Trashcan2",
+          "anchor": {
+            "type": "wall",
+            "wall": "W4",
+            "along": 0.8
+          },
+          "rot": 0,
+          "size": 0.45,
+          "distFromWall": 0.4
+        },
+        {
+          "id": "kt-fridgelarge",
+          "model": "furn:kitchenFridgeLarge",
+          "anchor": {
+            "type": "wall",
+            "wall": "W4",
+            "along": 0.13
+          },
+          "rot": 0,
+          "size": 1.4,
+          "distFromWall": 7.45
+        }
+      ],
+      "windows": [
+        {
+          "id": "kt-win-s",
+          "model": "WindowSmall",
+          "anchor": {
+            "type": "wall",
+            "wall": "W3",
+            "along": 0.5
+          },
+          "rot": 3.14159
+        }
+      ],
+      "doors": [
+        {
+          "id": "kt-door",
+          "model": "Door6",
+          "anchor": {
+            "type": "wall",
+            "wall": "W4",
+            "along": 0.5
+          },
+          "swingDir": -1,
+          "distFromWall": 0.07,
+          "size": 1,
+          "maskWidth": 1.02,
+          "maskHeight": 2.43,
+          "maskAlong": 0.5
+        }
+      ]
+    },
+    "hallway": {
+      "furniture": [
+        {
+          "id": "hw-rug",
+          "model": "quat:RoundRug",
+          "anchor": {
+            "type": "wall",
+            "wall": "W1",
+            "along": 0.5
+          },
+          "rot": 0,
+          "size": 3,
+          "distFromWall": 2.5,
+          "yOffset": 0.35
+        },
+        {
+          "id": "hw-plant",
+          "model": "quat:Houseplant6",
+          "anchor": {
+            "type": "corner",
+            "corner": "SE"
+          },
+          "rot": 0,
+          "size": 0.9
+        },
+        {
+          "id": "hw-lamp",
+          "model": "quat:LightFloor1",
+          "anchor": {
+            "type": "wall",
+            "wall": "W3",
+            "along": 0.2
+          },
+          "rot": 0,
+          "size": 0.7,
+          "distFromWall": 0.3
+        },
+        {
+          "id": "hw-trashcan",
+          "model": "quat:Trashcan2",
+          "anchor": {
+            "type": "corner",
+            "corner": "NE"
+          },
+          "rot": 0,
+          "size": 0.45
+        }
+      ],
+      "windows": [],
+      "doors": [
+        {
+          "id": "hw-door",
+          "model": "Door7",
+          "anchor": {
+            "type": "wall",
+            "wall": "W3",
+            "along": 0.385
+          },
+          "swingDir": 1,
+          "distFromWall": 0.07,
+          "size": 0.99,
+          "maskWidth": 1,
+          "maskHeight": 2.37,
+          "maskAlong": 0.55
+        }
+      ]
+    }
+  }
+}

@@ -17,7 +17,7 @@ function normalize(raw: string): string {
     .toLowerCase()
     .replace(/['']/g, "'")
     .replace(/[,;:!?.]+/g, ' ')
-    .replace(/\b(please|alexa|hey alexa|okay alexa|ok alexa|bhai|yaar|can\s+you|could\s+you|will\s+you|would\s+you|i\s+want\s+(you\s+to\s+)?|i\s+need\s+(you\s+to\s+)?|for\s+me)\b/g, '')
+    .replace(/\b(please|alexa|hey alexa|okay alexa|ok alexa|bhai|yaar|i\s+want\s+(you\s+to\s+)?|i\s+need\s+(you\s+to\s+)?|for\s+me)\b/g, '')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -57,6 +57,15 @@ function extractRoom(q: string): string | null {
   return null;
 }
 
+// Extract ALL rooms mentioned (for multi-room commands)
+function extractAllRooms(q: string): string[] {
+  const found: string[] = [];
+  for (const [re, id] of ROOM_ALIASES) {
+    if (re.test(q) && !found.includes(id)) found.push(id);
+  }
+  return found;
+}
+
 // Find all devices of a type, optionally filtered to a room
 function byType(objects: PlacedObject[], type: string, roomId?: string | null): PlacedObject[] {
   return objects.filter(
@@ -68,12 +77,69 @@ function applyTo(objects: PlacedObject[], type: string, changes: Partial<AlexaDe
   return byType(objects, type, roomId).map(o => ({ id: o.id, changes }));
 }
 
+// Split compound "X and also Y" / "X then Y" into sub-commands
+function splitCompound(raw: string): string[] {
+  // Split on " and also ", " and then ", " then ", " also " when preceded by an action verb
+  const parts = raw
+    .split(/\band\s+(also\s+)?(?=(?:turn|switch|set|dim|brighten|put|power|enable|disable|start|stop|mute|unmute|lock|unlock))/i)
+    .map(s => s.trim())
+    .filter(Boolean);
+  return parts.length > 1 ? parts : [raw];
+}
+
+// Merge multiple CommandResult objects (for compound + multi-room)
+function merge(results: CommandResult[]): CommandResult {
+  const matched = results.some(r => r.matched);
+  const updates = results.flatMap(r => r.updates);
+  // Deduplicate by id (last-write wins)
+  const byId = new Map<string, { id: string; changes: Partial<AlexaDeviceState> }>();
+  for (const u of updates) byId.set(u.id, u);
+  const responses = results.filter(r => r.matched).map(r => r.response);
+  const tier: CommandTier = results.some(r => r.tier === 'BACKEND_NEEDED')
+    ? 'BACKEND_NEEDED'
+    : results.some(r => r.tier === 'T1_LOCAL') ? 'T1_LOCAL' : 'T0_LOCAL';
+  const roomFocuses = results.filter(r => r.matched && r.roomFocus !== undefined).map(r => r.roomFocus);
+  const roomFocus = roomFocuses.length > 1 ? null : roomFocuses[0];
+  return { matched, response: responses.join(' '), tier, updates: [...byId.values()], roomFocus };
+}
+
 // ── Main processor ────────────────────────────────────────────────────────────
 
 export function processCommand(raw: string, objects: PlacedObject[]): CommandResult {
+  // Handle compound commands ("turn off lights and turn on the fan")
+  const parts = splitCompound(raw);
+  if (parts.length > 1) {
+    const results = parts.map(p => processCommand(p, objects));
+    if (results.some(r => r.matched)) return merge(results);
+  }
+
   const q = normalize(raw);
   const action = detectAction(q);
-  const room = extractRoom(q);
+  const rooms = extractAllRooms(q);
+  const room = rooms[0] ?? null;
+
+  // Multi-room: "lights in kitchen and bedroom"
+  if (rooms.length > 1 && action !== null) {
+    const lightTarget = /\blight(s)?\b|\bbulb\b|\blamp\b/.test(q);
+    const fanTarget = /\bfan\b/.test(q);
+    const allTarget = /\beverything\b|\ball\b/.test(q) && !lightTarget && !fanTarget;
+
+    if (lightTarget || allTarget || fanTarget) {
+      const allUpdates: CommandResult['updates'] = [];
+      for (const r of rooms) {
+        if (lightTarget || allTarget) allUpdates.push(...applyTo(objects, 'smart-bulb', { isOn: action }, r));
+        if (fanTarget || allTarget)   allUpdates.push(...applyTo(objects, 'ceiling-fan', { isOn: action }, r));
+      }
+      const roomNames = rooms.map(r => ROOM_LABEL[r] ?? r).join(' and ');
+      const deviceDesc = lightTarget ? 'lights' : fanTarget ? 'fans' : 'devices';
+      return {
+        matched: true, tier: 'T1_LOCAL',
+        response: `${roomNames} ${deviceDesc} ${action ? 'on' : 'off'}.`,
+        roomFocus: null,
+        updates: allUpdates,
+      };
+    }
+  }
 
   const unmatched: CommandResult = {
     matched: false,
@@ -128,7 +194,7 @@ export function processCommand(raw: string, objects: PlacedObject[]): CommandRes
 
   if (/\bgood\s+night\b|\bbed\s*time\b|\bnight\s+mode\b|\bsleep\s+mode\b|\bgo\s+to\s+sleep\b/.test(q)) {
     const controllable = objects.filter(o =>
-      o.isAlexaDevice && !['camera', 'smoke-detector', 'motion-sensor', 'doorbell'].includes(o.type)
+      o.isAlexaDevice && !['camera', 'smoke-detector', 'motion-sensor', 'doorbell', 'smart-lock'].includes(o.type)
     );
     return {
       matched: true, tier: 'T0_LOCAL',
@@ -161,7 +227,7 @@ export function processCommand(raw: string, objects: PlacedObject[]): CommandRes
       response: 'Away mode. Lights off, cameras on, door locked.',
       roomFocus: null,
       updates: [
-        ...objects.filter(o => o.isAlexaDevice).map(o => ({
+        ...objects.filter(o => o.isAlexaDevice && o.type !== 'smart-lock').map(o => ({
           id: o.id,
           changes: { isOn: keepOn.includes(o.type) } as Partial<AlexaDeviceState>,
         })),
@@ -235,7 +301,7 @@ export function processCommand(raw: string, objects: PlacedObject[]): CommandRes
     };
   }
 
-  // ─── ROOM + ALL DEVICES ON/OFF (T1) — must come before global all-off ───────
+  // ─── ROOM + ALL DEVICES ON/OFF (T1) , must come before global all-off ───────
 
   if (room !== null && action !== null) {
     const allDevices = /\b(everything|all\s+(the\s+)?(devices?|appliances?|things?|stuff|electronics?))\b/.test(q);
@@ -260,7 +326,7 @@ export function processCommand(raw: string, objects: PlacedObject[]): CommandRes
 
   if (/\b(everything|all)\s+off\b|\bturn\s+off\s+(everything|all)\b|\bshut\s+(everything|all)\s+off\b|\ball\s+off\b/.test(q)) {
     const controllable = objects.filter(o =>
-      o.isAlexaDevice && !['camera', 'smoke-detector', 'motion-sensor', 'doorbell'].includes(o.type)
+      o.isAlexaDevice && !['camera', 'smoke-detector', 'motion-sensor', 'doorbell', 'smart-lock'].includes(o.type)
     );
     return {
       matched: true, tier: 'T0_LOCAL',
@@ -285,9 +351,11 @@ export function processCommand(raw: string, objects: PlacedObject[]): CommandRes
   // ─── ALL LIGHTS (T0) ─────────────────────────────────────────────────────
 
   if (
-    /\ball\s+lights?\b|\blights?\s+out\b|\blights?\s+(on|off)\b/.test(q) ||
-    (/\blight(s)?\b/.test(q) && action !== null && room === null &&
-      /\b(turn|switch|put|all)\b/.test(q))
+    room === null && (
+      /\ball\s+lights?\b|\blights?\s+out\b|\blights?\s+(on|off)\b/.test(q) ||
+      (/\blight(s)?\b/.test(q) && action !== null &&
+        /\b(turn|switch|put|all|chalao|chalu|jalao|jala|band|bandh|karo|kardo)\b/.test(q))
+    )
   ) {
     const isOn = action !== null ? action : /\bon\b/.test(q);
     const bulbs = byType(objects, 'smart-bulb');
@@ -300,7 +368,8 @@ export function processCommand(raw: string, objects: PlacedObject[]): CommandRes
 
   // ─── ALL FANS (T0) ───────────────────────────────────────────────────────
 
-  if (/\ball\s+fans?\b|\bfans?\s+(on|off)\b/.test(q) && room === null) {
+  if (/\ball\s+fans?\b|\bfans?\s+(on|off)\b/.test(q) && room === null &&
+      !/\b(low|medium|mid|moderate|normal|high|max|full|fastest|maximum|min|slow|slowest|faster|slower)\b/.test(q)) {
     const isOn = action !== null ? action : /\bon\b/.test(q);
     const fans = byType(objects, 'ceiling-fan');
     return {
@@ -327,7 +396,7 @@ export function processCommand(raw: string, objects: PlacedObject[]): CommandRes
 
   // ─── ROOM + LIGHTS (T1) ───────────────────────────────────────────────────
 
-  if (/\blight(s)?\b|\bbulb\b|\blamp\b|\btubelight\b/.test(q) && room !== null) {
+  if ((/\blight(s)?\b|\bbulb\b|\blamp\b|\btubelight\b/.test(q) || /\bbright(ness)?\b|\bdim\b/.test(q)) && room !== null) {
     // Brightness value
     const bMatch = q.match(/\b(\d{1,3})\s*(%|percent)?\b/);
     if (bMatch && action === null) {
@@ -496,7 +565,7 @@ export function processCommand(raw: string, objects: PlacedObject[]): CommandRes
 
   // ─── TV (T0/T1) ───────────────────────────────────────────────────────────
 
-  if (/\b(tv|television|telly|screen)\b/.test(q)) {
+  if (/\b(tv|television|telly|screen)\b/.test(q) || /\b(volume|channel|mute)\b/.test(q)) {
     // Volume
     const volN = q.match(/\bvolume\s+(?:to\s+)?(\d+)\b/);
     if (volN) {
@@ -634,7 +703,7 @@ export function processCommand(raw: string, objects: PlacedObject[]): CommandRes
     return { matched: true, tier: 'T0_LOCAL', response: 'Showing full home.', roomFocus: null, updates: [] };
   }
 
-  // ─── SINGLE DEVICE — match by deviceName substring (T1) ──────────────────
+  // ─── SINGLE DEVICE , match by deviceName substring (T1) ──────────────────
 
   if (action !== null) {
     const lowerRaw = raw.toLowerCase();
@@ -649,6 +718,16 @@ export function processCommand(raw: string, objects: PlacedObject[]): CommandRes
         };
       }
     }
+  }
+
+  // ─── MUSIC / PLAY (T0) ───────────────────────────────────────────────────────
+  if (/\b(play|start|put\s+on)\b/.test(q) && /\b(music|jazz|song|something|tunes?|beats?|audio)\b/.test(q)) {
+    const speakers = [...byType(objects, 'echo-dot'), ...byType(objects, 'echo-show')];
+    return {
+      matched: true, tier: 'T0_LOCAL',
+      response: 'Playing soulful jazz for you.',
+      updates: speakers.map(o => ({ id: o.id, changes: { isOn: true, volume: 60 } as Partial<AlexaDeviceState> })),
+    };
   }
 
   return unmatched;

@@ -14,6 +14,7 @@ import type {
 } from '../types';
 import { DEFAULT_ROOMS, ASSET_MAP, DEFAULT_ROUTINES, DEFAULT_SCENES } from '../constants/assets';
 import { DEFAULT_PLACED_OBJECTS } from '../constants/defaults';
+import { processCommand, type CommandResult } from './commandProcessor';
 
 function generateId(): string {
   return crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
@@ -31,6 +32,14 @@ interface AppState {
   routines: Routine[];
   scenes: Scene[];
   simulationTick: number;
+
+  // Devices changed by the most recent command , drives the 3D confirm glow
+  recentlyChangedIds: string[];
+  setRecentlyChanged: (ids: string[]) => void;
+
+  // Active scenario , drives 3D world reactions
+  activeScenarioId: string | null;
+  setActiveScenarioId: (id: string | null) => void;
 
   // Room actions
   setActiveRoom: (roomId: string | null) => void;
@@ -69,15 +78,68 @@ interface AppState {
   toggleRoutine: (id: string) => void;
 
   // Voice commands
+  runLocalCommand: (text: string) => CommandResult;
   executeVoiceCommand: (text: string) => string;
+
+  // Last cloud-escalated command (T3)
+  lastCloudCommand: { text: string; time: string } | null;
+  setLastCloudCommand: (text: string) => void;
+  lastSpecialist: string | null;
+  setLastSpecialist: (s: string) => void;
+  pendingLookup: string | null;
+  setPendingLookup: (query: string | null) => void;
+  activeMemoryVault: Array<{ query: string; timestamp: string; approved: boolean }>;
+  addActiveMemory: (entry: { query: string; timestamp: string; approved: boolean }) => void;
 
   // Simulation
   tickSimulation: () => void;
+
+  // Furniture inspector (layout overrides)
+  selectedFurnitureId: string | null;
+  furnitureOverrides: Record<string, FurnitureOverride>;
+  setSelectedFurniture: (id: string | null) => void;
+  updateFurnitureOverride: (id: string, patch: Partial<FurnitureOverride>) => void;
+  resetFurnitureOverride: (id: string) => void;
+
+  // Door inspector
+  selectedDoorId: string | null;
+  doorOverrides: Record<string, DoorOverride>;
+  setSelectedDoor: (id: string | null) => void;
+  updateDoorOverride: (id: string, patch: Partial<DoorOverride>) => void;
+  resetDoorOverride: (id: string) => void;
+
+  // Window inspector
+  selectedWindowId: string | null;
+  windowOverrides: Record<string, { along?: number; maskW?: number; maskH?: number; yBottom?: number; maskEnabled?: boolean }>;
+  setSelectedWindow: (id: string | null) => void;
+  updateWindowOverride: (id: string, patch: { along?: number; maskW?: number; maskH?: number; yBottom?: number; maskEnabled?: boolean }) => void;
+  resetWindowOverride: (id: string) => void;
 
   // Persistence
   exportState: () => string;
   importState: (json: string) => void;
 }
+
+export type FurnitureOverride = {
+  wall?: 'W1' | 'W2' | 'W3' | 'W4';
+  along?: number;
+  distFromWall?: number;
+  rot?: number;
+  size?: number;
+  yOffset?: number;
+};
+
+export type DoorOverride = {
+  wall?: 'W1' | 'W2' | 'W3' | 'W4';
+  along?: number;
+  distFromWall?: number;
+  swingDir?: 1 | -1;
+  size?: number;
+  maskWidth?: number;
+  maskHeight?: number;
+  maskWall?: 'W1' | 'W2' | 'W3' | 'W4'; // independent mask wall (defaults to door wall)
+  maskAlong?: number;                      // independent mask position (0-1 along wall)
+};
 
 const INITIAL_UI: UIState = {
   activeRoomId: null,
@@ -113,7 +175,63 @@ export const useAppStore = create<AppState>()(
         scenes: DEFAULT_SCENES,
         simulationTick: 0,
 
+        recentlyChangedIds: [],
+        setRecentlyChanged: (ids) => {
+          set({ recentlyChangedIds: ids });
+          if (ids.length) setTimeout(() => set({ recentlyChangedIds: [] }), 2200);
+        },
+
         ui: INITIAL_UI,
+        selectedFurnitureId: null,
+        furnitureOverrides: {},
+        setSelectedFurniture: (id) => set({ selectedFurnitureId: id }),
+        updateFurnitureOverride: (id, patch) =>
+          set((s) => ({
+            furnitureOverrides: {
+              ...s.furnitureOverrides,
+              [id]: { ...s.furnitureOverrides[id], ...patch },
+            },
+          })),
+        resetFurnitureOverride: (id) =>
+          set((s) => {
+            const next = { ...s.furnitureOverrides };
+            delete next[id];
+            return { furnitureOverrides: next };
+          }),
+
+        selectedDoorId: null,
+        doorOverrides: {},
+        setSelectedDoor: (id) => set({ selectedDoorId: id }),
+        updateDoorOverride: (id, patch) =>
+          set((s) => ({
+            doorOverrides: {
+              ...s.doorOverrides,
+              [id]: { ...s.doorOverrides[id], ...patch },
+            },
+          })),
+        resetDoorOverride: (id) =>
+          set((s) => {
+            const next = { ...s.doorOverrides };
+            delete next[id];
+            return { doorOverrides: next };
+          }),
+
+        selectedWindowId: null,
+        windowOverrides: {},
+        setSelectedWindow: (id) => set({ selectedWindowId: id }),
+        updateWindowOverride: (id, patch) =>
+          set((s) => ({
+            windowOverrides: { ...s.windowOverrides, [id]: { ...s.windowOverrides[id], ...patch } },
+          })),
+        resetWindowOverride: (id) =>
+          set((s) => {
+            const next = { ...s.windowOverrides };
+            delete next[id];
+            return { windowOverrides: next };
+          }),
+
+        activeScenarioId: null,
+        setActiveScenarioId: (id) => set({ activeScenarioId: id }),
 
         setActiveRoom: (roomId) =>
           set((s) => ({
@@ -160,6 +278,16 @@ export const useAppStore = create<AppState>()(
               'success',
               obj.id
             );
+            // Register with backend so Alexa can control it
+            import('../api').then(({ homeApi }) => {
+              homeApi.registerDevice(undefined, {
+                device_id: obj.id,
+                name: obj.deviceName,
+                type: obj.type,
+                room_id: roomId ?? undefined,
+                state: obj.alexaDeviceState as Record<string, unknown>,
+              }).catch(() => {/* backend offline — local state still intact */});
+            });
           }
         },
 
@@ -356,92 +484,72 @@ export const useAppStore = create<AppState>()(
             ),
           })),
 
-        executeVoiceCommand: (text: string): string => {
-          const lower = text.toLowerCase().trim();
-          const { placedObjects, rooms } = get();
+        // Deterministic local resolver: drives device state, camera and confirm-glow.
+        // The robust matcher lives in commandProcessor.ts (unit-tested) , this wires its
+        // result into the store so known twin commands always work, with or without backend.
+        runLocalCommand: (text: string): CommandResult => {
+          const { placedObjects } = get();
+          const result = processCommand(text, placedObjects);
 
-          if (/turn (on|off) (all |the )?lights?/.test(lower)) {
-            const isOn = lower.includes('turn on');
-            let count = 0;
-            set((s) => ({
-              placedObjects: s.placedObjects.map((o) => {
-                if (o.type === 'smart-bulb' || (o.type === 'smart-plug' && o.alexaDeviceState.isOn !== isOn)) {
-                  count++;
-                  return { ...o, alexaDeviceState: { ...o.alexaDeviceState, isOn } };
-                }
-                return o;
-              }),
-            }));
-            get().addNotification(`Lights turned ${isOn ? 'on' : 'off'}.`, isOn ? 'success' : 'info');
-            return `Turning ${isOn ? 'on' : 'off'} ${count} light${count !== 1 ? 's' : ''}.`;
-          }
+          if (result.matched) {
+            // 1. apply device state changes
+            for (const u of result.updates) get().updateAlexaState(u.id, u.changes);
 
-          if (/good morning/.test(lower)) { get().triggerScene('morning'); return 'Good morning! Turning on the lights and setting the temperature.'; }
-          if (/good night|bedtime/.test(lower)) { get().triggerScene('night'); return 'Good night! Turning off devices and locking the doors.'; }
-          if (/movie time|movie night/.test(lower)) { get().triggerScene('movie'); return 'Enjoy the movie! Dimming the lights and turning on the TV.'; }
-          if (/away mode|leaving|i.m leaving/.test(lower)) { get().triggerScene('away'); return 'Away mode activated. Securing your home.'; }
+            // 2. confirmation glow on exactly the devices that changed
+            const changedIds = result.updates.map((u) => u.id);
+            if (changedIds.length) get().setRecentlyChanged(changedIds);
 
-          for (const room of rooms) {
-            if (lower.includes(room.name.toLowerCase())) {
-              get().setActiveRoom(room.id);
-              return `Showing ${room.name}.`;
+            // 3. camera choreography , room id zooms in, null returns to house view,
+            //    undefined leaves the camera untouched
+            if (result.roomFocus !== undefined) {
+              get().setActiveRoom(result.roomFocus);
+              if (result.roomFocus !== null) {
+                // auto-return after the action reads, unless the user navigated elsewhere
+                setTimeout(() => {
+                  if (get().ui.activeRoomId === result.roomFocus) get().setActiveRoom(null);
+                }, 3500);
+              }
+            }
+
+            // 4. notify only when a device actually changed (skip greetings/status)
+            if (changedIds.length) {
+              get().addNotification(result.response, 'success', changedIds[0]);
+            }
+
+            // 5. Jazz: play when speaker turns on, stop when off
+            const speakerTypes = new Set(['echo-dot', 'echo-show']);
+            const turnedOnSpeakers = result.updates.filter(u => {
+              const o = placedObjects.find(p => p.id === u.id);
+              return o && speakerTypes.has(o.type) && u.changes.isOn === true;
+            });
+            const turnedOffSpeakers = result.updates.filter(u => {
+              const o = placedObjects.find(p => p.id === u.id);
+              return o && speakerTypes.has(o.type) && u.changes.isOn === false;
+            });
+            if (turnedOnSpeakers.length > 0) {
+              import('../utils/jazzPlayer').then(({ playJazz }) => playJazz()).catch(() => {});
+            }
+            if (turnedOffSpeakers.length > 0) {
+              import('../utils/jazzPlayer').then(({ stopJazz }) => stopJazz()).catch(() => {});
             }
           }
 
-          const brightnessMatch = lower.match(/set brightness (?:to )?(\d+)/);
-          if (brightnessMatch) {
-            const val = Math.min(100, Math.max(0, parseInt(brightnessMatch[1])));
-            let count = 0;
-            set((s) => ({
-              placedObjects: s.placedObjects.map((o) => {
-                if (o.type === 'smart-bulb') { count++; return { ...o, alexaDeviceState: { ...o.alexaDeviceState, brightness: val } }; }
-                return o;
-              }),
-            }));
-            get().addNotification(`Brightness set to ${val}%.`, 'info');
-            return `Setting brightness to ${val}% for ${count} bulb${count !== 1 ? 's' : ''}.`;
-          }
-
-          const tempMatch = lower.match(/set (?:the )?temperature (?:to )?(\d+)/);
-          if (tempMatch) {
-            const val = Math.min(30, Math.max(16, parseInt(tempMatch[1])));
-            set((s) => ({
-              placedObjects: s.placedObjects.map((o) =>
-                o.type === 'thermostat' ? { ...o, alexaDeviceState: { ...o.alexaDeviceState, temperature: val } } : o
-              ),
-            }));
-            get().addNotification(`Temperature set to ${val}°C.`, 'info');
-            return `Setting temperature to ${val}°C.`;
-          }
-
-          if (/lock|unlock/.test(lower)) {
-            const isLocked = lower.includes('lock') && !lower.includes('unlock');
-            set((s) => ({
-              placedObjects: s.placedObjects.map((o) =>
-                o.type === 'smart-lock' ? { ...o, alexaDeviceState: { ...o.alexaDeviceState, isLocked } } : o
-              ),
-            }));
-            get().addNotification(`Door ${isLocked ? 'locked' : 'unlocked'}.`, isLocked ? 'success' : 'warning');
-            return `${isLocked ? 'Locking' : 'Unlocking'} the door.`;
-          }
-
-          for (const obj of placedObjects) {
-            if (obj.isAlexaDevice && lower.includes(obj.deviceName.toLowerCase())) {
-              const isOn = lower.includes('turn on') || (!lower.includes('turn off') && !obj.alexaDeviceState.isOn);
-              get().updateAlexaState(obj.id, { isOn });
-              const def = ASSET_MAP.get(obj.type);
-              get().addNotification(`${def?.emoji ?? ''} ${obj.deviceName} turned ${isOn ? 'on' : 'off'}.`, 'success', obj.id);
-              return `Turning ${isOn ? 'on' : 'off'} ${obj.deviceName}.`;
-            }
-          }
-
-          if (/show (?:the )?house|home view|all rooms/.test(lower)) {
-            get().setActiveRoom(null);
-            return 'Showing full house view.';
-          }
-
-          return "Sorry, I didn't understand that. Try \"turn on the lights\" or \"good morning\".";
+          return result;
         },
+
+        lastCloudCommand: null,
+        setLastCloudCommand: (text: string) =>
+          set({ lastCloudCommand: { text, time: new Date().toLocaleTimeString() } }),
+        lastSpecialist: null,
+        setLastSpecialist: (s: string) => set({ lastSpecialist: s }),
+        pendingLookup: null,
+        setPendingLookup: (query: string | null) => set({ pendingLookup: query }),
+        activeMemoryVault: [],
+        addActiveMemory: (entry) => set((state) => ({
+          activeMemoryVault: [entry, ...state.activeMemoryVault].slice(0, 20),
+        })),
+
+        executeVoiceCommand: (text: string): string => get().runLocalCommand(text).response,
 
         tickSimulation: () => {
           set((s) => {
@@ -492,20 +600,36 @@ export const useAppStore = create<AppState>()(
         },
       }),
       {
-        name: 'alexa-twin-v3',
+        name: 'alexa-twin-v9', // bumped: window mask toggle + yOffset guard for object anchors
         storage: createJSONStorage(() => localStorage),
         partialize: (state) => ({
           placedObjects: state.placedObjects,
+          doorOverrides: state.doorOverrides,
+          furnitureOverrides: state.furnitureOverrides,
+          windowOverrides: state.windowOverrides,
           ui: {
             isLayoutEditMode: state.ui.isLayoutEditMode,
             layoutLocked: state.ui.layoutLocked,
           },
         }),
         merge: (persisted: unknown, current) => {
-          const p = persisted as Partial<{ placedObjects: typeof current.placedObjects; ui: Partial<typeof current.ui> }>;
+          const p = persisted as Partial<{
+            placedObjects: typeof current.placedObjects;
+            doorOverrides: typeof current.doorOverrides;
+            furnitureOverrides: typeof current.furnitureOverrides;
+            windowOverrides: typeof current.windowOverrides;
+            ui: Partial<typeof current.ui>;
+          }>;
+          // Merge new default objects that weren't in the cached state
+          const persisted_objs = p.placedObjects ?? current.placedObjects;
+          const existingIds = new Set(persisted_objs.map((o: { id: string }) => o.id));
+          const missingDefaults = DEFAULT_PLACED_OBJECTS.filter(d => !existingIds.has(d.id));
           return {
             ...current,
-            placedObjects: p.placedObjects ?? current.placedObjects,
+            placedObjects: [...persisted_objs, ...missingDefaults],
+            doorOverrides: p.doorOverrides ?? current.doorOverrides,
+            furnitureOverrides: p.furnitureOverrides ?? current.furnitureOverrides,
+            windowOverrides: p.windowOverrides ?? current.windowOverrides,
             ui: { ...current.ui, ...(p.ui ?? {}) },
           };
         },
