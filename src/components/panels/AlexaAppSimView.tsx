@@ -45,32 +45,15 @@ function AlexaRing({ onVoiceSubmit }: { onVoiceSubmit: (text: string) => void })
     if (!window.speechSynthesis) return;
     window.speechSynthesis.cancel();
     const utt = new SpeechSynthesisUtterance(text);
-    utt.lang = 'en-US';
-    utt.rate = 1.0;
-    utt.pitch = 1.0;
-    utt.volume = 1.0;
-    const pickVoice = () => {
-      const voices = window.speechSynthesis.getVoices();
-      return (
-        voices.find(v => /Aria|Jenny/i.test(v.name) && v.lang.startsWith('en')) ??
-        voices.find(v => /Natural|Neural|Online/i.test(v.name) && v.lang.startsWith('en')) ??
-        voices.find(v => v.name === 'Google UK English Female') ??
-        voices.find(v => v.name === 'Google US English') ??
-        voices.find(v => v.lang === 'en-US') ??
-        voices.find(v => v.lang.startsWith('en')) ??
-        null
-      );
-    };
-    const doSpeak = () => {
-      const voice = pickVoice();
-      if (voice) utt.voice = voice;
-      window.speechSynthesis.speak(utt);
-    };
-    if (window.speechSynthesis.getVoices().length === 0) {
-      window.speechSynthesis.addEventListener('voiceschanged', doSpeak, { once: true });
-    } else {
-      doSpeak();
-    }
+    utt.lang = 'en-IN';
+    utt.rate = 0.88;
+    utt.pitch = 1.1;
+    utt.volume = 0.92;
+    // Prefer an Indian English voice if available
+    const voices = window.speechSynthesis.getVoices();
+    const preferred = voices.find(v => v.lang === 'en-IN') ?? voices.find(v => v.lang.startsWith('en'));
+    if (preferred) utt.voice = preferred;
+    window.speechSynthesis.speak(utt);
   };
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
