@@ -205,7 +205,13 @@ function AlexaRing({ onVoiceSubmit, onRingClick }: { onVoiceSubmit: (text: strin
           if (p.specialist) setLastSpecialist(p.specialist);
           if (p.transcript) setLastCloudCommand(p.transcript);
         }
-        browserSpeak(spokenText);
+        if (p.audio_base64 && !p.audio_is_mock) {
+          const audio = new Audio(`data:${p.audio_content_type ?? 'audio/mpeg'};base64,${p.audio_base64}`);
+          audio.onerror = () => browserSpeak(spokenText);
+          audio.play().catch(() => browserSpeak(spokenText));
+        } else {
+          browserSpeak(spokenText);
+        }
       } else if (msg.type === 'lookup_request') {
         const p = msg.payload as any;
         setIsWaitingResponse(false);
