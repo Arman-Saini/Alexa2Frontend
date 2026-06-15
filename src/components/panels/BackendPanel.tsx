@@ -1,5 +1,7 @@
 import { useState, useCallback } from 'react';
 import { backendApi, homeApi } from '../../api';
+import { ASSET_DEFINITIONS } from '../../constants/assets';
+import { useAppStore } from '../../store/store';
 import type { RegimeState, T0Rule, ProposedRule } from '../../api';
 import { env } from '../../config/env';
 
@@ -7,7 +9,7 @@ import { env } from '../../config/env';
 
 function JsonBlock({ data }: { data: unknown }) {
   return (
-    <pre className="mt-1.5 bg-[#0A0A0A] border border-[#2A2A2A] rounded-lg p-2.5 text-[9px] text-[#00CAFF] overflow-auto max-h-40 leading-relaxed whitespace-pre-wrap break-all">
+    <pre className="mt-1.5 bg-[#07101E] border border-[#233345] rounded-lg p-2.5 text-[9px] text-[#F0F0EE] overflow-auto max-h-40 leading-relaxed whitespace-pre-wrap break-all">
       {JSON.stringify(data, null, 2)}
     </pre>
   );
@@ -18,10 +20,10 @@ function StatusBadge({ ok, msg }: { ok: boolean | null; msg?: string }) {
   return (
     <span
       className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${
-        ok ? 'bg-[#1DB95433] text-[#1DB954]' : 'bg-[#F4433633] text-[#F44336]'
+        ok ? 'bg-[#5A9A5A33] text-[#5A9A5A]' : 'bg-[#F4433633] text-[#F44336]'
       }`}
     >
-      {ok ? 'OK' : 'ERR'}{msg ? ` — ${msg}` : ''}
+      {ok ? 'OK' : 'ERR'}{msg ? ` , ${msg}` : ''}
     </span>
   );
 }
@@ -30,7 +32,7 @@ interface SectionProps { title: string; icon: string; children: React.ReactNode;
 function Section({ title, icon, children, defaultOpen = false }: SectionProps) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="border border-[#2A2A2A] rounded-xl overflow-hidden">
+    <div className="border border-[#233345] rounded-xl overflow-hidden">
       <button
         onClick={() => setOpen((v) => !v)}
         className="w-full flex items-center justify-between px-3 py-2.5 bg-[#1A1A1A] hover:bg-[#222] transition-colors"
@@ -40,13 +42,13 @@ function Section({ title, icon, children, defaultOpen = false }: SectionProps) {
           {title}
         </span>
         <svg
-          className={`w-3.5 h-3.5 text-[#555] transition-transform ${open ? 'rotate-180' : ''}`}
+          className={`w-3.5 h-3.5 text-[#4A5E72] transition-transform ${open ? 'rotate-180' : ''}`}
           fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"
         >
           <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
         </svg>
       </button>
-      {open && <div className="p-3 flex flex-col gap-3 bg-[#121212]">{children}</div>}
+      {open && <div className="p-3 flex flex-col gap-3 bg-[#111111]">{children}</div>}
     </div>
   );
 }
@@ -60,11 +62,11 @@ function Btn({
   small?: boolean;
 }) {
   const colors = {
-    blue:   'bg-[#00A8E022] border-[#00A8E066] text-[#00A8E0] hover:bg-[#00A8E044]',
+    blue:   'bg-[#E8E8E622] border-[#E8E8E666] text-[#E8E8E6] hover:bg-[#E8E8E644]',
     orange: 'bg-[#FF8C0022] border-[#FF8C0066] text-[#FF8C00] hover:bg-[#FF8C0044]',
-    green:  'bg-[#1DB95422] border-[#1DB95466] text-[#1DB954] hover:bg-[#1DB95444]',
+    green:  'bg-[#5A9A5A22] border-[#5A9A5A66] text-[#5A9A5A] hover:bg-[#5A9A5A44]',
     red:    'bg-[#F4433622] border-[#F4433666] text-[#F44336] hover:bg-[#F4433644]',
-    gray:   'bg-[#242424] border-[#383838] text-[#8A8A8A] hover:text-white',
+    gray:   'bg-[#242424] border-[#404040] text-[#888888] hover:text-white',
   };
   return (
     <button
@@ -115,6 +117,59 @@ function HealthPanel() {
   );
 }
 
+// ── Add Device Catalog ─────────────────────────────────────────────────────────
+
+const ALEXA_DEVICES = ASSET_DEFINITIONS.filter(d => d.isAlexaDevice);
+
+function AddDeviceCatalog() {
+  const [open, setOpen] = useState(false);
+  const [added, setAdded] = useState<string | null>(null);
+  const { addObject, rooms, ui } = useAppStore();
+
+  const handleAdd = (type: string) => {
+    const room = rooms.find(r => r.id === ui.activeRoomId) ?? rooms[0];
+    addObject(type as never, room?.id ?? 'living-room', { x: 0, y: 0, z: 0 });
+    setAdded(type);
+    setTimeout(() => setAdded(null), 1500);
+  };
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold transition-colors"
+        style={{ background: open ? '#E8E8E620' : '#1A2A1A', border: '1px solid #E8E8E650', color: '#E8E8E6' }}
+      >
+        <span>+ Add Device</span>
+        <span className="text-[10px]">{open ? '▲' : '▼'}</span>
+      </button>
+      {open && (
+        <div className="grid grid-cols-2 gap-1.5 max-h-60 overflow-y-auto pr-0.5">
+          {ALEXA_DEVICES.map(def => (
+            <button
+              key={def.type}
+              draggable
+              onDragStart={e => {
+                e.dataTransfer.setData('assetType', def.type);
+                e.dataTransfer.effectAllowed = 'copy';
+              }}
+              onClick={() => handleAdd(def.type)}
+              className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-left transition-colors hover:opacity-80 cursor-grab active:cursor-grabbing"
+              style={{
+                background: added === def.type ? def.color + '30' : '#1A1A1A',
+                border: `1px solid ${added === def.type ? def.color : '#404040'}`,
+              }}
+            >
+              <span className="text-base shrink-0">{def.emoji}</span>
+              <span className="text-[10px] font-medium leading-tight" style={{ color: '#D0D0D0' }}>{def.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function HomePanel() {
   const { run: runState, result: stateRes, ok: stateOk } = useApiCall(() => backendApi.getHomeState());
   const { run: runStats, result: statsRes, ok: statsOk } = useApiCall(() => backendApi.getHomeStats());
@@ -135,7 +190,7 @@ function HomePanel() {
 
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-[9px] text-[#555] uppercase tracking-widest">Home ID: {env.HOME_ID}</p>
+      <p className="text-[9px] text-[#4A5E72] uppercase tracking-widest">Home ID: {env.HOME_ID}</p>
       <div className="grid grid-cols-2 gap-1.5">
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-1.5">
@@ -152,11 +207,8 @@ function HomePanel() {
           {statsRes != null && <JsonBlock data={statsRes} />}
         </div>
       </div>
+      <AddDeviceCatalog />
       <div className="flex flex-wrap gap-1.5">
-        <div className="flex items-center gap-1.5">
-          <Btn label="Seed Home" onClick={runSeed} color="green" />
-          <StatusBadge ok={seedOk} msg={(seedRes as { message?: string } | null)?.message} />
-        </div>
         <div className="flex items-center gap-1.5">
           <Btn label="Seed History" onClick={runSeedHist} color="green" />
           <StatusBadge ok={seedHistOk} />
@@ -175,13 +227,13 @@ function HomePanel() {
       {eventsRes != null && <JsonBlock data={eventsRes} />}
 
       {/* PATCH inventory */}
-      <div className="border border-[#2A2A2A] rounded-lg p-2.5 flex flex-col gap-2 mt-1">
-        <p className="text-[9px] font-bold text-[#8A8A8A] uppercase tracking-wider">PATCH — Inventory</p>
+      <div className="border border-[#233345] rounded-lg p-2.5 flex flex-col gap-2 mt-1">
+        <p className="text-[9px] font-bold text-[#888888] uppercase tracking-wider">PATCH , Inventory</p>
         <textarea
           value={invItems}
           onChange={(e) => setInvItems(e.target.value)}
           rows={2}
-          className="bg-[#1A1A1A] border border-[#383838] rounded px-2 py-1 text-[10px] text-white font-mono focus:outline-none focus:border-[#00A8E0] resize-none"
+          className="bg-[#1A1A1A] border border-[#404040] rounded px-2 py-1 text-[10px] text-white font-mono focus:outline-none focus:border-[#E8E8E6] resize-none"
         />
         <div className="flex items-center gap-1.5">
           <Btn label="Update Inventory" onClick={runInventory} color="orange" />
@@ -225,7 +277,7 @@ function DevicePanel() {
 
   const inp = (placeholder: string, value: string, onChange: (v: string) => void) => (
     <input placeholder={placeholder} value={value} onChange={(e) => onChange(e.target.value)}
-      className="flex-1 bg-[#1A1A1A] border border-[#383838] rounded px-2 py-1 text-[10px] text-white focus:outline-none focus:border-[#00A8E0]" />
+      className="flex-1 bg-[#1A1A1A] border border-[#404040] rounded px-2 py-1 text-[10px] text-white focus:outline-none focus:border-[#E8E8E6]" />
   );
 
   return (
@@ -243,9 +295,9 @@ function DevicePanel() {
       {typesRes != null && <JsonBlock data={typesRes} />}
       {listRes != null && <JsonBlock data={listRes} />}
 
-      {/* POST — register */}
-      <div className="border border-[#2A2A2A] rounded-lg p-2.5 flex flex-col gap-2">
-        <p className="text-[9px] font-bold text-[#8A8A8A] uppercase tracking-wider">POST — Register Device</p>
+      {/* POST , register */}
+      <div className="border border-[#233345] rounded-lg p-2.5 flex flex-col gap-2">
+        <p className="text-[9px] font-bold text-[#888888] uppercase tracking-wider">POST , Register Device</p>
         {inp('Device name', regForm.name, (v) => setRegForm((f) => ({ ...f, name: v })))}
         {inp('Type (e.g. smart-bulb)', regForm.type, (v) => setRegForm((f) => ({ ...f, type: v })))}
         {inp('Room ID (optional)', regForm.room_id, (v) => setRegForm((f) => ({ ...f, room_id: v })))}
@@ -256,9 +308,9 @@ function DevicePanel() {
         {regRes != null && <JsonBlock data={regRes} />}
       </div>
 
-      {/* PATCH — update property */}
-      <div className="border border-[#2A2A2A] rounded-lg p-2.5 flex flex-col gap-2">
-        <p className="text-[9px] font-bold text-[#8A8A8A] uppercase tracking-wider">PATCH — Update Property</p>
+      {/* PATCH , update property */}
+      <div className="border border-[#233345] rounded-lg p-2.5 flex flex-col gap-2">
+        <p className="text-[9px] font-bold text-[#888888] uppercase tracking-wider">PATCH , Update Property</p>
         {inp('Device ID', updateForm.device_id, (v) => setUpdateForm((f) => ({ ...f, device_id: v })))}
         <div className="flex gap-1.5">
           {inp('Property', updateForm.property, (v) => setUpdateForm((f) => ({ ...f, property: v })))}
@@ -271,13 +323,13 @@ function DevicePanel() {
         {updateRes != null && <JsonBlock data={updateRes} />}
       </div>
 
-      {/* PATCH — set online */}
-      <div className="border border-[#2A2A2A] rounded-lg p-2.5 flex flex-col gap-2">
-        <p className="text-[9px] font-bold text-[#8A8A8A] uppercase tracking-wider">PATCH — Set Online/Offline</p>
+      {/* PATCH , set online */}
+      <div className="border border-[#233345] rounded-lg p-2.5 flex flex-col gap-2">
+        <p className="text-[9px] font-bold text-[#888888] uppercase tracking-wider">PATCH , Set Online/Offline</p>
         <div className="flex gap-1.5 items-center">
           {inp('Device ID', onlineForm.device_id, (v) => setOnlineForm((f) => ({ ...f, device_id: v })))}
           <select value={String(onlineForm.online)} onChange={(e) => setOnlineForm((f) => ({ ...f, online: e.target.value === 'true' }))}
-            className="bg-[#1A1A1A] border border-[#383838] rounded px-2 py-1 text-[10px] text-white focus:outline-none">
+            className="bg-[#1A1A1A] border border-[#404040] rounded px-2 py-1 text-[10px] text-white focus:outline-none">
             <option value="true">Online</option>
             <option value="false">Offline</option>
           </select>
@@ -290,8 +342,8 @@ function DevicePanel() {
       </div>
 
       {/* DELETE */}
-      <div className="border border-[#2A2A2A] rounded-lg p-2.5 flex flex-col gap-2">
-        <p className="text-[9px] font-bold text-[#8A8A8A] uppercase tracking-wider">DELETE — Remove Device</p>
+      <div className="border border-[#233345] rounded-lg p-2.5 flex flex-col gap-2">
+        <p className="text-[9px] font-bold text-[#888888] uppercase tracking-wider">DELETE , Remove Device</p>
         <div className="flex gap-1.5">
           {inp('Device ID', deleteId, setDeleteId)}
           <Btn label="Delete" onClick={runDelete} color="red" />
@@ -325,15 +377,15 @@ function RoomsPanel() {
       </div>
       {listRes != null && <JsonBlock data={listRes} />}
 
-      <div className="border border-[#2A2A2A] rounded-lg p-2.5 flex flex-col gap-2">
-        <p className="text-[9px] font-bold text-[#8A8A8A] uppercase tracking-wider">POST — Create Room</p>
+      <div className="border border-[#233345] rounded-lg p-2.5 flex flex-col gap-2">
+        <p className="text-[9px] font-bold text-[#888888] uppercase tracking-wider">POST , Create Room</p>
         <input placeholder="Room name" value={roomForm.name} onChange={(e) => setRoomForm((f) => ({ ...f, name: e.target.value }))}
-          className="bg-[#1A1A1A] border border-[#383838] rounded px-2 py-1 text-[10px] text-white focus:outline-none focus:border-[#00A8E0]" />
+          className="bg-[#1A1A1A] border border-[#404040] rounded px-2 py-1 text-[10px] text-white focus:outline-none focus:border-[#E8E8E6]" />
         <div className="flex gap-1.5">
           <input placeholder="Width (m)" value={roomForm.width} onChange={(e) => setRoomForm((f) => ({ ...f, width: e.target.value }))}
-            className="flex-1 bg-[#1A1A1A] border border-[#383838] rounded px-2 py-1 text-[10px] text-white focus:outline-none focus:border-[#00A8E0]" />
+            className="flex-1 bg-[#1A1A1A] border border-[#404040] rounded px-2 py-1 text-[10px] text-white focus:outline-none focus:border-[#E8E8E6]" />
           <input placeholder="Depth (m)" value={roomForm.depth} onChange={(e) => setRoomForm((f) => ({ ...f, depth: e.target.value }))}
-            className="flex-1 bg-[#1A1A1A] border border-[#383838] rounded px-2 py-1 text-[10px] text-white focus:outline-none focus:border-[#00A8E0]" />
+            className="flex-1 bg-[#1A1A1A] border border-[#404040] rounded px-2 py-1 text-[10px] text-white focus:outline-none focus:border-[#E8E8E6]" />
         </div>
         <div className="flex items-center gap-1.5">
           <Btn label="Create" onClick={runCreate} color="green" />
@@ -342,13 +394,13 @@ function RoomsPanel() {
         {createRes != null && <JsonBlock data={createRes} />}
       </div>
 
-      <div className="border border-[#2A2A2A] rounded-lg p-2.5 flex flex-col gap-2">
-        <p className="text-[9px] font-bold text-[#8A8A8A] uppercase tracking-wider">PATCH — Room Occupancy</p>
+      <div className="border border-[#233345] rounded-lg p-2.5 flex flex-col gap-2">
+        <p className="text-[9px] font-bold text-[#888888] uppercase tracking-wider">PATCH , Room Occupancy</p>
         <div className="flex gap-1.5 items-center">
           <input placeholder="Room ID" value={occForm.room_id} onChange={(e) => setOccForm((f) => ({ ...f, room_id: e.target.value }))}
-            className="flex-1 bg-[#1A1A1A] border border-[#383838] rounded px-2 py-1 text-[10px] text-white focus:outline-none focus:border-[#00A8E0]" />
+            className="flex-1 bg-[#1A1A1A] border border-[#404040] rounded px-2 py-1 text-[10px] text-white focus:outline-none focus:border-[#E8E8E6]" />
           <select value={String(occForm.occupied)} onChange={(e) => setOccForm((f) => ({ ...f, occupied: e.target.value === 'true' }))}
-            className="bg-[#1A1A1A] border border-[#383838] rounded px-2 py-1 text-[10px] text-white focus:outline-none">
+            className="bg-[#1A1A1A] border border-[#404040] rounded px-2 py-1 text-[10px] text-white focus:outline-none">
             <option value="true">Occupied</option>
             <option value="false">Empty</option>
           </select>
@@ -386,12 +438,12 @@ function RegimePanel() {
       {refreshRes != null && <JsonBlock data={refreshRes} />}
 
       <div className="flex flex-col gap-1.5">
-        <p className="text-[9px] font-bold text-[#8A8A8A] uppercase tracking-wider">Force Regime</p>
+        <p className="text-[9px] font-bold text-[#888888] uppercase tracking-wider">Force Regime</p>
         <div className="flex gap-1.5">
           <select
             value={regime}
             onChange={(e) => setRegime(e.target.value)}
-            className="flex-1 bg-[#1A1A1A] border border-[#383838] rounded px-2 py-1 text-[10px] text-white focus:outline-none focus:border-[#00A8E0]"
+            className="flex-1 bg-[#1A1A1A] border border-[#404040] rounded px-2 py-1 text-[10px] text-white focus:outline-none focus:border-[#E8E8E6]"
           >
             {REGIMES.map((r) => (
               <option key={r} value={r}>{r}</option>
@@ -449,7 +501,7 @@ function RulesPanel() {
 
       {listRes && (
         <div>
-          <p className="text-[9px] text-[#555] mb-1">
+          <p className="text-[9px] text-[#4A5E72] mb-1">
             {(listRes as { rules?: T0Rule[] }).rules?.length ?? 0} T0 rules
           </p>
           <JsonBlock data={listRes} />
@@ -465,9 +517,9 @@ function RulesPanel() {
       {proposed.length > 0 && (
         <div className="flex flex-col gap-1.5">
           {proposed.map((p) => (
-            <div key={p.proposal_id} className="border border-[#2A2A2A] rounded-lg p-2 flex flex-col gap-1">
+            <div key={p.proposal_id} className="border border-[#233345] rounded-lg p-2 flex flex-col gap-1">
               <p className="text-[10px] text-white font-medium">{p.description}</p>
-              <p className="text-[9px] text-[#555]">Confidence: {((p.confidence ?? 0) * 100).toFixed(0)}% · {p.status}</p>
+              <p className="text-[9px] text-[#4A5E72]">Confidence: {((p.confidence ?? 0) * 100).toFixed(0)}% · {p.status}</p>
               {p.status === 'pending' && (
                 <div className="flex gap-1 mt-0.5">
                   <Btn label="Confirm" onClick={() => confirmRule(p.proposal_id)} color="green" small />
@@ -513,11 +565,11 @@ function VoicePanel() {
       {configRes != null && <JsonBlock data={configRes} />}
 
       <div className="flex flex-col gap-1.5">
-        <p className="text-[9px] font-bold text-[#8A8A8A] uppercase tracking-wider">POST /voice/speak (TTS)</p>
+        <p className="text-[9px] font-bold text-[#888888] uppercase tracking-wider">POST /voice/speak (TTS)</p>
         <input
           value={ttsText}
           onChange={(e) => setTtsText(e.target.value)}
-          className="bg-[#1A1A1A] border border-[#383838] rounded px-2 py-1.5 text-[10px] text-white focus:outline-none focus:border-[#00A8E0]"
+          className="bg-[#1A1A1A] border border-[#404040] rounded px-2 py-1.5 text-[10px] text-white focus:outline-none focus:border-[#E8E8E6]"
         />
         <div className="flex items-center gap-1.5">
           <Btn label="Synthesize" onClick={runTts} color="blue" />
@@ -527,12 +579,12 @@ function VoicePanel() {
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <p className="text-[9px] font-bold text-[#8A8A8A] uppercase tracking-wider">POST /voice/respond</p>
+        <p className="text-[9px] font-bold text-[#888888] uppercase tracking-wider">POST /voice/respond</p>
         <input
           value={respondText}
           onChange={(e) => setRespondText(e.target.value)}
           placeholder="Event result text to speak aloud"
-          className="bg-[#1A1A1A] border border-[#383838] rounded px-2 py-1.5 text-[10px] text-white focus:outline-none focus:border-[#00A8E0]"
+          className="bg-[#1A1A1A] border border-[#404040] rounded px-2 py-1.5 text-[10px] text-white focus:outline-none focus:border-[#E8E8E6]"
         />
         <div className="flex items-center gap-1.5">
           <Btn label="Respond" onClick={runRespond} color="blue" />
@@ -541,14 +593,14 @@ function VoicePanel() {
         {respondRes != null && <JsonBlock data={respondRes} />}
       </div>
 
-      {/* GET /voice/speak — TTS via query param */}
+      {/* GET /voice/speak , TTS via query param */}
       <div className="flex flex-col gap-1.5">
-        <p className="text-[9px] font-bold text-[#8A8A8A] uppercase tracking-wider">GET /voice/speak</p>
+        <p className="text-[9px] font-bold text-[#888888] uppercase tracking-wider">GET /voice/speak</p>
         <a
           href={`${env.BACKEND_URL}/api/voice/speak?text=${encodeURIComponent(ttsText)}`}
           target="_blank"
           rel="noreferrer"
-          className="text-[10px] text-[#00A8E0] underline truncate"
+          className="text-[10px] text-[#E8E8E6] underline truncate"
         >
           Open audio URL ↗
         </a>
@@ -597,12 +649,12 @@ function SimulatePanel() {
         ))}
       </div>
 
-      <div className="flex flex-col gap-1.5 border-t border-[#2A2A2A] pt-2">
-        <p className="text-[9px] font-bold text-[#8A8A8A] uppercase tracking-wider">Voice Command Sim</p>
+      <div className="flex flex-col gap-1.5 border-t border-[#233345] pt-2">
+        <p className="text-[9px] font-bold text-[#888888] uppercase tracking-wider">Voice Command Sim</p>
         <input
           value={voiceText}
           onChange={(e) => setVoiceText(e.target.value)}
-          className="bg-[#1A1A1A] border border-[#383838] rounded px-2 py-1 text-[10px] text-white focus:outline-none focus:border-[#00A8E0]"
+          className="bg-[#1A1A1A] border border-[#404040] rounded px-2 py-1 text-[10px] text-white focus:outline-none focus:border-[#E8E8E6]"
         />
         <div className="flex items-center gap-1.5">
           <Btn
@@ -645,14 +697,14 @@ function AppStoreExtrasPanel() {
       {modsRes != null && <JsonBlock data={modsRes} />}
 
       {/* PATCH /sounds/:cluster_id/identify */}
-      <div className="border border-[#2A2A2A] rounded-lg p-2.5 flex flex-col gap-2">
-        <p className="text-[9px] font-bold text-[#8A8A8A] uppercase tracking-wider">PATCH — Identify Sound Cluster</p>
+      <div className="border border-[#233345] rounded-lg p-2.5 flex flex-col gap-2">
+        <p className="text-[9px] font-bold text-[#888888] uppercase tracking-wider">PATCH , Identify Sound Cluster</p>
         <div className="flex gap-1.5">
           <input
             placeholder="Cluster ID"
             value={soundClusterId}
             onChange={(e) => setSoundClusterId(e.target.value)}
-            className="flex-1 bg-[#1A1A1A] border border-[#383838] rounded px-2 py-1 text-[10px] text-white focus:outline-none focus:border-[#00A8E0]"
+            className="flex-1 bg-[#1A1A1A] border border-[#404040] rounded px-2 py-1 text-[10px] text-white focus:outline-none focus:border-[#E8E8E6]"
           />
           <Btn label="Identify" onClick={runIdentifySound} color="orange" />
         </div>
@@ -667,10 +719,10 @@ function AppStoreExtrasPanel() {
 
 export function BackendPanel() {
   return (
-    <div className="flex flex-col gap-2 p-3 bg-[#121212] h-full overflow-y-auto">
+    <div className="flex flex-col gap-2 p-3 bg-[#111111] h-full overflow-y-auto">
       <div className="flex items-center justify-between mb-1">
-        <p className="text-[10px] font-bold text-[#00A8E0] uppercase tracking-widest">Backend API Explorer</p>
-        <span className="text-[9px] text-[#555]">{env.BACKEND_URL}</span>
+        <p className="text-[10px] font-bold text-[#E8E8E6] uppercase tracking-widest">Backend API Explorer</p>
+        <span className="text-[9px] text-[#4A5E72]">{env.BACKEND_URL}</span>
       </div>
 
       <Section title="Health" icon="💚" defaultOpen>

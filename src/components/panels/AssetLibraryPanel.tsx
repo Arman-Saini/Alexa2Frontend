@@ -30,18 +30,18 @@ export function AssetLibraryPanel() {
   const furnitureCount = ASSET_DEFINITIONS.filter((a) => !a.isAlexaDevice).length;
 
   return (
-    <div className="flex flex-col h-full bg-[#121212] p-3 gap-3">
+    <div className="flex flex-col h-full bg-[#111111] p-3 gap-3">
       {/* Header */}
       <div className="shrink-0">
         <p className="text-xs font-bold text-white mb-0.5">Asset Library</p>
-        <p className="text-[10px] text-[#8A8A8A] leading-snug">
+        <p className="text-[10px] text-[#888888] leading-snug">
           Select a device, then click on the 3D floor to place it.
         </p>
       </div>
 
       {/* Search */}
       <div className="relative shrink-0">
-        <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#8A8A8A]" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+        <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#888888]" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
         </svg>
         <input
@@ -49,12 +49,12 @@ export function AssetLibraryPanel() {
           placeholder="Search assets..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full bg-[#242424] border border-[#383838] rounded-lg pl-8 pr-3 py-1.5 text-xs text-white placeholder-[#8A8A8A] focus:outline-none focus:border-[#00A8E0] transition-colors"
+          className="w-full bg-[#242424] border border-[#404040] rounded-lg pl-8 pr-3 py-1.5 text-xs text-white placeholder-[#888888] focus:outline-none focus:border-[#E8E8E6] transition-colors"
         />
         {search && (
           <button
             onClick={() => setSearch('')}
-            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#8A8A8A] hover:text-white"
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#888888] hover:text-white"
           >
             ×
           </button>
@@ -69,8 +69,8 @@ export function AssetLibraryPanel() {
             onClick={() => setCategory(cat)}
             className={`flex items-center gap-1.5 flex-1 justify-center py-1.5 rounded-lg text-[10px] font-semibold uppercase tracking-wider transition-all ${
               category === cat
-                ? 'bg-[#00A8E0] text-[#121212]'
-                : 'bg-[#242424] text-[#8A8A8A] border border-[#383838] hover:border-[#00A8E0] hover:text-white'
+                ? 'bg-[#E8E8E6] text-[#111111]'
+                : 'bg-[#242424] text-[#888888] border border-[#404040] hover:border-[#E8E8E6] hover:text-white'
             }`}
           >
             <span>{CATEGORY_ICONS[cat]}</span>
@@ -83,7 +83,7 @@ export function AssetLibraryPanel() {
 
       {/* Results count */}
       {search && (
-        <p className="text-[10px] text-[#8A8A8A] shrink-0 -mt-1">
+        <p className="text-[10px] text-[#888888] shrink-0 -mt-1">
           {filtered.length} result{filtered.length !== 1 ? 's' : ''} for "{search}"
         </p>
       )}
@@ -93,7 +93,7 @@ export function AssetLibraryPanel() {
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-32 text-center">
             <span className="text-2xl mb-2">🔍</span>
-            <p className="text-xs text-[#8A8A8A]">No assets match "{search}"</p>
+            <p className="text-xs text-[#888888]">No assets match "{search}"</p>
           </div>
         ) : (
           filtered.map((def) => (
@@ -114,10 +114,10 @@ export function AssetLibraryPanel() {
 
       {/* Active placement hint */}
       {ui.isPlacementMode && (
-        <div className="shrink-0 flex flex-col gap-1 px-3 py-2 bg-[#1A3A4A] border border-[#00A8E0] rounded-lg">
+        <div className="shrink-0 flex flex-col gap-1 px-3 py-2 bg-[#1A3A4A] border border-[#E8E8E6] rounded-lg">
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-[#00A8E0] animate-pulse" />
-            <p className="text-xs text-[#00A8E0] font-semibold">Placement mode active</p>
+            <span className="w-2 h-2 rounded-full bg-[#E8E8E6] animate-pulse" />
+            <p className="text-xs text-[#E8E8E6] font-semibold">Placement mode active</p>
           </div>
           <p className="text-[10px] text-[#6ABEDC] pl-4">
             Click the 3D floor to place · or drag an asset card directly onto the canvas
@@ -154,8 +154,8 @@ function AssetCard({
       title="Click to enter placement mode · Drag onto the 3D canvas to place directly"
       className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all card-hover cursor-grab active:cursor-grabbing ${
         isSelected
-          ? 'bg-[#1A3A4A] border border-[#00A8E0]'
-          : 'bg-[#242424] border border-[#383838] hover:border-[#505050]'
+          ? 'bg-[#1A3A4A] border border-[#E8E8E6]'
+          : 'bg-[#242424] border border-[#404040] hover:border-[#505050]'
       }`}
     >
       {/* Color swatch + emoji */}
@@ -168,21 +168,21 @@ function AssetCard({
 
       <div className="flex-1 min-w-0">
         <p className="text-xs font-semibold text-white truncate">{def.label}</p>
-        <p className="text-[10px] text-[#8A8A8A] truncate leading-tight mt-0.5">
+        <p className="text-[10px] text-[#888888] truncate leading-tight mt-0.5">
           {def.defaultDescription.slice(0, 48)}…
         </p>
         {def.isAlexaDevice && def.defaultState.powerConsumption !== undefined && (
-          <p className="text-[9px] text-[#00A8E0] mt-0.5">⚡ {def.defaultState.powerConsumption}W</p>
+          <p className="text-[9px] text-[#E8E8E6] mt-0.5">⚡ {def.defaultState.powerConsumption}W</p>
         )}
       </div>
 
       {/* Alexa / Furniture badge */}
       {def.isAlexaDevice ? (
-        <span className="shrink-0 text-[9px] bg-[#1A3A4A] text-[#00A8E0] px-1.5 py-0.5 rounded-md font-semibold border border-[#00A8E033]">
+        <span className="shrink-0 text-[9px] bg-[#1A3A4A] text-[#E8E8E6] px-1.5 py-0.5 rounded-md font-semibold border border-[#E8E8E633]">
           Alexa
         </span>
       ) : (
-        <span className="shrink-0 text-[9px] bg-[#242424] text-[#8A8A8A] px-1.5 py-0.5 rounded-md border border-[#383838]">
+        <span className="shrink-0 text-[9px] bg-[#242424] text-[#888888] px-1.5 py-0.5 rounded-md border border-[#404040]">
           Furniture
         </span>
       )}

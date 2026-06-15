@@ -1,4 +1,4 @@
-// TierBadge — shows T0/T1/T3/CACHED result with latency + cost
+// TierBadge , shows T0/T1/T3/CACHED result with latency + cost
 // Animated entrance, color-coded, used after every simulate/voice event.
 
 interface TierBadgeProps {

@@ -11,7 +11,7 @@ const TIER_BADGE: Record<string, { label: string; color: string; bg: string }> =
 };
 
 const MODE_COLORS: Record<string, string> = {
-  normal: '#00A8E0',
+  normal: '#E8E8E6',
   festival: '#FF6B35',
   guest: '#9B59B6',
   sleep: '#34495E',
@@ -56,7 +56,7 @@ function AnticipationCard({ item }: { item: Anticipation }) {
           <ConfidenceDot confidence={item.confidence} />
         </div>
       </div>
-      <p className="text-[10px] text-[#8A8A8A] leading-relaxed">{item.reason}</p>
+      <p className="text-[10px] text-[#888888] leading-relaxed">{item.reason}</p>
       {item.trigger_window && (
         <p className="text-[9px] text-[#555] mt-0.5">⏰ {item.trigger_window}</p>
       )}
@@ -65,7 +65,7 @@ function AnticipationCard({ item }: { item: Anticipation }) {
 }
 
 function TwinModePill({ mode }: { mode: string }) {
-  const color = MODE_COLORS[mode] ?? '#00A8E0';
+  const color = MODE_COLORS[mode] ?? '#E8E8E6';
   const labels: Record<string, string> = {
     normal: '🏠 Normal',
     festival: '🎉 Festival',
@@ -112,11 +112,11 @@ export function AnticipationsPanel() {
       const res = await fn();
       const msg = (res as { message?: string }).message ?? 'done';
       setSimResults((r) => ({ ...r, [key]: msg }));
-      addNotification(`⚡ ${ALL_SIMS.find(s => s.key === key)?.label} — ${msg}`, 'info');
+      addNotification(`⚡ ${ALL_SIMS.find(s => s.key === key)?.label} , ${msg}`, 'info');
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'error';
       setSimResults((r) => ({ ...r, [key]: `Error: ${msg}` }));
-      addNotification(`Backend offline — ${key} skipped`, 'warning');
+      addNotification(`Backend offline , ${key} skipped`, 'warning');
     }
   };
 
@@ -128,7 +128,7 @@ export function AnticipationsPanel() {
         style={{ background: '#0D0D18', borderColor: '#2A2A36' }}
       >
         <div>
-          <p className="text-[10px] text-[#8A8A8A] uppercase tracking-wider font-semibold mb-1">
+          <p className="text-[10px] text-[#888888] uppercase tracking-wider font-semibold mb-1">
             Digital Twin Mode
           </p>
           {twinData ? (
@@ -138,15 +138,15 @@ export function AnticipationsPanel() {
           )}
         </div>
         {twinData?.mode_info && (
-          <p className="text-[10px] text-[#8A8A8A] max-w-[120px] text-right leading-relaxed">
+          <p className="text-[10px] text-[#888888] max-w-[120px] text-right leading-relaxed">
             {twinData.mode_info.description}
           </p>
         )}
       </div>
 
-      {/* Simulate buttons — all 8 endpoints */}
+      {/* Simulate buttons , all 8 endpoints */}
       <div>
-        <p className="text-[10px] text-[#8A8A8A] uppercase tracking-wider font-semibold mb-2 px-1">
+        <p className="text-[10px] text-[#888888] uppercase tracking-wider font-semibold mb-2 px-1">
           Simulate Events
         </p>
         <div className="flex flex-col gap-1.5">
@@ -157,7 +157,7 @@ export function AnticipationsPanel() {
                   value={voiceText}
                   onChange={(e) => setVoiceText(e.target.value)}
                   placeholder="Voice command text…"
-                  className="w-full mb-1 bg-[#1A1A26] border border-[#2A2A36] rounded-lg px-3 py-1.5 text-[10px] text-white placeholder-[#555] focus:outline-none focus:border-[#00A8E0]"
+                  className="w-full mb-1 bg-[#1A1A26] border border-[#2A2A36] rounded-lg px-3 py-1.5 text-[10px] text-white placeholder-[#555] focus:outline-none focus:border-[#E8E8E6]"
                 />
               )}
               <button
@@ -180,13 +180,13 @@ export function AnticipationsPanel() {
       {/* Anticipations */}
       <div className="flex-1">
         <div className="flex items-center justify-between mb-2 px-1">
-          <p className="text-[10px] text-[#8A8A8A] uppercase tracking-wider font-semibold">
+          <p className="text-[10px] text-[#888888] uppercase tracking-wider font-semibold">
             AI Anticipations
           </p>
           <button
             onClick={refetch}
             disabled={loading}
-            className="text-[9px] text-[#555] hover:text-[#8A8A8A] transition-colors disabled:opacity-40"
+            className="text-[9px] text-[#555] hover:text-[#888888] transition-colors disabled:opacity-40"
           >
             {loading ? 'Loading…' : '↻ Refresh'}
           </button>

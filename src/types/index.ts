@@ -15,7 +15,7 @@ export interface WallSegment {
   fromId: string;
   toId: string;
   height: number;
-  sharedBy: string[]; // room IDs — length 1 = exterior, 2 = interior divider
+  sharedBy: string[]; // room IDs , length 1 = exterior, 2 = interior divider
 }
 
 export type AlexaDeviceType =
@@ -32,6 +32,7 @@ export type AlexaDeviceType =
   | 'ceiling-fan'
   | 'doorbell'
   | 'air-purifier'
+  | 'floor-lamp'
   | 'geyser'
   | 'water-motor'
   | 'pressure-cooker';
@@ -80,6 +81,7 @@ export interface PlacedObject {
   parentRoomId: string | null;
   isAlexaDevice: boolean;
   alexaDeviceState: AlexaDeviceState;
+  alexaDeviceId?: string;  // matches backend device_id for live state sync
   color?: string;
 }
 

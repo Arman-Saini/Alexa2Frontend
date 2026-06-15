@@ -18,7 +18,7 @@ const TABS: { id: ActivePanel; label: string; icon: React.ReactNode }[] = [
       <div
         className="w-4 h-4 rounded-full flex items-center justify-center"
         style={{
-          background: 'conic-gradient(from 0deg, #005580, #00A8E0, #00CAFF, #0080B0, #005580)',
+          background: 'conic-gradient(from 0deg, #005580, #E8E8E6, #F0F0EE, #0080B0, #005580)',
         }}
       >
         <div className="w-2.5 h-2.5 rounded-full bg-[#1A1A1A]" />
@@ -69,25 +69,25 @@ export function PanelTabs() {
   const unreadNotifs = notifications.length;
 
   return (
-    <div className="flex bg-[#1A1A1A] border-b border-[#383838] shrink-0">
+    <div className="flex bg-[#1A1A1A] border-b border-[#404040] shrink-0">
       {TABS.map((tab) => {
         const isActive = ui.activePanel === tab.id;
         return (
           <button
             key={tab.id}
             onClick={() => setActivePanel(tab.id)}
-            className={`relative flex-1 flex flex-col items-center justify-center gap-1 py-2.5 text-[10px] font-medium transition-all ${
+            className={`relative flex-1 flex flex-col items-center justify-center gap-1.5 py-3 text-[10px] font-medium transition-all ${
               isActive
-                ? 'text-[#00A8E0] bg-[#121212]'
-                : 'text-[#8A8A8A] hover:text-white hover:bg-[#242424]'
+                ? 'text-[#E8E8E6] bg-[#111111]'
+                : 'text-[#888888] hover:text-white hover:bg-[#242424]'
             }`}
           >
-            <span className={isActive ? 'text-[#00A8E0]' : 'text-[#8A8A8A]'}>{tab.icon}</span>
-            <span className="uppercase tracking-wider">{tab.label}</span>
+            <span className={isActive ? 'text-[#E8E8E6]' : 'text-[#888888]'}>{tab.icon}</span>
+            <span className="uppercase tracking-widest" style={{ letterSpacing: '0.08em' }}>{tab.label}</span>
 
             {/* Active underline */}
             {isActive && (
-              <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-6 h-0.5 bg-[#00A8E0] rounded-t" />
+              <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-6 h-0.5 bg-[#E8E8E6] rounded-t" />
             )}
 
             {/* Badge: notification count on Alexa tab */}
@@ -99,7 +99,7 @@ export function PanelTabs() {
 
             {/* Badge: selection indicator on Inspector tab */}
             {tab.id === 'inspector' && hasSelected && !isActive && (
-              <span className="absolute top-1.5 right-3 w-2 h-2 bg-[#00A8E0] rounded-full" />
+              <span className="absolute top-1.5 right-3 w-2 h-2 bg-[#E8E8E6] rounded-full" />
             )}
           </button>
         );

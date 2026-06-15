@@ -48,7 +48,7 @@ async function resolveBackendUrl(): Promise<void> {
   const primary = env.BACKEND_URL;
 
   if (primary === LOCALHOST) {
-    // Dev environment — only check localhost
+    // Dev environment , only check localhost
     const alive = await tryHealth(LOCALHOST, 2000);
     backendState.url = LOCALHOST;
     backendState.source = alive ? 'local' : 'offline';
@@ -67,7 +67,7 @@ async function resolveBackendUrl(): Promise<void> {
     return;
   }
 
-  // Deployed is down — fall back to localhost
+  // Deployed is down , fall back to localhost
   const localAlive = await tryHealth(LOCALHOST, 1500);
   backendState.url = localAlive ? LOCALHOST : primary;
   backendState.source = localAlive ? 'local' : 'offline';
