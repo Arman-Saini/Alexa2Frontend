@@ -20,9 +20,9 @@ interface TourStep {
 const STEPS: TourStep[] = [
   {
     id: 'welcome',
-    title: 'Alexa+ India , Smart Home AI',
-    body: 'This is a live digital twin of a smart Indian home. Every panel here connects to a real backend. You\'ll learn what each part does and why , click Next or press the right arrow key.',
-    badge: 'WELCOME',
+    title: 'Alexa+ India',
+    body: 'Over 600 million Alexa devices have been sold worldwide, yet most households use only a fraction of capabilities. The average user sticks to music, alarms, and weather.\n\nThe core problem is device connection. Every vendor speaks a different protocol, making integration hard for both developers and users. We solve this with an MCP-style integration framework where any device is registered once and immediately available as a standardised capability across all automations.\n\nOn top of that: a three-tier compute model runs most decisions locally, cultural awareness built for Indian households, and a privacy-first design where every automation is explainable and user-controlled.\n\nClick Next to see how each part works.',
+    badge: 'AMAZON HACKATHON 2025',
     badgeColor: C.cyan,
   },
   {
@@ -170,11 +170,11 @@ export function GuidedTour({ onClose }: Props) {
   const cardStyle  = cardPosition(targetRect);
 
   const next = () => {
-    if (isLast) { onClose(); localStorage.setItem(TOUR_KEY, '1'); }
+    if (isLast) { onClose(); sessionStorage.setItem(TOUR_KEY, '1'); }
     else setStep(s => s + 1);
   };
   const prev = () => setStep(s => Math.max(0, s - 1));
-  const skip = () => { onClose(); localStorage.setItem(TOUR_KEY, '1'); };
+  const skip = () => { onClose(); sessionStorage.setItem(TOUR_KEY, '1'); };
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -251,6 +251,7 @@ export function GuidedTour({ onClose }: Props) {
       <div
         style={{
           ...cardStyle,
+          ...(step === 0 ? { width: Math.min(560, window.innerWidth - 40), left: '50%', transform: 'translate(-50%, -50%)' } : {}),
           zIndex: 9003,
           background: C.surface,
           border: `1px solid ${C.border2}`,
@@ -355,5 +356,5 @@ export function GuidedTour({ onClose }: Props) {
 }
 
 export function shouldShowTour(): boolean {
-  try { return !localStorage.getItem(TOUR_KEY); } catch { return false; }
+  try { return !sessionStorage.getItem(TOUR_KEY); } catch { return false; }
 }
