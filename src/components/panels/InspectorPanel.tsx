@@ -159,16 +159,33 @@ function ObjectForm({
         </Field>
 
         {/* Position */}
-        <Field label="Position (X / Y / Z)">
-          <div className="flex gap-1.5">
+        <div className="flex flex-col gap-1.5 pt-1 border-t border-[#404040]">
+          <p className="text-[10px] font-bold text-[#E8E8E6] uppercase tracking-wider">Position</p>
+          <SliderField
+            label="X (West ← → East)"
+            value={parseFloat(obj.position.x.toFixed(2))}
+            min={-13} max={13} step={0.1}
+            unit="m"
+            color="#4FC3F7"
+            onChange={(v) => onUpdate(obj.id, { position: { ...obj.position, x: v } })}
+          />
+          <SliderField
+            label="Z (North ↑ ↓ South)"
+            value={parseFloat(obj.position.z.toFixed(2))}
+            min={-10} max={10} step={0.1}
+            unit="m"
+            color="#A5D6A7"
+            onChange={(v) => onUpdate(obj.id, { position: { ...obj.position, z: v } })}
+          />
+          <div className="flex gap-1.5 mt-0.5">
             {(['x', 'y', 'z'] as const).map((axis) => (
-              <div key={axis} className="flex-1 bg-[#1A1A1A] border border-[#404040] rounded-lg px-2 py-1.5 text-xs text-[#888888]">
+              <div key={axis} className="flex-1 bg-[#1A1A1A] border border-[#333] rounded-lg px-2 py-1 text-xs text-[#888888]">
                 <span className="text-[#555] uppercase text-[9px]">{axis} </span>
-                <span className="text-white">{obj.position[axis].toFixed(2)}</span>
+                <span className="text-[#E8E8E6]">{obj.position[axis].toFixed(2)}</span>
               </div>
             ))}
           </div>
-        </Field>
+        </div>
 
         {/* Alexa device controls */}
         {obj.isAlexaDevice && (
