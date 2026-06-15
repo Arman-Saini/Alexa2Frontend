@@ -1,4 +1,4 @@
-// Base HTTP client — all API modules use this instead of raw fetch.
+// Base HTTP client , all API modules use this instead of raw fetch.
 // Handles: base URL injection, timeout, JSON serialisation, error normalisation, debug logging.
 
 import { backendState } from '../config/backendState';
@@ -10,7 +10,7 @@ export class ApiError extends Error {
   url: string;
 
   constructor(status: number, statusText: string, body: unknown, url: string) {
-    super(`API ${status} ${statusText} — ${url}`);
+    super(`API ${status} ${statusText} , ${url}`);
     this.name = 'ApiError';
     this.status = status;
     this.statusText = statusText;

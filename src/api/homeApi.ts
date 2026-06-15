@@ -74,6 +74,11 @@ export const homeApi = {
   getDevices: (homeId = env.HOME_ID) =>
     apiClient.get<{ devices: HomeDevice[] }>(endpoints.homeDevices(homeId)),
 
+  registerDevice: (
+    homeId = env.HOME_ID,
+    payload: { device_id: string; name: string; type: string; room_id?: string; state?: Record<string, unknown> }
+  ) => apiClient.post<{ success: boolean; device?: HomeDevice }>(endpoints.homeDevices(homeId), payload),
+
   seedHome: (homeId = env.HOME_ID) =>
     apiClient.post<{ success: boolean; message: string }>(endpoints.seedHome(homeId)),
 

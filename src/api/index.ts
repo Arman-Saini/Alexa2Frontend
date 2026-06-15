@@ -1,4 +1,4 @@
-// Barrel export — import from '@/api' (or '../../api') to access all API modules.
+// Barrel export , import from '@/api' (or '../../api') to access all API modules.
 // Never import directly from sub-modules in components or hooks.
 
 export { apiClient, ApiError } from './client';

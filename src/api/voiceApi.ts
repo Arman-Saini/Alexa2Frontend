@@ -5,13 +5,37 @@ import { endpoints } from './endpoints';
 
 export interface TranscribeResponse {
   transcript: string;
-  stt_is_mock: boolean;
-  language: string;
+  stt_is_mock?: boolean;
+  language?: string;
   audio_path?: string;
+  spoken_text?: string;
+  voice?: {
+    audio_base64?: string;
+    content_type?: string;
+    is_mock?: boolean;
+    voice_used?: string;
+  };
   event_result?: {
     tier: string;
-    message: string;
+    cost?: string;
+    message?: string;
+    spoken_text?: string;
+    voice?: {
+      audio_base64?: string;
+      content_type?: string;
+      is_mock?: boolean;
+    };
+    result?: {
+      reasoning?: string;
+      explanation?: string;
+      action?: string;
+      intent?: string;
+      final_plan?: string;
+      specialist?: string;
+      [key: string]: unknown;
+    };
     actions_taken?: unknown[];
+    [key: string]: unknown;
   };
 }
 
@@ -25,13 +49,16 @@ export interface TtsResponse {
 // ── API functions ─────────────────────────────────────────────────────────────
 
 export const voiceApi = {
-  // Send typed text to the backend STT pipeline (mock mode — no real audio upload)
-  transcribeMockText: (text: string, autoRoute = true) =>
+  // Send typed text to the backend STT pipeline (mock mode , no real audio upload)
+  transcribeMockText: (text: string, autoRoute = true, homeId?: string) =>
     apiClient.post<TranscribeResponse>(endpoints.transcribe, {
-      mock_text: text,
+      home_id:    homeId,
+      mock_text:  text,
       auto_route: autoRoute,
-      language: 'en-IN',
-    }),
+      language:   'en-IN',
+      speaker_id: 'owner_1',
+      voice_response: true,
+    }, { timeoutMs: 45_000 }),
 
   // Upload a real audio Blob recorded from the browser mic
   transcribeAudio: (audioBlob: Blob, autoRoute = true) => {
@@ -42,7 +69,7 @@ export const voiceApi = {
     return apiClient.postForm<TranscribeResponse>(endpoints.transcribe, form);
   },
 
-  // Text-to-speech — returns audio URL or base64
+  // Text-to-speech , returns audio URL or base64
   synthesise: (text: string, voice?: string) =>
     apiClient.post<TtsResponse>(endpoints.tts, { text, voice }),
 };
