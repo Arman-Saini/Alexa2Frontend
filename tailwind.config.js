@@ -3,23 +3,28 @@ export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
+      fontFamily: {
+        'encode': ['Encode Sans', 'sans-serif'],
+        'work': ['Work Sans', 'sans-serif'],
+        sans: ['Encode Sans', 'Work Sans', 'Inter', 'system-ui', 'sans-serif'],
+      },
       colors: {
         alexa: {
-          // Real Alexa app palette
-          blue: '#00A8E0',        // Alexa cyan-blue
-          ring: '#00CAFF',        // Ring glow (brighter)
-          dark: '#121212',        // App background
-          surface: '#1A1A1A',     // Surface / side panel
-          card: '#242424',        // Card background
-          card2: '#2E2E2E',       // Elevated card
-          border: '#383838',      // Subtle borders
-          text: '#FFFFFF',
-          muted: '#8A8A8A',       // Secondary text
-          accent: '#1A3A4A',      // Highlight accent bg
-          green: '#1DB954',       // On/success
-          orange: '#FF8C00',      // Warning / routines
-          red: '#F44336',         // Alert
-          purple: '#7B2FBE',      // Scenes
+          // Salt & Pepper palette
+          blue:    '#E8E8E6',   // salt — primary accent
+          ring:    '#F0F0EE',   // bright salt
+          dark:    '#111111',   // pepper black — app bg
+          surface: '#1A1A1A',   // dark pepper
+          card:    '#242424',   // card
+          card2:   '#333333',   // elevated card
+          border:  '#404040',   // border
+          text:    '#F0F0EE',   // salt white — primary text
+          muted:   '#888888',   // mid gray
+          accent:  '#1E1E1E',   // accent bg
+          green:   '#5A9A5A',   // muted sage
+          orange:  '#A07848',   // muted tan
+          red:     '#A03030',   // muted red
+          purple:  '#606080',   // muted slate
         },
       },
       animation: {
@@ -34,8 +39,8 @@ export default {
           '50%': { opacity: '1', transform: 'scale(1.05)' },
         },
         ringListen: {
-          '0%, 100%': { opacity: '1', transform: 'scale(1)', boxShadow: '0 0 0 0 rgba(0,168,224,0.5)' },
-          '50%': { opacity: '1', transform: 'scale(1.08)', boxShadow: '0 0 0 12px rgba(0,168,224,0)' },
+          '0%, 100%': { opacity: '1', transform: 'scale(1)', boxShadow: '0 0 0 0 rgba(201,168,76,0.5)' },
+          '50%': { opacity: '1', transform: 'scale(1.08)', boxShadow: '0 0 0 12px rgba(201,168,76,0)' },
         },
         fadeIn: {
           from: { opacity: '0' },
