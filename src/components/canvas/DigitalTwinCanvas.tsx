@@ -146,7 +146,7 @@ export function DigitalTwinCanvas() {
     >
       <Canvas
         orthographic
-        shadows
+        shadows={{ type: THREE.PCFShadowMap }}
         camera={{ position: [22, 20, 22], zoom: 22, near: -500, far: 500 }}
         gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
         style={{ background: '#1a1a2e' }}

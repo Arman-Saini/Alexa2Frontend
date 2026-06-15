@@ -118,7 +118,8 @@ export function RoomMesh({ room, isActive, isHovered }: RoomMeshProps) {
         position={[0, 0.05, 0]}
         rotation={[-Math.PI / 2, 0, 0]}
         fontSize={isActive ? 0.52 : 0.42}
-        color={isActive ? '#ffffff' : isHovered ? '#ffffff' : '#ffffffcc'}
+        color="#ffffff"
+        fillOpacity={isActive ? 1 : isHovered ? 1 : 0.8}
         anchorX="center"
         anchorY="middle"
         maxWidth={room.width - 1}
