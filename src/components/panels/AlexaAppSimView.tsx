@@ -39,7 +39,7 @@ function AlexaRing({ onVoiceSubmit }: { onVoiceSubmit: (text: string) => void })
   const [micError, setMicError] = useState<string | null>(null);
   const [interimText, setInterimText] = useState('');
   const executeVoiceCommand = useAppStore((s) => s.executeVoiceCommand);
-  const addNotification = useAppStore((s) => s.addNotification);
+
   const { sendMockText, isProcessing } = useBackendVoice();
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -140,14 +140,15 @@ function AlexaRing({ onVoiceSubmit }: { onVoiceSubmit: (text: string) => void })
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
       if (event.error === 'no-speech') { setInterimText(''); return; }
       const msg = event.error === 'not-allowed'
-        ? 'Mic denied — click the lock icon in your browser address bar'
+        ? 'Mic access denied — allow microphone in browser settings'
         : event.error === 'network'
-        ? 'Network error — check internet connection'
+        ? 'Voice STT unavailable — type your command below instead'
         : `Voice error: ${event.error}`;
       setMicError(msg);
       setIsRecording(false);
       setListeningVoice(false);
-      addNotification('🎤 ' + msg, 'alert');
+      // Auto-focus the text input so demo can continue without voice
+      setTimeout(() => inputRef.current?.focus(), 100);
     };
 
     recognition.onend = () => {
