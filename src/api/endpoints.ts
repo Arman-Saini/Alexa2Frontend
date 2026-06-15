@@ -22,7 +22,7 @@ export const endpoints = {
 
   // ── Voice ─────────────────────────────────────────────────────────
   transcribe: '/api/voice/transcribe',
-  tts: '/api/voice/tts',
+  tts: '/api/voice/speak',
 
   // ── Simulate ──────────────────────────────────────────────────────
   simulateStudyMode: '/api/simulate/study_mode',
