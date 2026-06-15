@@ -2,8 +2,11 @@ import { useRef } from 'react';
 import { useAppStore } from '../../store/store';
 
 export function Header() {
-  const { ui, setActiveRoom, exportState, importState, rooms, placedObjects, toggleMiniMap } = useAppStore();
-  const { activeRoomId, isPlacementMode } = ui;
+  const {
+    ui, setActiveRoom, exportState, importState, rooms, placedObjects,
+    toggleMiniMap, enterLayoutEditMode, exitLayoutEditMode, lockLayout,
+  } = useAppStore();
+  const { activeRoomId, isPlacementMode, isLayoutEditMode, layoutLocked } = ui;
   const activeRoom = rooms.find((r) => r.id === activeRoomId);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -97,6 +100,39 @@ export function Header() {
           <span className="text-[10px] bg-[#00A8E0] text-[#121212] px-2 py-1 rounded-lg font-bold animate-pulse">
             PLACING
           </span>
+        )}
+
+        {/* Layout Edit / Lock controls */}
+        {layoutLocked ? (
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#1A1000] border border-[#FF8C00] text-[10px] text-[#FF8C00] font-semibold">
+            🔒 Locked
+          </div>
+        ) : isLayoutEditMode ? (
+          <div className="flex items-center gap-1">
+            <button
+              onClick={lockLayout}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#FF8C00] text-black text-[10px] font-bold hover:bg-[#FFA030] transition-colors"
+            >
+              🔒 Lock Layout
+            </button>
+            <button
+              onClick={exitLayoutEditMode}
+              className="px-2 py-1 rounded-lg bg-[#242424] border border-[#FF8C0066] text-[10px] text-[#FF8C00] hover:border-[#FF8C00] transition-colors"
+            >
+              Exit Edit
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={enterLayoutEditMode}
+            title="Edit layout — drag objects to reposition"
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#242424] border border-[#383838] text-[10px] text-[#8A8A8A] hover:text-[#FF8C00] hover:border-[#FF8C0066] transition-colors"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+            </svg>
+            Edit Layout
+          </button>
         )}
 
         {/* Minimap toggle */}

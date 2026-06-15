@@ -4,9 +4,7 @@ import { Grid } from '@react-three/drei';
 import * as THREE from 'three';
 import { useAppStore } from '../../store/store';
 import { RoomMesh } from './RoomMesh';
-import { PlacedObjectMesh } from './PlacedObjectMesh';
 import { ConnectedWalls } from './ConnectedWalls';
-import { TOON_GRADIENT } from './ToonMaterial';
 
 // Sims-style grass ground outside the house footprint
 function GroundPlane() {
@@ -38,14 +36,11 @@ function GroundPlane() {
 }
 
 export function House() {
-  const { ui, rooms, placedObjects, addPlacedObject, exitPlacementMode, setActiveRoom } = useAppStore();
+  const { ui, rooms, addPlacedObject, exitPlacementMode, setActiveRoom } = useAppStore();
   const { activeRoomId, isPlacementMode, placementAssetType, hoveredRoomId } = ui;
   const groundRef = useRef<THREE.Mesh>(null);
 
   const visibleRooms = activeRoomId ? rooms.filter(r => r.id === activeRoomId) : rooms;
-  const visibleObjects = activeRoomId
-    ? placedObjects.filter(o => o.parentRoomId === activeRoomId)
-    : placedObjects;
 
   const isInsideHouse = (x: number, z: number) =>
     rooms.some((room) => {
@@ -120,11 +115,6 @@ export function House() {
           isActive={activeRoomId === room.id}
           isHovered={hoveredRoomId === room.id}
         />
-      ))}
-
-      {/* Placed objects */}
-      {visibleObjects.map(obj => (
-        <PlacedObjectMesh key={obj.id} obj={obj} />
       ))}
     </group>
   );
