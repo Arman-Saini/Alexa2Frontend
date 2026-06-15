@@ -64,10 +64,6 @@ function byType(objects: PlacedObject[], type: string, roomId?: string | null): 
   );
 }
 
-function setOn(objects: PlacedObject[], type: string, on: boolean, roomId?: string | null, extra?: Partial<AlexaDeviceState>) {
-  return byType(objects, type, roomId).map(o => ({ id: o.id, changes: { isOn: on, ...extra } }));
-}
-
 function applyTo(objects: PlacedObject[], type: string, changes: Partial<AlexaDeviceState>, roomId?: string | null) {
   return byType(objects, type, roomId).map(o => ({ id: o.id, changes }));
 }
@@ -438,7 +434,6 @@ export function processCommand(raw: string, objects: PlacedObject[]): CommandRes
     }
 
     if (action !== null) {
-      const fans = room ? byType(objects, 'ceiling-fan', room) : byType(objects, 'ceiling-fan');
       const label = room ? ROOM_LABEL[room] + ' ' : '';
       return {
         matched: true, tier: room ? 'T1_LOCAL' : 'T0_LOCAL',
