@@ -1,7 +1,7 @@
-// WebSocket hook — connects to the backend WS and dispatches events to the store.
 import { useEffect, useRef, useCallback } from 'react';
-import { backendState } from '../config/backendState';
+import { backendState, onBackendResolved } from '../config/backendState';
 import { useAppStore } from '../store/store';
+import { env } from '../config/env';
 
 export type WsMessageType =
   | 'event_result'
@@ -21,11 +21,22 @@ export function useWebSocket() {
   const addNotification = useAppStore((s) => s.addNotification);
   const reconnectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wsCallbacksRef = useRef<Array<(msg: WsMessage) => void>>([]);
+  const mountedRef = useRef(true);
 
   const connect = useCallback(() => {
+    if (!mountedRef.current) return;
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
-    const wsUrl = backendState.url.replace(/^http/, 'ws') + `/ws?home_id=${import.meta.env.VITE_HOME_ID ?? 'home_001'}`;
+    // Wait until the backend probe completes before attempting WS
+    if (!backendState.isResolved) {
+      onBackendResolved(() => { if (mountedRef.current) connect(); });
+      return;
+    }
+
+    // If backend is unreachable, don't spam connection attempts
+    if (backendState.source === 'offline') return;
+
+    const wsUrl = backendState.url.replace(/^http/, 'ws') + `/ws?home_id=${env.HOME_ID}`;
 
     try {
       const ws = new WebSocket(wsUrl);
@@ -40,23 +51,20 @@ export function useWebSocket() {
           const msg: WsMessage = JSON.parse(e.data);
           if (msg.type === 'ping') return;
 
-          // Dispatch to all registered callbacks
           wsCallbacksRef.current.forEach((cb) => cb(msg));
 
-          // Handle known message types globally
           if (msg.type === 'regime_change' && msg.payload) {
             const regime = msg.payload.new_regime as string;
-            const emoji = regimeEmoji(regime);
-            addNotification(`${emoji} Regime changed to ${regime}`, 'info');
+            addNotification(`Home mode changed to ${regime}`, 'info');
           }
 
           if (msg.type === 'rule_proposed' && msg.payload) {
-            addNotification(`⚡ New rule proposed: "${msg.payload.title ?? 'Auto rule'}"`, 'success');
+            addNotification(`New rule proposed: "${msg.payload.title ?? 'Auto rule'}"`, 'success');
           }
 
           if (msg.type === 'device_update' && msg.payload) {
             const { device_id, property, new_value } = msg.payload;
-            addNotification(`🔧 ${device_id}: ${property} → ${new_value}`, 'info');
+            addNotification(`${device_id}: ${property} → ${new_value}`, 'info');
           }
         } catch {
           // ignore malformed messages
@@ -65,21 +73,24 @@ export function useWebSocket() {
 
       ws.onclose = () => {
         wsRef.current = null;
-        // Reconnect after 5s
-        reconnectRef.current = setTimeout(connect, 5000);
+        if (!mountedRef.current) return;
+        // Reconnect after 8s — longer gap to reduce noise when server is down
+        reconnectRef.current = setTimeout(connect, 8000);
       };
 
       ws.onerror = () => {
         ws.close();
       };
     } catch {
-      // WebSocket not available
+      // WebSocket API not available
     }
   }, [addNotification]);
 
   useEffect(() => {
+    mountedRef.current = true;
     connect();
     return () => {
+      mountedRef.current = false;
       if (reconnectRef.current) clearTimeout(reconnectRef.current);
       wsRef.current?.close();
     };
@@ -95,15 +106,4 @@ export function useWebSocket() {
   const isConnected = wsRef.current?.readyState === WebSocket.OPEN;
 
   return { subscribe, isConnected };
-}
-
-function regimeEmoji(regime: string) {
-  const map: Record<string, string> = {
-    normal: '🟢',
-    festival: '🎉',
-    guest: '👤',
-    sleep: '🌙',
-    away: '🏠',
-  };
-  return map[regime] ?? '⚙️';
 }

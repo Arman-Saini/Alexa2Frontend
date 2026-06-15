@@ -14,15 +14,18 @@ body,
   width: 100%;
   height: 100%;
   overflow: hidden;
-  font-family: 'Amazon Ember', 'Segoe UI', system-ui, Roboto, sans-serif;
-  background: #121212;
-  color: #ffffff;
+  font-family: 'Amazon Ember', 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: #090A13;
+  color: #DDE0EF;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-size: 14px;
 }
 
-/* Alexa-style scrollbar */
-::-webkit-scrollbar { width: 3px; }
+/* Premium scrollbar */
+::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #383838; border-radius: 2px; }
+::-webkit-scrollbar-thumb { background: #1C1F36; border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: #00A8E0; }
 
 /* Canvas cursors */
