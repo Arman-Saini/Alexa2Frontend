@@ -60,22 +60,10 @@ export function LiveWaveform({ isListening, barCount = 20 }: { isListening: bool
     streamRef.current = null;
   }, []);
 
-  // Idle random animation — always running when not listening
+  // When not listening — reset to flat static bars
   useEffect(() => {
     if (isListening) return;
-    let t = 0;
-    const noise = Array.from({ length: barCount }, () => Math.random() * Math.PI * 2);
-    const idle = () => {
-      t += 0.025;
-      setBars(Array.from({ length: barCount }, (_, i) => {
-        const slow = 0.13 + 0.07 * Math.sin(t * 0.7 + i * 0.5);
-        const fast = 0.04 * Math.sin(t * 2.3 + noise[i]);
-        return Math.max(0.06, slow + fast);
-      }));
-      animRef.current = requestAnimationFrame(idle);
-    };
-    animRef.current = requestAnimationFrame(idle);
-    return () => { if (animRef.current) cancelAnimationFrame(animRef.current); };
+    setBars(Array(barCount).fill(0.12));
   }, [isListening, barCount]);
 
   // Mic-reactive animation — only when listening
