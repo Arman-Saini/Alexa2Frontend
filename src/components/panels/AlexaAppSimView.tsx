@@ -2,11 +2,9 @@ import { useState, useRef } from 'react';
 import { useAppStore } from '../../store/store';
 import { ASSET_MAP } from '../../constants/assets';
 import { useBackendVoice } from '../../hooks/useBackendApi';
-import type { ProcessingTier } from '../../hooks/useBackendApi';
-import { voiceApi, ApiError } from '../../api';
 import type { PlacedObject, AlexaNotification } from '../../types';
 
-// ── Top Status Bar ────────────────────────────────────────────────────────────
+// ─── Top Status Bar ───────────────────────────────────────────────────────────
 function StatusBar() {
   const now = new Date();
   // Force 24h "HH:MM" format so it never shows a dot-separated locale time
@@ -34,88 +32,49 @@ function AlexaRing({ onVoiceSubmit }: { onVoiceSubmit: (text: string) => void })
   const { ui, setListeningVoice } = useAppStore();
   const [inputText, setInputText] = useState('');
   const [response, setResponse] = useState('');
-  const [tier, setTier] = useState<ProcessingTier>(null);
-  const [backendMode, setBackendMode] = useState(true);
+  const [backendMode, setBackendMode] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [micError, setMicError] = useState<string | null>(null);
   const [interimText, setInterimText] = useState('');
   const executeVoiceCommand = useAppStore((s) => s.executeVoiceCommand);
   const addNotification = useAppStore((s) => s.addNotification);
-  const { sendToBackend, isProcessing } = useBackendVoice();
+  const { sendAudio, sendMockText, isProcessing } = useBackendVoice();
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Pick the best available voice: neural/online > Google > any English
-  const pickVoice = (voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | undefined => {
-    const en = voices.filter(v => v.lang.startsWith('en'));
-    return (
-      en.find(v => /aria.*natural|natural.*aria/i.test(v.name)) ??       // MS Aria Neural (Edge/Win)
-      en.find(v => /jenny.*natural|natural.*jenny/i.test(v.name)) ??     // MS Jenny Neural
-      en.find(v => /zira.*natural|natural.*zira/i.test(v.name)) ??
-      en.find(v => v.name.toLowerCase().includes('online')) ??            // any online neural
-      en.find(v => v.name === 'Google UK English Female') ??
-      en.find(v => v.name === 'Google US English') ??
-      en.find(v => v.lang === 'en-US') ??
-      en[0]
-    );
-  };
-
-  // Cross-browser speechSynthesis with neural voice selection
   const speak = (text: string) => {
     if (!window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
     const utt = new SpeechSynthesisUtterance(text);
     utt.lang = 'en-US';
-    utt.rate = 1.05;
+    utt.rate = 1.0;
     utt.pitch = 1.0;
     utt.volume = 1.0;
-
+    const pickVoice = () => {
+      const voices = window.speechSynthesis.getVoices();
+      return (
+        voices.find(v => /Aria|Jenny/i.test(v.name) && v.lang.startsWith('en')) ??
+        voices.find(v => /Natural|Neural|Online/i.test(v.name) && v.lang.startsWith('en')) ??
+        voices.find(v => v.name === 'Google UK English Female') ??
+        voices.find(v => v.name === 'Google US English') ??
+        voices.find(v => v.lang === 'en-US') ??
+        voices.find(v => v.lang.startsWith('en')) ??
+        null
+      );
+    };
     const doSpeak = () => {
-      const voice = pickVoice(window.speechSynthesis.getVoices());
+      const voice = pickVoice();
       if (voice) utt.voice = voice;
-      window.speechSynthesis.cancel();
       window.speechSynthesis.speak(utt);
     };
-
-    if (window.speechSynthesis.getVoices().length > 0) {
-      doSpeak();
+    if (window.speechSynthesis.getVoices().length === 0) {
+      window.speechSynthesis.addEventListener('voiceschanged', doSpeak, { once: true });
     } else {
-      // Firefox: voices aren't ready synchronously — wait for the event
-      window.speechSynthesis.onvoiceschanged = () => {
-        window.speechSynthesis.onvoiceschanged = null;
-        doSpeak();
-      };
+      doSpeak();
     }
-  };
-
-  // Keep response short: take up to 2 sentences or 130 chars, strip escaped quotes
-  const toTts = (text: string): string => {
-    const clean = text.replace(/\\"/g, '').replace(/\\n/g, ' ').trim();
-    if (clean.length <= 130) return clean;
-    const m = clean.match(/^.{20,130}[.!?]/);
-    return m ? m[0] : clean.slice(0, 130);
-  };
-
-  // Backend TTS (Sarvam / Polly) → browser neural voice if mock or offline
-  const speakBackend = async (rawText: string) => {
-    const text = toTts(rawText);
-    try {
-      const result = await voiceApi.synthesise(text, 'kajal');
-      // Skip mock stub audio — it plays as silence and never triggers .catch()
-      if (result.audio_base64 && !result.is_mock) {
-        const mime = result.content_type ?? 'audio/mpeg';
-        const audio = new Audio(`data:${mime};base64,${result.audio_base64}`);
-        audio.play().catch(() => speak(text));
-        return;
-      }
-    } catch (err) {
-      if (err instanceof ApiError) {
-        addNotification(`🔊 TTS error ${err.status} — using browser voice`, 'warning');
-      }
-    }
-    speak(text);
   };
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const recognitionRef = useRef<any>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
   const isListening = ui.isListeningVoice;
 
   // Kick off real mic capture
@@ -124,74 +83,117 @@ function AlexaRing({ onVoiceSubmit }: { onVoiceSubmit: (text: string) => void })
     setResponse('');
     setListeningVoice(true);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const SpeechRecognitionClass = (window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition;
+    if (backendMode) {
+      // Backend mode: MediaRecorder → blob → POST /api/voice/transcribe
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const recorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+        mediaRecorderRef.current = recorder;
+        chunksRef.current = [];
 
-    if (!SpeechRecognitionClass) {
-      setIsRecording(false);
-      setListeningVoice(false);
-      setTimeout(() => inputRef.current?.focus(), 100);
-      return;
-    }
+        recorder.ondataavailable = (e) => {
+          if (e.data.size > 0) chunksRef.current.push(e.data);
+        };
 
-    const recognition = new SpeechRecognitionClass();
-    recognitionRef.current = recognition;
-    recognition.lang = 'en-US';
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.maxAlternatives = 1;
+        recorder.onstop = async () => {
+          stream.getTracks().forEach((t) => t.stop());
+          const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
+          const result = await sendAudio(blob);
+          if (result) {
+            setResponse(result.response);
+            onVoiceSubmit(result.transcript);
+          }
+          setIsRecording(false);
+          setListeningVoice(false);
+        };
 
-    recognition.onresult = async (event: SpeechRecognitionEvent) => {
-      let interim = '';
-      let final = '';
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        if (event.results[i].isFinal) final += event.results[i][0].transcript;
-        else interim += event.results[i][0].transcript;
-      }
-      setInterimText(interim);
-      if (final) {
-        const cleaned = final.replace(/^(hey\s+)?alexa[,\s]*/i, '').trim() || final.trim();
-        recognition.stop();
-        setIsRecording(false);
+        recorder.start();
+        setIsRecording(true);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Microphone access denied';
+        setMicError(msg);
         setListeningVoice(false);
-        setInterimText('');
-        await handleCommand(cleaned);
-        onVoiceSubmit(cleaned);
+        addNotification('🎤 ' + msg, 'alert');
       }
-    };
+    } else {
+      // Local mode: Web Speech API (Chrome/Edge built-in STT, no backend needed)
+      const SpeechRecognitionClass =
+        (window as unknown as { SpeechRecognition?: typeof SpeechRecognition; webkitSpeechRecognition?: typeof SpeechRecognition })
+          .SpeechRecognition ??
+        (window as unknown as { webkitSpeechRecognition?: typeof SpeechRecognition }).webkitSpeechRecognition;
 
-    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-      if (event.error === 'no-speech') { setInterimText(''); return; }
-      if (event.error === 'network') {
-        // Chrome STT couldn't reach Google — fall back to text input silently
+      if (!SpeechRecognitionClass) {
+        // Fallback: show text input if browser doesn't support Web Speech API
         setIsRecording(false);
-        setListeningVoice(false);
         setTimeout(() => inputRef.current?.focus(), 100);
         return;
       }
-      const msg = event.error === 'not-allowed'
-        ? 'Mic denied — click the lock icon in your browser address bar'
-        : `Voice error: ${event.error}`;
-      setMicError(msg);
-      setIsRecording(false);
-      setListeningVoice(false);
-      addNotification('🎤 ' + msg, 'alert');
-    };
 
-    recognition.onend = () => {
-      if (isRecording) {
-        try { recognition.start(); } catch { /* already stopped */ }
-        return;
+      const recognition = new SpeechRecognitionClass();
+      recognitionRef.current = recognition;
+      recognition.lang = 'en-US';
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.maxAlternatives = 1;
+
+      recognition.onresult = (event) => {
+        let interim = '';
+        let final = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          if (event.results[i].isFinal) {
+            final += event.results[i][0].transcript;
+          } else {
+            interim += event.results[i][0].transcript;
+          }
+        }
+        setInterimText(interim);
+        if (final) {
+          // Strip "Alexa" / "Hey Alexa" wake word prefix if present
+          const cleaned = final.replace(/^(hey\s+)?alexa[,\s]*/i, '').trim() || final.trim();
+          const result = executeVoiceCommand(cleaned);
+          speak(result);
+          setResponse(result);
+          setInterimText('');
+          onVoiceSubmit(cleaned);
+          recognition.stop();
+          setListeningVoice(false);
+          setIsRecording(false);
+        }
+      };
+
+      recognition.onerror = (event) => {
+        if (event.error === 'no-speech') {
+          // Retry silently — keep listening state, just clear interim
+          setInterimText('');
+          return;
+        }
+        const msg = event.error === 'not-allowed'
+          ? 'Mic denied — click the lock icon in your browser address bar'
+          : event.error === 'network'
+          ? 'Network error — check internet connection'
+          : `Voice error: ${event.error}`;
+        setMicError(msg);
+        setIsRecording(false);
+        setListeningVoice(false);
+        addNotification('🎤 ' + msg, 'alert');
+      };
+
+      recognition.onend = () => {
+        // With continuous=true, restart if still supposed to be listening
+        if (isRecording) {
+          try { recognition.start(); } catch { /* already stopped */ }
+          return;
+        }
+        setIsRecording(false);
+        setListeningVoice(false);
+      };
+
+      try {
+        recognition.start();
+        setIsRecording(true);
+      } catch {
+        setTimeout(() => inputRef.current?.focus(), 100);
       }
-      setIsRecording(false);
-      setListeningVoice(false);
-    };
-
-    try {
-      recognition.start();
-      setIsRecording(true);
-    } catch {
-      setTimeout(() => inputRef.current?.focus(), 100);
     }
   };
 
@@ -214,41 +216,23 @@ function AlexaRing({ onVoiceSubmit }: { onVoiceSubmit: (text: string) => void })
     }
   };
 
-  // Central command handler — local NLU first, backend only if unmatched
-  const handleCommand = async (text: string) => {
-    const localResult = executeVoiceCommand(text);
-
-    if (localResult.matched) {
-      // Deterministic command — speak instantly with browser neural voice (no backend round-trip)
-      setResponse(localResult.response);
-      setTier(localResult.tier as ProcessingTier);
-      speak(localResult.response);
-      return;
-    }
-
-    if (backendMode) {
-      // Not recognised locally — escalate to backend T0→T1→T3
-      setTier('BACKEND');
-      const backendResult = await sendToBackend(text);
-      const resp = backendResult?.response || "I can mainly help with controlling your home devices.";
-      setResponse(resp);
-      speakBackend(resp);
-    } else {
-      // Offline mode with no match
-      const msg = "Try: \"bedroom fan on\", \"dim the lights\", \"good night\", or \"geyser on\".";
-      setResponse(msg);
-      setTier('T1_LOCAL');
-      speak(msg);
-    }
-  };
-
   // Text input fallback submit
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputText.trim()) return;
     const text = inputText.trim();
     setInputText('');
-    await handleCommand(text);
+
+    if (backendMode) {
+      const result = await sendMockText(text);
+      const resp = result?.response ?? 'Sent to backend.';
+      speak(resp);
+      setResponse(resp);
+    } else {
+      const result = executeVoiceCommand(text);
+      speak(result);
+      setResponse(result);
+    }
     onVoiceSubmit(text);
     setListeningVoice(false);
   };
@@ -374,27 +358,10 @@ function AlexaRing({ onVoiceSubmit }: { onVoiceSubmit: (text: string) => void })
         </form>
       )}
 
-      {/* Response bubble + processing tier badge */}
+      {/* Response bubble */}
       {response && (
-        <div className="mx-4 mt-2 panel-slide-in w-full px-4">
-          <div className="px-3 py-2 bg-alexa-accent rounded-xl text-xs text-alexa-ring text-center leading-relaxed">
-            {response}
-          </div>
-          {tier && (
-            <div className="flex justify-center mt-1">
-              <span className={`text-[9px] font-semibold px-2 py-0.5 rounded-full ${
-                tier === 'T0_LOCAL'
-                  ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                  : tier === 'T1_LOCAL'
-                  ? 'bg-blue-500/15 text-blue-400 border border-blue-500/30'
-                  : 'bg-purple-500/15 text-purple-400 border border-purple-500/30'
-              }`}>
-                {tier === 'T0_LOCAL' ? '⚡ Instant · Local'
-                  : tier === 'T1_LOCAL' ? '🧠 NLU · Local'
-                  : '🌐 Backend · T3'}
-              </span>
-            </div>
-          )}
+        <div className="mx-4 mt-2 px-3 py-2 bg-alexa-accent rounded-xl text-xs text-alexa-ring panel-slide-in text-center leading-relaxed">
+          {response}
         </div>
       )}
     </div>
