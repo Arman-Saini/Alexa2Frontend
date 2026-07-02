@@ -55,7 +55,7 @@ export const endpoints = {
   voiceRespond: '/api/voice/respond',
   voiceDemoPhrases: '/api/voice/demo-phrases',
   transcribe: '/api/voice/transcribe',
-  tts: '/api/voice/tts',
+  tts: '/api/voice/speak',
 
   // ── Simulate ──────────────────────────────────────────────────────
   simulateGeyser: '/api/simulate/geyser',

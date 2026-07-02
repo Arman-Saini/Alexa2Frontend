@@ -306,7 +306,7 @@ function AlexaRing({ onVoiceSubmit, onRingClick }: { onVoiceSubmit: (text: strin
 
     const recognition = new SpeechRecognitionClass();
     recognitionRef.current = recognition;
-    recognition.lang = 'en-IN';
+    recognition.lang = 'en-US';
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.maxAlternatives = 3;
@@ -341,6 +341,8 @@ function AlexaRing({ onVoiceSubmit, onRingClick }: { onVoiceSubmit: (text: strin
       if (event.error === 'no-speech') { setInterimText(''); return; }
       const msg = event.error === 'not-allowed'
         ? 'Mic access denied — allow microphone in browser settings'
+        : event.error === 'network'
+        ? 'Speech recognition unavailable — try typing your command instead'
         : `Voice error: ${event.error}`;
       setMicError(msg);
       isRecordingRef.current = false;
