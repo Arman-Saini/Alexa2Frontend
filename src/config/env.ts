@@ -9,7 +9,7 @@ export const env = {
   // Base URL for all backend REST calls , no trailing slash.
   // Defaults to the deployed DuckDNS backend so dev + prod both hit the live server
   // unless VITE_BACKEND_URL is explicitly overridden.
-  BACKEND_URL: optional('VITE_BACKEND_URL', 'https://alexa-india.duckdns.org'),
+  BACKEND_URL: optional('VITE_BACKEND_URL', 'https://api.armansaini.me'),
 
   // Home ID used in every /homes/:home_id route
   HOME_ID: optional('VITE_HOME_ID', 'home_001'),
