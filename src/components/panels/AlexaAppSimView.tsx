@@ -8,16 +8,44 @@ import type { BackendSource } from '../../config/backendState';
 import type { PlacedObject, AlexaNotification } from '../../types';
 
 // Browser SpeechSynthesis helper — picks an Indian English voice when available
+// Prime voice list early — Chrome loads voices async on first getVoices() call
+if (typeof window !== 'undefined') {
+  window.speechSynthesis?.getVoices();
+  window.speechSynthesis?.addEventListener('voiceschanged', () => {}, { once: true });
+}
+
+function pickBestVoice(): SpeechSynthesisVoice | null {
+  const voices = window.speechSynthesis?.getVoices() ?? [];
+  return (
+    voices.find(v => v.lang === 'en-IN') ??
+    voices.find(v => /Samantha|Karen|Moira|Tessa/i.test(v.name)) ??
+    voices.find(v => v.lang === 'en-US') ??
+    voices.find(v => v.lang.startsWith('en')) ??
+    null
+  );
+}
+
 function browserSpeak(text: string) {
   if (!text || !window.speechSynthesis) return;
   window.speechSynthesis.cancel();
+
   const utter = new SpeechSynthesisUtterance(text);
-  const voices = window.speechSynthesis.getVoices();
-  const indian = voices.find(v => v.lang === 'en-IN') ?? voices.find(v => v.lang.startsWith('en'));
-  if (indian) utter.voice = indian;
   utter.rate = 0.95;
   utter.pitch = 1.05;
-  window.speechSynthesis.speak(utter);
+  utter.lang = 'en-US';
+
+  const doSpeak = () => {
+    const voice = pickBestVoice();
+    if (voice) { utter.voice = voice; utter.lang = voice.lang; }
+    // Small delay avoids Chrome bug where speak() after cancel() gets stuck
+    setTimeout(() => window.speechSynthesis.speak(utter), 50);
+  };
+
+  if (window.speechSynthesis.getVoices().length > 0) {
+    doSpeak();
+  } else {
+    window.speechSynthesis.addEventListener('voiceschanged', doSpeak, { once: true });
+  }
 }
 
 // ─── Top Status Bar ───────────────────────────────────────────────────────────
@@ -304,76 +332,88 @@ function AlexaRing({ onVoiceSubmit, onRingClick }: { onVoiceSubmit: (text: strin
       return;
     }
 
-    const recognition = new SpeechRecognitionClass();
-    recognitionRef.current = recognition;
-    recognition.lang = 'en-US';
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.maxAlternatives = 3;
-    finalBufferRef.current = '';
-
-    recognition.onresult = (event: SpeechRecognitionEvent) => {
-      let newFinal = '';
-      let interim = '';
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        if (event.results[i].isFinal) newFinal += event.results[i][0].transcript;
-        else interim += event.results[i][0].transcript;
-      }
-      if (newFinal) finalBufferRef.current += ' ' + newFinal;
-      const liveText = (finalBufferRef.current + ' ' + interim).trim();
-      setInputText(liveText);
-      setInterimText(liveText);
-
-      if (newFinal && !interim) {
-        const accumulated = finalBufferRef.current.trim();
-        finalBufferRef.current = '';
-        const cleaned = accumulated.replace(/^(hey\s+)?alexa[,\s]*/i, '').trim() || accumulated;
-        isRecordingRef.current = false;
-        setIsRecording(false);
-        setInterimText('');
-        setInputText('');
-        recognition.stop();
-        handleVoiceResult(cleaned);
-      }
-    };
-
-    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-      if (event.error === 'no-speech') { setInterimText(''); return; }
-      const msg = event.error === 'not-allowed'
-        ? 'Mic access denied — allow microphone in browser settings'
-        : event.error === 'network'
-        ? 'Speech recognition unavailable — try typing your command instead'
-        : `Voice error: ${event.error}`;
-      setMicError(msg);
-      isRecordingRef.current = false;
-      setIsRecording(false);
-      setListeningVoice(false);
-    };
-
-    recognition.onend = () => {
-      if (isRecordingRef.current) { try { recognition.start(); } catch { /* already stopped */ } return; }
-      setIsRecording(false);
-      setListeningVoice(false);
-    };
-
     isRecordingRef.current = true;
     setIsRecording(true);
-    try { recognition.start(); } catch {
-      isRecordingRef.current = false;
-      setIsRecording(false);
-    }
+    finalBufferRef.current = '';
+
+    // Spawn a fresh recognition instance per utterance — avoids state corruption
+    // from long-running continuous sessions. Each session handles exactly one
+    // utterance; onend restarts silently if the user hasn't stopped recording.
+    const spawnSession = () => {
+      if (!isRecordingRef.current) return;
+
+      const recognition = new SpeechRecognitionClass();
+      recognitionRef.current = recognition;
+      recognition.lang = 'en-US';
+      recognition.continuous = false;   // single utterance — Chrome ends cleanly on silence
+      recognition.interimResults = true;
+      recognition.maxAlternatives = 1;
+
+      let sessionFinal = '';
+
+      recognition.onresult = (event: SpeechRecognitionEvent) => {
+        let final = '';
+        let interim = '';
+        for (let i = 0; i < event.results.length; i++) {
+          if (event.results[i].isFinal) final += event.results[i][0].transcript + ' ';
+          else interim += event.results[i][0].transcript;
+        }
+        if (final) sessionFinal = final.trim();
+        setInputText((sessionFinal + ' ' + interim).trim());
+        setInterimText((sessionFinal + ' ' + interim).trim());
+      };
+
+      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+        if (event.error === 'no-speech' || event.error === 'aborted') return;
+        const msg = event.error === 'not-allowed'
+          ? 'Mic access denied — allow microphone in browser settings'
+          : event.error === 'network'
+          ? 'Speech recognition unavailable — try typing your command instead'
+          : `Voice error: ${event.error}`;
+        setMicError(msg);
+        isRecordingRef.current = false;
+        setIsRecording(false);
+        setListeningVoice(false);
+      };
+
+      // Chrome auto-ends the session after silence. If we got speech, submit it.
+      // If not, restart a fresh session so the user stays in listening mode.
+      recognition.onend = () => {
+        if (!isRecordingRef.current) return;
+
+        if (sessionFinal) {
+          const cleaned = sessionFinal.replace(/^(hey\s+)?alexa[,\s]*/i, '').trim() || sessionFinal;
+          isRecordingRef.current = false;
+          setIsRecording(false);
+          setListeningVoice(false);
+          setInterimText('');
+          setInputText('');
+          finalBufferRef.current = '';
+          handleVoiceResult(cleaned);
+        } else {
+          // No speech captured — restart immediately for next utterance
+          spawnSession();
+        }
+      };
+
+      try { recognition.start(); } catch {
+        isRecordingRef.current = false;
+        setIsRecording(false);
+        setListeningVoice(false);
+      }
+    };
+
+    spawnSession();
   };
 
   const stopListening = () => {
     isRecordingRef.current = false;
-    const accumulated = finalBufferRef.current.trim();
     finalBufferRef.current = '';
     recognitionRef.current?.stop();
     setIsRecording(false);
     setListeningVoice(false);
     setInterimText('');
     setInputText('');
-    if (accumulated) handleVoiceResult(accumulated.replace(/^(hey\s+)?alexa[,\s]*/i, '').trim());
   };
 
   const handleRingClick = () => {
