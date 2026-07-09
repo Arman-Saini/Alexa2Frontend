@@ -91,8 +91,8 @@ export function EngineAssembly({ onScrollChange, onHoverChange, isWhiteTheme }: 
       groupRef.current.rotation.x = THREE.MathUtils.damp(groupRef.current.rotation.x, baseRotX + idlePitch, 6, delta);
     }
 
-    let targetZoom = isMobile ? 26 : 40;
-    let lookAtY = 0;
+    let targetZoom: number;
+    let lookAtY: number;
 
     if (progress < 0.2) {
       targetZoom = isMobile ? 26 : 40;
