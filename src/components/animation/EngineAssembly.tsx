@@ -55,14 +55,17 @@ export function EngineAssembly({
 
   // Group references for leader lines projection
   const headRef = useRef<THREE.Group>(null);
-  const lensRef = useRef<THREE.Group>(null);
-  const gearLargeRef = useRef<THREE.Group>(null);
-  const gearSmallRef = useRef<THREE.Group>(null);
-  const baseRef = useRef<THREE.Group>(null);
+  const lensRef = useRef<THREE.Group>(null);       // T0 Sensory Node
+  const gearLargeRef = useRef<THREE.Group>(null);  // T2 Master Core Node
+  const gearSmallRef = useRef<THREE.Group>(null);  // App Cartridge Node
+  const baseRef = useRef<THREE.Group>(null);       // T3 Cloud Synapse Node
+
+  // Rotating privacy shield
+  const privacyShieldRef = useRef<THREE.Group>(null);
 
   // Colors parsed to THREE formats
   const mainColor = useMemo(() => new THREE.Color(bodyColor), [bodyColor]);
-  const outlineColor = useMemo(() => new THREE.Color('#141312'), []);
+  const outlineColor = useMemo(() => new THREE.Color(isWhiteTheme ? '#2E2B28' : '#141312'), [isWhiteTheme]);
   const ledThreeColor = useMemo(() => new THREE.Color(ledColor), [ledColor]);
 
   // Procedural singing states to show effort
@@ -81,9 +84,6 @@ export function EngineAssembly({
   // Dizzy face timer/cooldown when reassembled
   const [showDizzyCooldown, setShowDizzyCooldown] = useState(false);
   const showDizzyCooldownRef = useRef(false);
-
-  // Gears rotation refs
-  const bladesRef = useRef<THREE.Group>(null);
 
   useEffect(() => {
     if (explodedProgress > 0) {
@@ -319,9 +319,9 @@ export function EngineAssembly({
     // Smooth yawning mouth animation
     if (expression === 'yawning' && yawnMouthRef.current) {
       const cycleTime = t % 5.0;
-        let scaleY: number;
-        let scaleX: number;
-        let showClosed: boolean;
+      let scaleY: number;
+      let scaleX: number;
+      let showClosed: boolean;
 
       if (cycleTime < 0.4) {
         scaleY = 1.0;
@@ -401,22 +401,32 @@ export function EngineAssembly({
       }
     }
 
-    // Animate inner aperture blades closing/opening
-    if (bladesRef.current) {
-      const children = bladesRef.current.children;
-      const rotationAngle = (1.0 - explodedProgress) * 0.45;
-      children.forEach((child, i) => {
-        child.rotation.z = rotationAngle + (i * Math.PI * 2) / 6;
-      });
+    // Animate holographic privacy shield rotation
+    if (privacyShieldRef.current) {
+      privacyShieldRef.current.rotation.y = t * 0.8;
+      privacyShieldRef.current.rotation.x = t * 0.3;
     }
 
-    // Rotate cogs in opposite directions
-    if (gearLargeRef.current) {
-      gearLargeRef.current.rotation.y = t * 0.5;
-    }
-    if (gearSmallRef.current) {
-      gearSmallRef.current.rotation.y = -t * 1.0;
-    }
+    // Camera shot blend (moves to top-down view looking into split-open hinge as it splits)
+    const LENS_DIR = new THREE.Vector3(0, 0.15, 1.0).normalize();
+    const TOP_DIR = new THREE.Vector3(0.5, 0.8, 0.7).normalize();
+    const CAM_DISTANCE = 7.2;
+    const LENS_LOOK_Y = 0.3;
+    const TOP_LOOK_Y = -0.2;
+
+    const shotT = THREE.MathUtils.clamp(explodedProgress, 0, 1);
+    const easedT = shotT * shotT * (3 - 2 * shotT);
+
+    const camDir = new THREE.Vector3().lerpVectors(LENS_DIR, TOP_DIR, easedT).normalize();
+    const lookY = THREE.MathUtils.lerp(LENS_LOOK_Y, TOP_LOOK_Y, easedT);
+    const desiredTarget = new THREE.Vector3(0, lookY, 0);
+    const desiredPos = desiredTarget.clone().addScaledVector(camDir, CAM_DISTANCE);
+
+    state.camera.position.x = THREE.MathUtils.lerp(state.camera.position.x, desiredPos.x, 0.08);
+    state.camera.position.y = THREE.MathUtils.lerp(state.camera.position.y, desiredPos.y, 0.08);
+    state.camera.position.z = THREE.MathUtils.lerp(state.camera.position.z, desiredPos.z, 0.08);
+    state.camera.lookAt(desiredTarget);
+    state.camera.updateProjectionMatrix();
 
     // Animate leader line screen projections
     const lineLayers = [
@@ -502,10 +512,11 @@ export function EngineAssembly({
   const buttonBaseMaterial = useMemo(() => new THREE.MeshBasicMaterial({ color: '#e6dfd5' }), []);
   const chipGlowMaterial = useMemo(() => new THREE.MeshBasicMaterial({ color: '#f1c40f', toneMapped: false }), []);
 
-  // Web color theme matching materials for gears/cogs (instead of liquid glass)
-  const gearMaterialLarge = useMemo(() => new THREE.MeshBasicMaterial({ color: '#e9b44c' }), []); // Pippo yellow/orange
-  const gearMaterialSmall = useMemo(() => new THREE.MeshBasicMaterial({ color: '#3a7ca5' }), []); // Doraemon blue
-  const lensRingMaterial = useMemo(() => new THREE.MeshBasicMaterial({ color: '#4a4844' }), []);
+  // Web color theme matching materials for microchips (instead of liquid glass cogs)
+  const sensoryMaterial = useMemo(() => new THREE.MeshBasicMaterial({ color: '#244d47' }), []);     // Ghibli Green
+  const masterCoreMaterial = useMemo(() => new THREE.MeshBasicMaterial({ color: '#e9b44c' }), []);   // Pippo Yellow
+  const synapseMaterial = useMemo(() => new THREE.MeshBasicMaterial({ color: '#2e323b' }), []);      // Charcoal base
+  const appCartridgeMaterial = useMemo(() => new THREE.MeshBasicMaterial({ color: '#3a7ca5' }), []); // Doraemon Blue
 
   const scaleFactor = 1.0 + outlineThickness * 0.025;
   const outlineScale = [scaleFactor, scaleFactor, scaleFactor] as [number, number, number];
@@ -516,7 +527,7 @@ export function EngineAssembly({
 
   return (
     <group ref={robotGroupRef}>
-      {/* 1. TOP SPHERICAL HEAD (slides up) */}
+      {/* 1. TOP SPHERICAL HEAD (slides up & hinges back) */}
       <group ref={headRef} position={[0, yHead, 0]}>
         {/* Uncut Dome in Assembled state */}
         {explodedProgress === 0 && (
@@ -772,7 +783,7 @@ export function EngineAssembly({
         </group>
       </group>
 
-      {/* 2. BOTTOM SPHERICAL BODY (slides down, revealing nested components inside Y-cavity) */}
+      {/* 2. BOTTOM SPHERICAL BODY (slides down, revealing nested Cascade Chipset inside Y-cavity) */}
       <group position={[0, yBase, 0]}>
         {/* Uncut bottom dome in Assembled state */}
         {explodedProgress === 0 && (
@@ -992,116 +1003,151 @@ export function EngineAssembly({
         </group>
 
         {/* -------------------------------------------------------------
-            NEW DETAILED TECHNICAL INNER REVEAL (NESTED TELESCOPIC CORES)
-            Gears & Lenses rise up as explodedProgress increases.
-            Solid Toon materials are used to match the Ghibli/Doraemon color theme.
+            REDESIGNED HERO COMPONENT: T0-T3 CASCADE CENTRAL BRAIN CHIPSET
+            Instead of cogs, we reveal layered square silicon computer chips
+            representing the local/cloud routing tiers, app cartridge plugins,
+            and the holographic privacy shield.
         ------------------------------------------------------------- */}
         {explodedProgress > 0.05 && (
           <group>
-            {/* A. WAKE-WORD ENGINE (Small Gear - Sits lower, rises slightly) */}
-            <group ref={gearSmallRef} position={[0, explodedProgress * 0.8, 0]}>
-              <mesh>
-                <cylinderGeometry args={[0.5, 0.5, 0.08, 20]} />
-                <primitive object={gearMaterialSmall} attach="material" />
-              </mesh>
-              <mesh scale={outlineScale}>
-                <cylinderGeometry args={[0.5, 0.5, 0.08, 20]} />
-                <primitive object={outlineMaterial} attach="material" />
-              </mesh>
-              {/* Teeth */}
-              {Array.from({ length: 12 }).map((_, i) => {
-                const angle = (i * Math.PI * 2) / 12;
-                return (
-                  <group key={i} rotation={[0, angle, 0]} position={[Math.cos(angle) * 0.53, 0, Math.sin(angle) * 0.53]}>
-                    <mesh>
-                      <boxGeometry args={[0.06, 0.06, 0.06]} />
-                      <primitive object={gearMaterialSmall} attach="material" />
-                    </mesh>
-                    <mesh scale={outlineScale}>
-                      <boxGeometry args={[0.06, 0.06, 0.06]} />
-                      <primitive object={outlineMaterial} attach="material" />
-                    </mesh>
-                  </group>
-                );
-              })}
-            </group>
-
-            {/* B. NLP PROCESSING MATRIX (Large Gear - Sits middle, rises moderately) */}
-            <group ref={gearLargeRef} position={[0, explodedProgress * 1.5, 0]}>
-              <mesh>
-                <cylinderGeometry args={[0.75, 0.75, 0.1, 24]} />
-                <primitive object={gearMaterialLarge} attach="material" />
-              </mesh>
-              <mesh scale={outlineScale}>
-                <cylinderGeometry args={[0.75, 0.75, 0.1, 24]} />
-                <primitive object={outlineMaterial} attach="material" />
-              </mesh>
-              {/* Teeth */}
-              {Array.from({ length: 16 }).map((_, i) => {
-                const angle = (i * Math.PI * 2) / 16;
-                return (
-                  <group key={i} rotation={[0, angle, 0]} position={[Math.cos(angle) * 0.78, 0, Math.sin(angle) * 0.78]}>
-                    <mesh>
-                      <boxGeometry args={[0.08, 0.08, 0.08]} />
-                      <primitive object={gearMaterialLarge} attach="material" />
-                    </mesh>
-                    <mesh scale={outlineScale}>
-                      <boxGeometry args={[0.08, 0.08, 0.08]} />
-                      <primitive object={outlineMaterial} attach="material" />
-                    </mesh>
-                  </group>
-                );
-              })}
-            </group>
-
-            {/* C. ACOUSTIC PERCEPTION LENS (Glass optics + Toon metal housing, rises highest) */}
+            {/* A. T0/T1 SENSORY REFLEX (Concave Sensor Ring, rises highest) */}
             <group ref={lensRef} position={[0, explodedProgress * 2.3, 0]}>
-              {/* Outer housing */}
+              {/* Outer circular bracket */}
               <mesh>
-                <torusGeometry args={[0.75, 0.06, 8, 32]} />
-                <primitive object={lensRingMaterial} attach="material" />
+                <cylinderGeometry args={[0.8, 0.8, 0.04, 24]} />
+                <primitive object={sensoryMaterial} attach="material" />
               </mesh>
               <mesh scale={outlineScale}>
-                <torusGeometry args={[0.75, 0.06, 8, 32]} />
+                <cylinderGeometry args={[0.8, 0.8, 0.04, 24]} />
                 <primitive object={outlineMaterial} attach="material" />
               </mesh>
 
-              {/* Blue glass lens elements (Keep glass for optics as requested) */}
-              <mesh position={[0, 0.03, 0]}>
-                <cylinderGeometry args={[0.68, 0.68, 0.03, 24]} />
+              {/* Glowing Green Sensory Path lines */}
+              <mesh position={[0, 0.02, 0]} rotation={[Math.PI / 2, 0, 0]}>
+                <torusGeometry args={[0.68, 0.015, 8, 32]} />
+                <meshBasicMaterial color="#3bf574" toneMapped={false} />
+              </mesh>
+              <mesh position={[0, 0.02, 0]} rotation={[Math.PI / 2, 0, Math.PI / 4]}>
+                <torusGeometry args={[0.45, 0.012, 8, 32]} />
+                <meshBasicMaterial color="#3bf574" toneMapped={false} />
+              </mesh>
+
+              {/* Central capture core - clear physical-like lens representing acoustic captures */}
+              <mesh position={[0, -0.01, 0]}>
+                <cylinderGeometry args={[0.26, 0.26, 0.05, 16]} />
                 <meshPhysicalMaterial
-                  color="#00f3ff"
-                  transmission={1.0}
-                  roughness={0.05}
-                  thickness={0.15}
+                  color="#3bf574"
+                  transmission={0.9}
+                  roughness={0.1}
+                  thickness={0.1}
                   transparent
                   opacity={0.7}
                 />
               </mesh>
+            </group>
 
-              {/* Glowing cyan active ring */}
-              <mesh position={[0, 0.05, 0]} rotation={[Math.PI / 2, 0, 0]}>
-                <torusGeometry args={[0.7, 0.01, 8, 32]} />
-                <meshBasicMaterial color="#00f3ff" toneMapped={false} />
+            {/* B. T2 EDGE MASTER CORE - SLM / AZ3 PROCESSOR (Square mecha chip block, sits center) */}
+            <group ref={gearLargeRef} position={[0, explodedProgress * 1.5, 0]}>
+              {/* Square Silicon Board */}
+              <mesh>
+                <boxGeometry args={[0.85, 0.06, 0.85]} />
+                <primitive object={masterCoreMaterial} attach="material" />
+              </mesh>
+              <mesh scale={outlineScale}>
+                <boxGeometry args={[0.85, 0.06, 0.85]} />
+                <primitive object={outlineMaterial} attach="material" />
               </mesh>
 
-              {/* Animated 6-blade Aperture Iris */}
-              <group ref={bladesRef} position={[0, -0.06, 0]}>
-                {Array.from({ length: 6 }).map((_, i) => {
-                  const baseAngle = (i * Math.PI * 2) / 6;
-                  const radiusOffset = 0.35;
-                  const x = Math.cos(baseAngle) * radiusOffset;
-                  const z = Math.sin(baseAngle) * radiusOffset;
-                  return (
-                    <group key={i} position={[x, 0, z]} rotation={[0, baseAngle, 0]}>
-                      <mesh rotation={[Math.PI / 2, 0, 0]}>
-                        <coneGeometry args={[0.18, 0.26, 3]} />
-                        <meshBasicMaterial color={isWhiteTheme ? '#3a3834' : '#1e1c1a'} side={THREE.DoubleSide} />
-                      </mesh>
-                    </group>
-                  );
-                })}
+              {/* Central pulsing amber core - "Hearth Butler Core" (Home-Sense) */}
+              <mesh position={[0, 0.04, 0]}>
+                <boxGeometry args={[0.32, 0.04, 0.32]} />
+                <primitive object={chipGlowMaterial} attach="material" />
+              </mesh>
+              <mesh position={[0, 0.04, 0]} scale={outlineScale}>
+                <boxGeometry args={[0.32, 0.04, 0.32]} />
+                <primitive object={outlineMaterial} attach="material" />
+              </mesh>
+
+              {/* Surrounding gold pins/circuits */}
+              {Array.from({ length: 4 }).map((_, i) => {
+                const x = ((i % 2) - 0.5) * 0.55;
+                const z = (Math.floor(i / 2) - 0.5) * 0.55;
+                return (
+                  <mesh key={i} position={[x, 0.035, z]}>
+                    <boxGeometry args={[0.12, 0.02, 0.12]} />
+                    <meshBasicMaterial color="#ffffff" />
+                  </mesh>
+                );
+              })}
+
+              {/* Modular App Cartridge Slot - holds the "App Vault" plugin card */}
+              <group position={[0, 0.01, 0]}>
+                {/* C. APP VAULT PLUGINS - Khata/Swiggy Cartridge slides out to the right */}
+                <group ref={gearSmallRef} position={[0.4 + explodedProgress * 0.9, 0.02, 0]}>
+                  {/* Cartridge board */}
+                  <mesh>
+                    <boxGeometry args={[0.42, 0.04, 0.52]} />
+                    <primitive object={appCartridgeMaterial} attach="material" />
+                  </mesh>
+                  <mesh scale={outlineScale}>
+                    <boxGeometry args={[0.42, 0.04, 0.52]} />
+                    <primitive object={outlineMaterial} attach="material" />
+                  </mesh>
+                  
+                  {/* Golden connection teeth */}
+                  <mesh position={[-0.22, 0, 0]}>
+                    <boxGeometry args={[0.04, 0.03, 0.35]} />
+                    <meshBasicMaterial color="#f1c40f" />
+                  </mesh>
+
+                  {/* Tiny text label indicator (blue block node) */}
+                  <mesh position={[0.05, 0.025, 0]}>
+                    <boxGeometry args={[0.2, 0.02, 0.2]} />
+                    <meshBasicMaterial color="#00f3ff" toneMapped={false} />
+                  </mesh>
+                </group>
               </group>
+            </group>
+
+            {/* D. T3 CLOUD SYNAPSE - BEDROCK (Dark charcoal database plate, sits lower) */}
+            <group ref={baseRef} position={[0, explodedProgress * 0.8, 0]}>
+              {/* Large Dark Silicon Base Plate */}
+              <mesh>
+                <boxGeometry args={[1.0, 0.06, 1.0]} />
+                <primitive object={synapseMaterial} attach="material" />
+              </mesh>
+              <mesh scale={outlineScale}>
+                <boxGeometry args={[1.0, 0.06, 1.0]} />
+                <primitive object={outlineMaterial} attach="material" />
+              </mesh>
+
+              {/* Synaptic Purple Paths */}
+              <mesh position={[0, 0.032, 0]} rotation={[Math.PI / 2, 0, 0]}>
+                <planeGeometry args={[0.9, 0.9]} />
+                <meshBasicMaterial color="#08080a" />
+              </mesh>
+              
+              {/* Glowing Purple node centers */}
+              {[-0.3, 0.3].map((x, xi) => (
+                [-0.3, 0.3].map((z, zi) => (
+                  <mesh key={`${xi}-${zi}`} position={[x, 0.038, z]}>
+                    <cylinderGeometry args={[0.08, 0.08, 0.01, 8]} />
+                    <meshBasicMaterial color="#d254ff" toneMapped={false} />
+                  </mesh>
+                ))
+              ))}
+            </group>
+
+            {/* E. HOLOGRAPHIC PRIVACY SHIELD (Glowing cyan ring rotating around the local T2 core) */}
+            <group ref={privacyShieldRef} position={[0, explodedProgress * 1.5, 0]}>
+              <mesh>
+                <torusGeometry args={[1.05, 0.025, 8, 48]} />
+                <meshBasicMaterial color="#00f3ff" transparent opacity={0.6} toneMapped={false} />
+              </mesh>
+              <mesh rotation={[Math.PI / 2, 0, 0]}>
+                <torusGeometry args={[1.05, 0.015, 8, 48]} />
+                <meshBasicMaterial color="#00f3ff" transparent opacity={0.3} toneMapped={false} />
+              </mesh>
             </group>
           </group>
         )}

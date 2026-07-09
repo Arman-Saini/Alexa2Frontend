@@ -40,11 +40,11 @@ const EXPRESSIONS: { type: ExpressionType; label: string; face: string }[] = [
 ];
 
 const TOP_RIGHT_LABELS = [
-  { id: 'head', text: 'TOP DOME' },
-  { id: 'lens', text: 'ACOUSTIC LENS' },
-  { id: 'gearLarge', text: 'NLP PROCESSING MATRIX' },
-  { id: 'gearSmall', text: 'WAKE-WORD ENGINE' },
-  { id: 'base', text: 'BASE CONSOLE' },
+  { id: 'head', text: 'TOP DOME (HINGE OPEN)' },
+  { id: 'lens', text: 'T0/T1 SENSORY REFLEX (EDGE)' },
+  { id: 'gearLarge', text: 'T2 EDGE MASTER CORE (AZ3)' },
+  { id: 'gearSmall', text: 'APP VAULT PLUGINS (KHATA/SWIGGY)' },
+  { id: 'base', text: 'T3 CLOUD SYNAPSE (BEDROCK)' },
 ];
 
 export function AnimationPage() {
