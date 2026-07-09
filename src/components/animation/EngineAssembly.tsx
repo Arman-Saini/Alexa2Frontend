@@ -81,33 +81,48 @@ export function EngineAssembly({ onScrollChange, onHoverChange, isWhiteTheme }: 
     if (groupRef.current) {
       groupRef.current.position.x = THREE.MathUtils.damp(groupRef.current.position.x, 0, 6, delta);
 
-      const baseRotY = Math.PI / 4;
-      const targetRotY = baseRotY + progress * (Math.PI * 0.18);
+      // Wide reorientation sweep (vertical → diagonal isometric) as the
+      // object explodes, matching the animejs.com reference's rotation.
+      const baseRotY = Math.PI / 5;
+      const targetRotY = baseRotY + progress * (Math.PI * 0.55);
       const idleSway = Math.sin(t * 0.4) * 0.03;
       groupRef.current.rotation.y = THREE.MathUtils.damp(groupRef.current.rotation.y, targetRotY + idleSway, 6, delta);
 
-      const baseRotX = 0.61547;
+      const baseRotX = 0.45;
+      const targetRotX = baseRotX + progress * 0.22;
       const idlePitch = Math.cos(t * 0.5) * 0.015;
-      groupRef.current.rotation.x = THREE.MathUtils.damp(groupRef.current.rotation.x, baseRotX + idlePitch, 6, delta);
+      groupRef.current.rotation.x = THREE.MathUtils.damp(groupRef.current.rotation.x, targetRotX + idlePitch, 6, delta);
     }
 
-    let targetZoom: number;
+    // Orthographic zoom is pixel-relative (drei's default frustum is
+    // ±size.width/2, ±size.height/2), so a fixed zoom constant renders
+    // at wildly different scales across viewports. Instead pick a target
+    // *world-space half-extent* the object should fill per stage, and
+    // derive zoom from the actual canvas size so the object always
+    // dominates the frame the same way regardless of screen size.
+    const shortSide = Math.min(state.size.width, state.size.height);
+    const zoomForHalfExtent = (halfExtent: number) => shortSide / 2 / halfExtent;
+
+    let targetHalfExtent: number;
     let lookAtY: number;
 
     if (progress < 0.2) {
-      targetZoom = isMobile ? 26 : 40;
-      lookAtY = 0.0;
+      // Overview: whole closed assembly (~4 units across) fills most of frame.
+      targetHalfExtent = isMobile ? 3.0 : 2.3;
+      lookAtY = 0.6;
     } else if (progress < 0.8) {
       const u = (progress - 0.2) / 0.6;
-      targetZoom = THREE.MathUtils.lerp(isMobile ? 26 : 40, isMobile ? 32 : 46, u);
-      lookAtY = THREE.MathUtils.lerp(0.0, 1.0, u);
+      targetHalfExtent = THREE.MathUtils.lerp(isMobile ? 3.0 : 2.3, isMobile ? 2.2 : 1.7, u);
+      lookAtY = THREE.MathUtils.lerp(0.6, 2.0, u);
     } else {
       const u = (progress - 0.8) / 0.2;
       const easedU = u * u * (3 - 2 * u);
-      targetZoom = THREE.MathUtils.lerp(isMobile ? 32 : 46, isMobile ? 40 : 58, easedU);
-      lookAtY = THREE.MathUtils.lerp(1.0, 2.8, easedU);
+      // Deep zoom onto the Acoustic Ring, echoing the reference's close-up finale.
+      targetHalfExtent = THREE.MathUtils.lerp(isMobile ? 2.2 : 1.7, isMobile ? 1.3 : 0.95, easedU);
+      lookAtY = THREE.MathUtils.lerp(2.0, 4.6, easedU);
     }
 
+    const targetZoom = zoomForHalfExtent(targetHalfExtent);
     state.camera.zoom = THREE.MathUtils.damp(state.camera.zoom, targetZoom, 7, delta);
 
     const camBase = 10;

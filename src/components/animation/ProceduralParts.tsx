@@ -47,11 +47,18 @@ export function ToonPart({
 // Sized to span from the Cloud Base (y=0) to the fully-expanded
 // Acoustic Ring (y=4.8, see LAYERS in EngineAssembly.tsx) plus padding.
 // ---------------------------------------------------------------
+// Hairline technical-drafting palette: body fill sits close to the page
+// background so the object reads mostly through its outline strokes and
+// ring seams, like the animejs.com reference — not flat toy-block color.
+const LINE_LIGHT = '#2E2B28';
+const LINE_DARK = '#D9A98A';
+
 export function CoreShaft({ isWhiteTheme }: { isWhiteTheme: boolean }) {
   return (
     <ToonPart
-      color={isWhiteTheme ? '#8A5940' : '#241F1B'}
-      outlineColor="#050505"
+      color={isWhiteTheme ? '#DED7CC' : '#161412'}
+      outlineColor={isWhiteTheme ? LINE_LIGHT : LINE_DARK}
+      outlineScale={1.015}
       position={[0, 2.2, 0]}
     >
       <cylinderGeometry args={[0.35, 0.35, 6.2, 24]} />
@@ -72,8 +79,9 @@ export function AcousticRing({ isWhiteTheme, isHovered }: LayerProps) {
   const nodesRef = useRef<THREE.InstancedMesh>(null);
   const glowRef = useRef<THREE.Mesh>(null);
 
-  const bodyColor = isWhiteTheme ? '#D9A98A' : '#C08662';
-  const lensColor = isWhiteTheme ? '#F2EDE6' : '#1A1816';
+  const bodyColor = isWhiteTheme ? '#E4DDD2' : '#181613';
+  const lineColor = isWhiteTheme ? LINE_LIGHT : LINE_DARK;
+  const lensColor = isWhiteTheme ? '#F2EDE6' : '#0F0E0C';
   const glowColor = '#3da5e0';
 
   useFrame((state) => {
@@ -101,10 +109,10 @@ export function AcousticRing({ isWhiteTheme, isHovered }: LayerProps) {
 
   return (
     <group>
-      <ToonPart color={bodyColor} outlineColor="#050505" castShadow>
+      <ToonPart color={bodyColor} outlineColor={lineColor} outlineScale={1.015} castShadow>
         <torusGeometry args={[1.3, 0.18, 12, 32]} />
       </ToonPart>
-      <ToonPart color={lensColor} outlineColor="#050505" position={[0, 0.1, 0]}>
+      <ToonPart color={lensColor} outlineColor={lineColor} outlineScale={1.015} position={[0, 0.1, 0]}>
         <cylinderGeometry args={[1.1, 1.1, 0.06, 32]} />
       </ToonPart>
       <mesh ref={glowRef} position={[0, 0.14, 0]}>
@@ -124,15 +132,16 @@ export function AcousticRing({ isWhiteTheme, isHovered }: LayerProps) {
 // spin — reads as inert/listening, not running), one ember accent band.
 // ---------------------------------------------------------------
 export function WakeWordDrum({ isWhiteTheme }: LayerProps) {
-  const bodyColor = isWhiteTheme ? '#C08662' : '#A96F50';
+  const bodyColor = isWhiteTheme ? '#E4DDD2' : '#181613';
+  const lineColor = isWhiteTheme ? LINE_LIGHT : LINE_DARK;
   const bandColor = '#D99A44';
 
   return (
     <group>
-      <ToonPart color={bodyColor} outlineColor="#050505" castShadow>
+      <ToonPart color={bodyColor} outlineColor={lineColor} outlineScale={1.015} castShadow>
         <cylinderGeometry args={[1.2, 1.2, 0.7, 6]} />
       </ToonPart>
-      <ToonPart color={bandColor} outlineColor="#050505" position={[0, 0.36, 0]}>
+      <ToonPart color={bandColor} outlineColor={lineColor} outlineScale={1.015} position={[0, 0.36, 0]}>
         <cylinderGeometry args={[1.22, 1.22, 0.08, 6]} />
       </ToonPart>
     </group>
@@ -146,7 +155,8 @@ export function WakeWordDrum({ isWhiteTheme }: LayerProps) {
 export function NlpMatrix({ isWhiteTheme }: LayerProps) {
   const groupRef = useRef<THREE.Group>(null);
   const blocksRef = useRef<THREE.InstancedMesh>(null);
-  const bodyColor = isWhiteTheme ? '#D9A98A' : '#C08662';
+  const bodyColor = isWhiteTheme ? '#E4DDD2' : '#181613';
+  const lineColor = isWhiteTheme ? LINE_LIGHT : LINE_DARK;
 
   useEffect(() => {
     if (!blocksRef.current) return;
@@ -167,12 +177,12 @@ export function NlpMatrix({ isWhiteTheme }: LayerProps) {
 
   return (
     <group ref={groupRef}>
-      <ToonPart color={bodyColor} outlineColor="#050505" castShadow>
+      <ToonPart color={bodyColor} outlineColor={lineColor} outlineScale={1.015} castShadow>
         <cylinderGeometry args={[1.25, 1.25, 0.45, 20]} />
       </ToonPart>
       <instancedMesh ref={blocksRef} args={[undefined, undefined, 16]} castShadow>
         <boxGeometry args={[0.14, 0.5, 0.14]} />
-        <meshBasicMaterial color="#050505" />
+        <meshBasicMaterial color={lineColor} />
       </instancedMesh>
     </group>
   );
@@ -187,7 +197,8 @@ export function NlpMatrix({ isWhiteTheme }: LayerProps) {
 // ---------------------------------------------------------------
 export function CloudBase({ isWhiteTheme }: LayerProps) {
   const shadowMatRef = useRef<THREE.MeshBasicMaterial>(null);
-  const bodyColor = isWhiteTheme ? '#8A5940' : '#241F1B';
+  const bodyColor = isWhiteTheme ? '#E4DDD2' : '#181613';
+  const lineColor = isWhiteTheme ? LINE_LIGHT : LINE_DARK;
   const ventColor = isWhiteTheme ? '#ECE6DF' : '#0A0A0A';
 
   const vents = useMemo(
@@ -207,7 +218,7 @@ export function CloudBase({ isWhiteTheme }: LayerProps) {
 
   return (
     <group>
-      <ToonPart color={bodyColor} outlineColor="#050505" castShadow receiveShadow>
+      <ToonPart color={bodyColor} outlineColor={lineColor} outlineScale={1.015} castShadow receiveShadow>
         <cylinderGeometry args={[1.6, 1.9, 0.5, 24]} />
       </ToonPart>
       {vents.map((pos, i) => (
