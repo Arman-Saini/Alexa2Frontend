@@ -6,7 +6,6 @@ import * as THREE from 'three';
 const LINE_LIGHT = '#2E2B28';
 const LINE_DARK = '#D9A98A';
 const ACCENT_BLUE = '#00f3ff';
-const ACCENT_EMBER = '#ff9233';
 
 export interface LayerProps {
   isWhiteTheme: boolean;
@@ -260,7 +259,7 @@ export function CartoonAlexaLens({ isWhiteTheme, explodedProgress }: LayerProps)
 }
 
 // 3. NLP PROCESSING MATRIX (Large Gear)
-export function GearLarge({ isWhiteTheme, explodedProgress }: LayerProps) {
+export function GearLarge({ isWhiteTheme }: LayerProps) {
   const lineCol = isWhiteTheme ? LINE_LIGHT : LINE_DARK;
   const gearRef = useRef<THREE.Group>(null);
 
@@ -307,7 +306,7 @@ export function GearLarge({ isWhiteTheme, explodedProgress }: LayerProps) {
 }
 
 // 4. WAKE-WORD ENGINE (Small Gear)
-export function GearSmall({ isWhiteTheme, explodedProgress }: LayerProps) {
+export function GearSmall({ isWhiteTheme }: LayerProps) {
   const lineCol = isWhiteTheme ? LINE_LIGHT : LINE_DARK;
   const gearRef = useRef<THREE.Group>(null);
 
@@ -354,7 +353,7 @@ export function GearSmall({ isWhiteTheme, explodedProgress }: LayerProps) {
 }
 
 // 5. BASE CONSOLE (Bottom half of Alexa Robot)
-export function CartoonAlexaBase({ isWhiteTheme, isHovered, explodedProgress }: LayerProps) {
+export function CartoonAlexaBase({ isWhiteTheme, explodedProgress }: LayerProps) {
   const chipRef = useRef<THREE.Group>(null);
 
   const bodyColor = isWhiteTheme ? '#e2d5c3' : '#2e323b';
@@ -364,8 +363,7 @@ export function CartoonAlexaBase({ isWhiteTheme, isHovered, explodedProgress }: 
   const chipGlowMaterial = useMemo(() => new THREE.MeshBasicMaterial({ color: '#f1c40f', toneMapped: false }), []);
   const ledThreeColor = useMemo(() => new THREE.Color(ACCENT_BLUE), []);
 
-  useFrame((state) => {
-    const t = state.clock.getElapsedTime();
+  useFrame(() => {
     // Processor chip slide up based on explodedProgress
     if (chipRef.current) {
       const targetZ = explodedProgress > 0.1 ? 0.15 : -0.05;
@@ -462,7 +460,7 @@ export function Pedestal({ outlineThickness = 1.3 }: { outlineThickness?: number
 }
 
 // 7. Core shaft (Central axis for vertical sliding)
-export function CoreShaft({ isWhiteTheme, explodedProgress }: { isWhiteTheme: boolean; explodedProgress: number }) {
+export function CoreShaft({ isWhiteTheme }: { isWhiteTheme: boolean; explodedProgress: number }) {
   const lineCol = isWhiteTheme ? LINE_LIGHT : LINE_DARK;
   return (
     <group position={[0, 0, 0]}>
