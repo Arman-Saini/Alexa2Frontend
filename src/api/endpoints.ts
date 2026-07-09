@@ -75,4 +75,18 @@ export const endpoints = {
   appStoreTemplate: '/api/app-store/modules/template',
   appStoreGenerate: '/api/app-store/generate-module',
   appStoreInstall: (moduleId: string, homeId = h) => `/api/app-store/modules/${moduleId}/install/${homeId}`,
+
+  // ── Scenario Builder ──────────────────────────────────────────────
+  scenarioBuilderPlan: '/api/scenario-builder/plan',
+
+  // ── Demo ──────────────────────────────────────────────────────────
+  demoScript: '/api/demo/script',
+
+  // ── Long-poll fallback (used when the WS connection is down) ──────
+  homePoll: (homeId = h, since: number) => `/api/homes/${homeId}/poll?since=${since}`,
+
+  // ── Khata (Bookkeeper) ──────────────────────────────────────────────
+  khataLog: (homeId = h) => `/api/homes/${homeId}/khata/log`,
+  khataLedger: (homeId = h) => `/api/homes/${homeId}/khata/ledger`,
+  khataSettle: (homeId = h) => `/api/homes/${homeId}/khata/settle`,
 } as const;

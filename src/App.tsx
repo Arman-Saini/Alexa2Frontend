@@ -1,20 +1,33 @@
-import { useState, useEffect } from 'react';
-import { DemoDashboard } from './components/demo/DemoDashboard';
-import { ConstructionMode } from './components/demo/ConstructionMode';
+import { useEffect, useState } from 'react';
+import { DigitalTwinCanvas } from './components/canvas/DigitalTwinCanvas';
+import { ActShell } from './components/acts/ActShell';
+import { EcosystemPage } from './components/ecosystem/EcosystemPage';
+
+type Route = 'home' | 'ecosystem';
+
+function routeFromHash(): Route {
+  return window.location.hash === '#/ecosystem' ? 'ecosystem' : 'home';
+}
 
 export default function App() {
-  const [page, setPage] = useState(
-    window.location.hash === '#/construct' ? 'construct' : 'dashboard'
-  );
+  const [route, setRoute] = useState<Route>(routeFromHash());
 
   useEffect(() => {
-    const handler = () => setPage(window.location.hash === '#/construct' ? 'construct' : 'dashboard');
+    const handler = () => setRoute(routeFromHash());
     window.addEventListener('hashchange', handler);
     return () => window.removeEventListener('hashchange', handler);
   }, []);
 
-  if (page === 'construct') {
-    return <ConstructionMode onBack={() => { window.location.hash = ''; }} />;
+  if (route === 'ecosystem') {
+    return <EcosystemPage />;
   }
-  return <DemoDashboard onOpenConstruct={() => { window.location.hash = '#/construct'; }} />;
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'var(--void-950)' }}>
+      <div style={{ position: 'absolute', inset: 0 }}>
+        <DigitalTwinCanvas />
+      </div>
+      <ActShell />
+    </div>
+  );
 }

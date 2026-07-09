@@ -2,7 +2,7 @@ import { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useAppStore } from '../../store/store';
-import { SCENARIOS } from '../demo/ScenarioDefs';
+import { SCENARIOS } from '../../constants/scenarioGlow';
 import { ROOM_BOUNDS } from '../../constants/roomBounds';
 
 // Map scenario roomGlow keys → roomBounds keys

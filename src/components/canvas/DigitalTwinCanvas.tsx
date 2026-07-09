@@ -7,19 +7,18 @@ import { useAppStore } from '../../store/store';
 import { House } from './House';
 import { RoomFurniture } from './RoomFurniture';
 import { EasterEggs } from './EasterEggs';
-import { speakNatural } from '../../utils/voice';
 import { Doors } from './Doors';
 import { CameraController } from './CameraController';
-import { MiniMap } from './MiniMap';
-import { SensorTooltip } from './SensorTooltip';
-import { DevicePanel } from './DevicePanel';
 import { SmartLights } from './SmartLights';
 import { GhostPreview } from './GhostPreview';
 import { sharedCameraRef, cameraTransitionRef } from './cameraRef';
 import { draggingObjectIdRef } from './dragRef';
 import { ScenarioReactor } from './ScenarioReactor';
 import { RoomWindows } from './RoomWindows';
+import { XRayEffect } from './XRayEffect';
+import { DevicePanel } from './DevicePanel';
 import { FurnitureInspector } from './FurnitureInspector';
+import { SensorTooltip } from './SensorTooltip';
 import { DoorInspector } from './DoorInspector';
 import { WindowInspector } from './WindowInspector';
 import type { AssetType } from '../../types';
@@ -130,27 +129,13 @@ export function DigitalTwinCanvas() {
   const {
     ui, rooms, placedObjects,
     setActiveRoom, setSelectedObject, exitPlacementMode,
-    toggleMiniMap, setAlexaTab, setListeningVoice, setActivePanel,
     addPlacedObject, enterPlacementMode, setDraggedAsset,
-    updatePlacedObject, exitLayoutEditMode, lockLayout, runLocalCommand,
+    updatePlacedObject,
+    selectedDoorId, setSelectedDoor, selectedWindowId, setSelectedWindow,
   } = useAppStore();
 
-  const [mousePos, setMousePos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
-  const [showCta, setShowCta] = useState(true);
-
-  // Onboarding: run a suggested command exactly like a real voice command so the judge
-  // sees the full choreography (room zoom → device animates → confirm glow → spoken reply).
-  const tryCommand = useCallback((cmd: string) => {
-    const res = runLocalCommand(cmd);
-    speakNatural(res.response);
-    setShowCta(false);
-  }, [runLocalCommand]);
   const canvasWrapperRef = useRef<HTMLDivElement>(null);
-
-  const hoveredObj = ui.hoveredObjectId
-    ? placedObjects.find((o) => o.id === ui.hoveredObjectId) ?? null
-    : null;
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -165,8 +150,6 @@ export function DigitalTwinCanvas() {
   }, [ui, setActiveRoom, setSelectedObject, exitPlacementMode]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    setMousePos({ x: e.clientX, y: e.clientY });
-
     const dragId = draggingObjectIdRef.current;
     if (!dragId || !ui.isLayoutEditMode) return;
 
@@ -292,6 +275,7 @@ export function DigitalTwinCanvas() {
           <ContactShadows position={[0, 0.01, 0]} opacity={0.8} scale={50} blur={1.6} far={6} color="#000008" />
           <SmartLights />
           <GhostPreview />
+          <XRayEffect />
           <CameraController />
           {/* 3/4 isometric with orbit ENABLED (per design spec §3): mouse drag / touch to
               orbit, scroll to zoom; room focus is driven by CameraController choreography. */}
@@ -343,165 +327,31 @@ export function DigitalTwinCanvas() {
         </Suspense>
       </Canvas>
 
-      {/* ── DOM tooltip overlay , renders OUTSIDE Canvas, no WebGL interference ── */}
-      {hoveredObj && !ui.isPlacementMode && (
-        <div
-          className="pointer-events-none"
-          style={{
-            position: 'fixed',
-            left: mousePos.x + 14,
-            top: mousePos.y - 14,
-            zIndex: 9999,
-            transform: 'translateY(-100%)',
-          }}
-        >
-          <SensorTooltip obj={hoveredObj} />
-        </div>
-      )}
+      {/* Act/UI chrome overlays mount here — added by later tickets (ActShell, inspectors) */}
+      {(() => {
+        const selectedObj = ui.selectedObjectId
+          ? placedObjects.find((o) => o.id === ui.selectedObjectId)
+          : undefined;
 
-      {/* ── Selected device panel (bottom-left, styled like Alexa card) ── */}
-      {ui.selectedObjectId && !ui.isPlacementMode && (() => {
-        const selectedObj = placedObjects.find(o => o.id === ui.selectedObjectId);
-        return selectedObj ? (
-          <div style={{ position: 'fixed', bottom: 16, left: 16, zIndex: 9998 }}>
+        if (selectedObj) {
+          return selectedObj.isAlexaDevice ? (
             <DevicePanel obj={selectedObj} onClose={() => setSelectedObject(null)} />
-          </div>
-        ) : null;
+          ) : (
+            <FurnitureInspector obj={selectedObj} onClose={() => setSelectedObject(null)} />
+          );
+        }
+        if (selectedDoorId) {
+          return <DoorInspector doorId={selectedDoorId} onClose={() => setSelectedDoor(null)} />;
+        }
+        if (selectedWindowId) {
+          return <WindowInspector windowId={selectedWindowId} onClose={() => setSelectedWindow(null)} />;
+        }
+        return null;
       })()}
-
-      {/* ── Furniture inspector (bottom-right) ── */}
-      <FurnitureInspector />
-      <DoorInspector />
-      <WindowInspector />
-
-      {/* Minimap */}
-      {ui.showMiniMap && !ui.isPlacementMode && <MiniMap />}
-      {!ui.isPlacementMode && !ui.showMiniMap && (
-        <button
-          onClick={toggleMiniMap}
-          className="absolute bottom-12 left-3 z-20 bg-[#1A1A1A] border border-[#404040] rounded-lg px-2 py-1.5 text-[10px] text-[#888888] hover:text-white hover:border-[#E8E8E6] transition-all"
-        >
-          Show Map
-        </button>
-      )}
-
-      {/* Room view controls */}
-      {ui.activeRoomId && !ui.isPlacementMode && (
-        <div className="absolute top-3 left-3 z-20 flex items-center gap-2">
-          <button
-            onClick={() => setActiveRoom(null)}
-            className="flex items-center gap-1.5 bg-white bg-opacity-85 border border-gray-200 rounded-full px-3 py-1.5 text-xs text-gray-700 hover:border-blue-400 hover:text-blue-600 transition-all shadow-md backdrop-blur-sm"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-            House View
-          </button>
-
-          <button
-            onClick={() => { setActivePanel('alexa'); setAlexaTab('home'); setListeningVoice(true); }}
-            className="flex items-center gap-2 bg-[#E8E8E6] hover:bg-[#0090C8] text-white rounded-full px-3 py-1.5 text-xs font-semibold shadow-lg transition-all"
-            style={{ boxShadow: '0 0 12px rgba(0,168,224,0.5)' }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="12" r="10" stroke="white" strokeWidth="2" opacity="0.4" />
-              <circle cx="12" cy="12" r="6"  stroke="white" strokeWidth="2.5" />
-              <circle cx="12" cy="12" r="2.5" fill="white" />
-            </svg>
-            Ask Alexa
-          </button>
-        </div>
-      )}
-
-      {/* Placement mode banner */}
-      {ui.isPlacementMode && (
-        <>
-          <div className="absolute inset-0 pointer-events-none border-2 border-[#E8E8E6] border-dashed opacity-50 rounded" />
-          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 bg-white bg-opacity-90 border border-blue-300 rounded-full px-4 py-1.5 shadow-lg">
-            <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-            <span className="text-xs font-semibold text-blue-700">
-              Click the floor to place {ui.placementAssetType?.replace(/-/g, ' ')}
-            </span>
-            <button
-              onClick={exitPlacementMode}
-              className="ml-2 text-[10px] text-gray-500 hover:text-gray-800 border border-gray-300 rounded-full px-2 py-0.5"
-            >
-              Cancel (Esc)
-            </button>
-          </div>
-        </>
-      )}
-
-      {/* Layout Edit Mode banner */}
-      {isEditMode && (
-        <>
-          <div className="absolute inset-0 pointer-events-none border-2 border-[#FF8C00] border-dashed opacity-40 rounded" />
-          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 bg-[#1A1000] bg-opacity-90 border border-[#FF8C00] rounded-full px-4 py-1.5 shadow-lg">
-            <span className="w-2 h-2 rounded-full bg-[#FF8C00] animate-pulse" />
-            <span className="text-xs font-semibold text-[#FF8C00]">Layout Edit Mode , drag objects to reposition</span>
-            <button
-              onClick={() => lockLayout()}
-              className="ml-2 text-[10px] bg-[#FF8C00] text-black font-bold rounded-full px-3 py-0.5 hover:bg-[#FFA030] transition-colors"
-            >
-              Lock Layout
-            </button>
-            <button
-              onClick={() => exitLayoutEditMode()}
-              className="text-[10px] text-[#FF8C00] hover:text-white border border-[#FF8C0066] rounded-full px-2 py-0.5"
-            >
-              Exit
-            </button>
-          </div>
-        </>
-      )}
-
-      {/* Layout locked badge */}
-      {ui.layoutLocked && !isEditMode && (
-        <div className="absolute top-3 right-3 z-20 flex items-center gap-1.5 bg-[#1A1000] border border-[#FF8C00] rounded-full px-3 py-1 text-[10px] text-[#FF8C00] font-semibold">
-          🔒 Layout Locked
-        </div>
-      )}
-
-      {/* Onboarding CTA , invites the judge to trigger Alexa and see the whole flow.
-          Each chip runs a real command (camera zoom + device animation + spoken reply). */}
-      {showCta && !ui.activeRoomId && !ui.isPlacementMode && (
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center gap-2">
-          <div className="flex items-center gap-2 text-[11px] text-white/90 font-medium">
-            <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#00C8FF] animate-pulse" />
-            Try Alexa , tap a command to see it run
-          </div>
-          <div className="flex items-center gap-2 flex-wrap justify-center max-w-[680px]">
-            {[
-              ['Turn on the bedroom fan', 'turn on the fan in the bedroom'],
-              ['Movie mode', 'movie mode'],
-              ['Good night', 'good night'],
-              ['Show the kitchen', 'show the kitchen'],
-            ].map(([label, cmd]) => (
-              <button
-                key={cmd}
-                onClick={() => tryCommand(cmd)}
-                className="bg-white/10 hover:bg-[#E8E8E6] border border-white/20 hover:border-[#00C8FF] text-white text-[11px] rounded-full px-3 py-1.5 backdrop-blur-md transition-all shadow-lg"
-              >
-                {label}
-              </button>
-            ))}
-            <button
-              onClick={() => setShowCta(false)}
-              className="text-white/40 hover:text-white/80 text-[11px] px-2 py-1.5"
-              title="Dismiss"
-            >
-              ✕
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Minimal controls hint once the CTA is dismissed */}
-      {!showCta && !ui.activeRoomId && !ui.isPlacementMode && (
-        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 text-[10px] text-white/70 bg-black/30 px-3 py-1.5 rounded-full pointer-events-none backdrop-blur-sm">
-          Click a room to zoom · Scroll to zoom · Ask Alexa to control devices
-        </div>
-      )}
+      {ui.hoveredObjectId && ui.hoveredObjectId !== ui.selectedObjectId && (() => {
+        const hoveredObj = placedObjects.find((o) => o.id === ui.hoveredObjectId);
+        return hoveredObj ? <SensorTooltip obj={hoveredObj} /> : null;
+      })()}
     </div>
   );
 }

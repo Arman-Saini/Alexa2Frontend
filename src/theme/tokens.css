@@ -1,0 +1,46 @@
+:root {
+  /* Void background scale (warm-tinted near-black, not neutral gray) */
+  --void-950: #050505;
+  --void-900: #0A0A0A;
+  --void-800: #121110;
+  --void-700: #1A1816;
+  --void-600: #241F1B;
+  --void-border: #2E2822;
+
+  /* Copper (structural accent) */
+  --copper-100: #F0DAC9;
+  --copper-300: #D9A98A;
+  --copper-500: #C08662;
+  --copper-600: #A96F50;
+  --copper-700: #8A5940;
+
+  /* Ember (restrained "alive/active" accent — use sparingly) */
+  --ember-300: #E8B368;
+  --ember-500: #D99A44;
+  --ember-600: #B87F35;
+
+  /* Text (warm off-white) */
+  --text-primary: #F2EDE6;
+  --text-secondary: #B8AFA4;
+  --text-tertiary: #7A7168;
+
+  /* Fonts */
+  --font-display: 'Bricolage Grotesque', system-ui, sans-serif;
+  --font-body: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+
+  /* Spacing scale */
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px;
+  --space-6: 24px; --space-8: 32px; --space-12: 48px; --space-16: 64px; --space-24: 96px;
+
+  /* Radius */
+  --r-sm: 8px; --r-md: 14px; --r-lg: 22px; --r-xl: 32px; --r-full: 999px;
+
+  /* Liquid glass (transient panels only): backdrop-filter must never be applied to persistent full-page chrome — GPU cost */
+  --glass-bg: rgba(18, 17, 16, 0.55);
+  --glass-border: rgba(192, 134, 98, 0.25);
+  --glass-blur: blur(24px) saturate(140%);
+  --shadow-copper-md: 0 8px 32px -8px rgba(192, 134, 98, 0.28), 0 2px 8px rgba(0, 0, 0, 0.35);
+  --shadow-ember-glow: 0 0 24px rgba(217, 154, 68, 0.35), 0 0 48px rgba(217, 154, 68, 0.15);
+  --glass-inset: inset 0 1px 0 rgba(242, 237, 230, 0.06);
+}
