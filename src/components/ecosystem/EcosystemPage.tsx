@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { ScrollReveal } from '../shared/ScrollReveal';
 import { MCPExplainer } from './MCPExplainer';
 import { BookkeeperLedger } from './BookkeeperLedger';
@@ -22,8 +23,8 @@ export function EcosystemPage() {
         boxSizing: 'border-box',
       }}
     >
-      <a
-        href="#"
+      <Link
+        to="/"
         style={{
           position: 'fixed',
           top: 'var(--space-6)',
@@ -36,7 +37,7 @@ export function EcosystemPage() {
         }}
       >
         ← Back to Hearth
-      </a>
+      </Link>
 
       {/* Main 2D App Store Section with Split Cards */}
       <div style={{ width: '100%', maxWidth: '1200px' }}>

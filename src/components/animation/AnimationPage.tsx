@@ -4,10 +4,11 @@ import { Link } from 'react-router-dom';
 import { HeroCanvas } from './HeroCanvas';
 
 const TOP_RIGHT_LABELS = [
-  { id: 'base', text: 'BARREL' },
-  { id: 'gearLarge', text: 'GEAR — LARGE' },
-  { id: 'gearSmall', text: 'GEAR — SMALL' },
-  { id: 'lens', text: 'LENS ELEMENT' },
+  { id: 'head', text: 'TOP DOME' },
+  { id: 'lens', text: 'ACOUSTIC LENS' },
+  { id: 'gearLarge', text: 'NLP PROCESSING MATRIX' },
+  { id: 'gearSmall', text: 'WAKE-WORD ENGINE' },
+  { id: 'base', text: 'BASE CONSOLE' },
 ];
 
 const BOTTOM_LEFT_LABELS = ['LATENCY', 'INTENT', 'ENTITY', 'RESPONSE', 'PIPELINE'];

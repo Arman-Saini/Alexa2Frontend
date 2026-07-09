@@ -5,13 +5,14 @@ import { useScroll } from '@react-three/drei';
 import * as THREE from 'three';
 import { easedExplodeProgress, layerTargetY } from '../../utils/explodeMath';
 import {
-  CoreShaft,
-  BarrelBase,
-  GearSmall,
-  GearMedium,
+  CartoonAlexaHead,
+  CartoonAlexaLens,
   GearLarge,
+  GearSmall,
+  CartoonAlexaBase,
+  Pedestal,
+  CoreShaft,
   SpinningWashers,
-  LensElement,
   type LayerProps,
 } from './ProceduralParts';
 
@@ -24,31 +25,27 @@ export interface EngineAssemblyProps {
 interface LayerDef {
   id: string;
   label: string;
-  closedX: number;
-  expandedX: number;
+  closedY: number;
+  expandedY: number;
   Component: React.ComponentType<LayerProps>;
 }
 
-// Base (tail) → lens (mouth), along the world X axis — the barrel
-// lies on its side. Adding a layer later: one array entry + one
-// component in ProceduralParts.tsx, no change to the math or camera
-// staging below.
+// Vertical exploded layers stacking: head is top dome, base is bottom console.
+// Spaced out symmetrically along Y axis.
 const LAYERS: LayerDef[] = [
-  { id: 'base', label: 'Barrel Base', closedX: 0.0, expandedX: 0.0, Component: BarrelBase },
-  { id: 'gearSmall', label: 'Gear — Small', closedX: 2.55, expandedX: 3.2, Component: GearSmall },
-  { id: 'gearMedium', label: 'Gear — Medium', closedX: 2.85, expandedX: 4.1, Component: GearMedium },
-  { id: 'gearLarge', label: 'Gear — Large', closedX: 3.15, expandedX: 5.0, Component: GearLarge },
-  { id: 'lens', label: 'Lens Element', closedX: 3.45, expandedX: 6.2, Component: LensElement },
+  { id: 'head', label: 'Top Dome', closedY: 0.0, expandedY: 2.4, Component: CartoonAlexaHead },
+  { id: 'lens', label: 'Acoustic Lens', closedY: 0.0, expandedY: 1.2, Component: CartoonAlexaLens },
+  { id: 'gearLarge', label: 'NLP Matrix', closedY: 0.0, expandedY: 0.0, Component: GearLarge },
+  { id: 'gearSmall', label: 'Wake-Word Engine', closedY: 0.0, expandedY: -1.2, Component: GearSmall },
+  { id: 'base', label: 'Base Console', closedY: 0.0, expandedY: -2.4, Component: CartoonAlexaBase },
 ];
 
-// Two camera "shots" blended by scroll progress: a near-frontal close
-// look at the lens at scroll 0, arcing to an elevated top-down view
-// of the fully opened barrel at scroll 1.
-const LENS_DIR = new THREE.Vector3(1, 0.3, 0.5).normalize();
-const TOP_DIR = new THREE.Vector3(0.35, 1.3, 0.55).normalize();
-const CAM_DISTANCE = 9;
-const LENS_LOOK_X = 3.45;
-const TOP_LOOK_X = 3.1;
+// Vertical camera blending: front face (0) to elevated top-down (1) view
+const LENS_DIR = new THREE.Vector3(0, 0.15, 1.0).normalize();
+const TOP_DIR = new THREE.Vector3(0.5, 0.8, 0.7).normalize();
+const CAM_DISTANCE = 7.2;
+const LENS_LOOK_Y = 0.3;
+const TOP_LOOK_Y = -0.2;
 
 export function EngineAssembly({ onScrollChange, onHoverChange, isWhiteTheme }: EngineAssemblyProps) {
   const scroll = useScroll();
@@ -56,7 +53,7 @@ export function EngineAssembly({ onScrollChange, onHoverChange, isWhiteTheme }: 
   const groupRef = useRef<THREE.Group>(null);
   const layerRefs = useRef<(THREE.Group | null)[]>([]);
   const lastProgressRef = useRef<number>(-1);
-  const lookTargetRef = useRef<THREE.Vector3>(new THREE.Vector3(LENS_LOOK_X, 0, 0));
+  const lookTargetRef = useRef<THREE.Vector3>(new THREE.Vector3(0, LENS_LOOK_Y, 0));
   const [hoveredId, setHoveredId] = useState<string | null>(null);
 
   const setLayerRef = (index: number) => (el: THREE.Group | null) => {
@@ -84,29 +81,27 @@ export function EngineAssembly({ onScrollChange, onHoverChange, isWhiteTheme }: 
     LAYERS.forEach((layer, idx) => {
       const ref = layerRefs.current[idx];
       if (!ref) return;
-      const targetX = layerTargetY(layer.closedX, layer.expandedX, eased);
-      ref.position.x = THREE.MathUtils.damp(ref.position.x, targetX, 8, delta);
+      const targetY = layerTargetY(layer.closedY, layer.expandedY, eased);
+      ref.position.y = THREE.MathUtils.damp(ref.position.y, targetY, 8, delta);
 
       const targetScale = hoveredId === layer.id ? 1.08 : 1.0;
       const currentScale = THREE.MathUtils.damp(ref.scale.x, targetScale, 8, delta);
       ref.scale.setScalar(currentScale);
     });
 
-    // Small idle sway only — the "moving to top view" reveal is the
-    // camera's job (below), not the object spinning under a fixed camera.
+    // Idle sway
     if (groupRef.current) {
       const idleSway = Math.sin(t * 0.4) * 0.02;
-      groupRef.current.rotation.z = THREE.MathUtils.damp(groupRef.current.rotation.z, idleSway, 6, delta);
+      groupRef.current.rotation.y = THREE.MathUtils.damp(groupRef.current.rotation.y, idleSway, 6, delta);
     }
 
-    // Two-shot camera blend: lens close-up (progress 0) → top-down
-    // opened-barrel view (progress 1), smoothstep-eased.
+    // Camera shot blend
     const shotT = THREE.MathUtils.clamp(progress, 0, 1);
     const easedT = shotT * shotT * (3 - 2 * shotT);
 
     const camDir = new THREE.Vector3().lerpVectors(LENS_DIR, TOP_DIR, easedT).normalize();
-    const lookX = THREE.MathUtils.lerp(LENS_LOOK_X, TOP_LOOK_X, easedT);
-    const desiredTarget = new THREE.Vector3(lookX, 0, 0);
+    const lookY = THREE.MathUtils.lerp(LENS_LOOK_Y, TOP_LOOK_Y, easedT);
+    const desiredTarget = new THREE.Vector3(0, lookY, 0);
     const desiredPos = desiredTarget.clone().addScaledVector(camDir, CAM_DISTANCE);
 
     state.camera.position.x = THREE.MathUtils.damp(state.camera.position.x, desiredPos.x, 6, delta);
@@ -118,10 +113,7 @@ export function EngineAssembly({ onScrollChange, onHoverChange, isWhiteTheme }: 
     lookTargetRef.current.z = THREE.MathUtils.damp(lookTargetRef.current.z, desiredTarget.z, 6, delta);
     state.camera.lookAt(lookTargetRef.current);
 
-    // Orthographic zoom is pixel-relative (drei's default frustum is
-    // ±size.width/2, ±size.height/2), so derive it from actual canvas
-    // size against a target world-space half-extent per stage, rather
-    // than a fixed zoom constant.
+    // Zoom calculation
     const shortSide = Math.min(state.size.width, state.size.height);
     const zoomForHalfExtent = (halfExtent: number) => shortSide / 2 / halfExtent;
     const baseHalfExtent = THREE.MathUtils.lerp(1.6, 2.8, easedT);
@@ -129,9 +121,7 @@ export function EngineAssembly({ onScrollChange, onHoverChange, isWhiteTheme }: 
     state.camera.zoom = THREE.MathUtils.damp(state.camera.zoom, zoomForHalfExtent(targetHalfExtent), 7, delta);
     state.camera.updateProjectionMatrix();
 
-    // Write screen-space coordinates for the diagonal leader lines drawn
-    // in AnimationPage.tsx — same imperative-DOM-write pattern the old
-    // ArchitectureStack.tsx used for its connector lines.
+    // Projected leader lines hookups
     LAYERS.forEach((layer, idx) => {
       const ref = layerRefs.current[idx];
       if (!ref) return;
@@ -165,15 +155,20 @@ export function EngineAssembly({ onScrollChange, onHoverChange, isWhiteTheme }: 
 
   return (
     <group ref={groupRef}>
-      <CoreShaft isWhiteTheme={isWhiteTheme} />
-      <SpinningWashers isWhiteTheme={isWhiteTheme} />
+      {scroll.offset > 0.05 && (
+        <>
+          <CoreShaft isWhiteTheme={isWhiteTheme} explodedProgress={scroll.offset} />
+          <SpinningWashers isWhiteTheme={isWhiteTheme} />
+        </>
+      )}
+      <Pedestal />
       {LAYERS.map((layer, idx) => {
         const Layer = layer.Component;
         return (
           <group
             key={layer.id}
             ref={setLayerRef(idx)}
-            position={[layer.closedX, 0, 0]}
+            position={[0, layer.closedY, 0]}
             onPointerOver={(e) => {
               e.stopPropagation();
               setHover(layer.id);
@@ -183,7 +178,11 @@ export function EngineAssembly({ onScrollChange, onHoverChange, isWhiteTheme }: 
               setHover(null);
             }}
           >
-            <Layer isWhiteTheme={isWhiteTheme} isHovered={hoveredId === layer.id} />
+            <Layer
+              isWhiteTheme={isWhiteTheme}
+              isHovered={hoveredId === layer.id}
+              explodedProgress={scroll.offset}
+            />
           </group>
         );
       })}

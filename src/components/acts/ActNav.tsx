@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { useActStore, type ActId } from '../../store/actStore';
 
 const ACT_LABELS: Record<ActId, string> = {
@@ -87,8 +88,8 @@ export function ActNav() {
 
       <div style={{ width: 1, height: 16, backgroundColor: 'var(--void-border)' }} />
 
-      <a
-        href="#/ecosystem"
+      <Link
+        to="/ecosystem"
         style={{
           fontFamily: 'var(--font-body)',
           fontSize: 11,
@@ -99,7 +100,55 @@ export function ActNav() {
         }}
       >
         App Store ↗
-      </a>
+      </Link>
+
+      <div style={{ width: 1, height: 16, backgroundColor: 'var(--void-border)' }} />
+
+      <Link
+        to="/animation"
+        style={{
+          fontFamily: 'var(--font-body)',
+          fontSize: 11,
+          fontWeight: 500,
+          color: 'var(--copper-300)',
+          textDecoration: 'none',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        3D Cascade ↗
+      </Link>
+
+      <div style={{ width: 1, height: 16, backgroundColor: 'var(--void-border)' }} />
+
+      <Link
+        to="/cartoon"
+        style={{
+          fontFamily: 'var(--font-body)',
+          fontSize: 11,
+          fontWeight: 500,
+          color: 'var(--copper-300)',
+          textDecoration: 'none',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        Cute Alexa ↗
+      </Link>
+
+      <div style={{ width: 1, height: 16, backgroundColor: 'var(--void-border)' }} />
+
+      <Link
+        to="/companion"
+        style={{
+          fontFamily: 'var(--font-body)',
+          fontSize: 11,
+          fontWeight: 500,
+          color: 'var(--copper-300)',
+          textDecoration: 'none',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        Companion App ↗
+      </Link>
     </nav>
   );
 }

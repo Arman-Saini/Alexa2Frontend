@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { GlassCard } from '../shared/GlassCard';
 import { useMic } from '../../hooks/useMic';
 import { useActStore } from '../../store/actStore';
@@ -433,8 +434,8 @@ export function PhoneMockup() {
                 paddingRight: '4px',
               }}
             >
-              <a
-                href="#/ecosystem"
+              <Link
+                to="/ecosystem"
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -449,8 +450,7 @@ export function PhoneMockup() {
                   textDecoration: 'none',
                   padding: '8px',
                   borderRadius: 'var(--r-md)',
-                  textAlign: 'center',
-                  transition: 'background 0.2s',
+                  transition: 'all 0.2s ease',
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.backgroundColor = 'rgba(217, 154, 68, 0.2)';
@@ -460,7 +460,7 @@ export function PhoneMockup() {
                 }}
               >
                 Open Full App Store ↗
-              </a>
+              </Link>
               {appModules.map((module) => {
                 const installed = installedModuleIds.includes(module.id);
                 const installing = installingId === module.id;
