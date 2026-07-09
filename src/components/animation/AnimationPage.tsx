@@ -254,6 +254,7 @@ export function AnimationPage() {
             setIsPanelOpen={setIsPanelOpen}
             isSpeaking={isSpeaking}
             isSinging={isSinging}
+            isWhiteTheme={isWhiteTheme}
           />
         </div>
 

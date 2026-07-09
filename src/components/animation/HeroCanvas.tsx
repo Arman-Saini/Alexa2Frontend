@@ -15,6 +15,7 @@ interface HeroCanvasProps {
   setIsPanelOpen: (open: boolean) => void;
   isSpeaking: boolean;
   isSinging: boolean;
+  isWhiteTheme: boolean;
 }
 
 // Platform/Pedestal for the mecha robot
@@ -63,6 +64,7 @@ export function HeroCanvas({
   setIsPanelOpen,
   isSpeaking,
   isSinging,
+  isWhiteTheme,
 }: HeroCanvasProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [isClicked, setIsClicked] = useState(false);
@@ -115,6 +117,7 @@ export function HeroCanvas({
             setIsPanelOpen={setIsPanelOpen}
             isSpeaking={isSpeaking}
             isSinging={isSinging}
+            isWhiteTheme={isWhiteTheme}
           />
         </group>
 

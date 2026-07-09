@@ -15,6 +15,7 @@ interface EngineAssemblyProps {
   setIsPanelOpen: (open: boolean) => void;
   isSpeaking: boolean;
   isSinging: boolean;
+  isWhiteTheme: boolean;
 }
 
 export function EngineAssembly({
@@ -29,6 +30,7 @@ export function EngineAssembly({
   setIsPanelOpen,
   isSpeaking,
   isSinging,
+  isWhiteTheme,
 }: EngineAssemblyProps) {
   const robotGroupRef = useRef<THREE.Group>(null);
   const antennaRef = useRef<THREE.Group>(null);
@@ -406,6 +408,14 @@ export function EngineAssembly({
       children.forEach((child, i) => {
         child.rotation.z = rotationAngle + (i * Math.PI * 2) / 6;
       });
+    }
+
+    // Rotate cogs in opposite directions
+    if (gearLargeRef.current) {
+      gearLargeRef.current.rotation.y = t * 0.5;
+    }
+    if (gearSmallRef.current) {
+      gearSmallRef.current.rotation.y = -t * 1.0;
     }
 
     // Animate leader line screen projections
