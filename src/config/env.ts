@@ -22,4 +22,7 @@ export const env = {
 
   // Set to false in production when nginx WebSocket proxy is not configured
   WS_ENABLED: optional('VITE_WS_ENABLED', 'true') === 'true',
+
+  // API secret key — must match API_SECRET_KEY on the backend
+  API_SECRET: optional('VITE_API_SECRET_KEY', ''),
 } as const;

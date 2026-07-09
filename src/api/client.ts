@@ -38,6 +38,9 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   if (body !== undefined && rawBody === undefined) {
     headers['Content-Type'] = 'application/json';
   }
+  // API key guard: inject on every request if configured
+  const apiSecret = import.meta.env.VITE_API_SECRET_KEY as string | undefined;
+  if (apiSecret) headers['x-api-key'] = apiSecret;
   Object.assign(headers, extraHeaders as Record<string, string>);
 
   if (import.meta.env.VITE_API_DEBUG === 'true') {

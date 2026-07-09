@@ -47,7 +47,8 @@ function createSocket() {
   if (_circuitOpen) return;
   if (_ws && (_ws.readyState === WebSocket.OPEN || _ws.readyState === WebSocket.CONNECTING)) return;
 
-  const url = backendState.url.replace(/^http/, 'ws') + `/ws?home_id=${env.HOME_ID}`;
+  const token = env.API_SECRET ? `&token=${encodeURIComponent(env.API_SECRET)}` : '';
+  const url = backendState.url.replace(/^http/, 'ws') + `/ws?home_id=${env.HOME_ID}${token}`;
   console.log('[WS] Connecting to', url);
 
   try {
