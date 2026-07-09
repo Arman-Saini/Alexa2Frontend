@@ -6,10 +6,12 @@ import * as THREE from 'three';
 import { easedExplodeProgress, layerTargetY } from '../../utils/explodeMath';
 import {
   CoreShaft,
-  LensElement,
-  GearUpper,
-  GearLower,
   BarrelBase,
+  GearSmall,
+  GearMedium,
+  GearLarge,
+  SpinningWashers,
+  LensElement,
   type LayerProps,
 } from './ProceduralParts';
 
@@ -22,18 +24,31 @@ export interface EngineAssemblyProps {
 interface LayerDef {
   id: string;
   label: string;
-  closedY: number;
-  expandedY: number;
+  closedX: number;
+  expandedX: number;
   Component: React.ComponentType<LayerProps>;
 }
 
-// Bottom-to-top spatial order. Barrel Base is the fixed anchor (offsets 0/0).
+// Base (tail) → lens (mouth), along the world X axis — the barrel
+// lies on its side. Adding a layer later: one array entry + one
+// component in ProceduralParts.tsx, no change to the math or camera
+// staging below.
 const LAYERS: LayerDef[] = [
-  { id: 'base', label: 'Barrel Base', closedY: 0.0, expandedY: 0.0, Component: BarrelBase },
-  { id: 'gearLower', label: 'Lower Gear', closedY: 0.42, expandedY: 1.6, Component: GearLower },
-  { id: 'gearUpper', label: 'Upper Gear', closedY: 0.84, expandedY: 3.2, Component: GearUpper },
-  { id: 'lens', label: 'Lens Element', closedY: 1.26, expandedY: 4.8, Component: LensElement },
+  { id: 'base', label: 'Barrel Base', closedX: 0.0, expandedX: 0.0, Component: BarrelBase },
+  { id: 'gearSmall', label: 'Gear — Small', closedX: 2.55, expandedX: 3.2, Component: GearSmall },
+  { id: 'gearMedium', label: 'Gear — Medium', closedX: 2.85, expandedX: 4.1, Component: GearMedium },
+  { id: 'gearLarge', label: 'Gear — Large', closedX: 3.15, expandedX: 5.0, Component: GearLarge },
+  { id: 'lens', label: 'Lens Element', closedX: 3.45, expandedX: 6.2, Component: LensElement },
 ];
+
+// Two camera "shots" blended by scroll progress: a near-frontal close
+// look at the lens at scroll 0, arcing to an elevated top-down view
+// of the fully opened barrel at scroll 1.
+const LENS_DIR = new THREE.Vector3(1, 0.3, 0.5).normalize();
+const TOP_DIR = new THREE.Vector3(0.35, 1.3, 0.55).normalize();
+const CAM_DISTANCE = 9;
+const LENS_LOOK_X = 3.45;
+const TOP_LOOK_X = 3.1;
 
 export function EngineAssembly({ onScrollChange, onHoverChange, isWhiteTheme }: EngineAssemblyProps) {
   const scroll = useScroll();
@@ -41,6 +56,7 @@ export function EngineAssembly({ onScrollChange, onHoverChange, isWhiteTheme }: 
   const groupRef = useRef<THREE.Group>(null);
   const layerRefs = useRef<(THREE.Group | null)[]>([]);
   const lastProgressRef = useRef<number>(-1);
+  const lookTargetRef = useRef<THREE.Vector3>(new THREE.Vector3(LENS_LOOK_X, 0, 0));
   const [hoveredId, setHoveredId] = useState<string | null>(null);
 
   const setLayerRef = (index: number) => (el: THREE.Group | null) => {
@@ -68,74 +84,49 @@ export function EngineAssembly({ onScrollChange, onHoverChange, isWhiteTheme }: 
     LAYERS.forEach((layer, idx) => {
       const ref = layerRefs.current[idx];
       if (!ref) return;
-      const targetY = layerTargetY(layer.closedY, layer.expandedY, eased);
-      ref.position.y = THREE.MathUtils.damp(ref.position.y, targetY, 8, delta);
+      const targetX = layerTargetY(layer.closedX, layer.expandedX, eased);
+      ref.position.x = THREE.MathUtils.damp(ref.position.x, targetX, 8, delta);
 
       const targetScale = hoveredId === layer.id ? 1.08 : 1.0;
       const currentScale = THREE.MathUtils.damp(ref.scale.x, targetScale, 8, delta);
       ref.scale.setScalar(currentScale);
     });
 
+    // Small idle sway only — the "moving to top view" reveal is the
+    // camera's job (below), not the object spinning under a fixed camera.
     if (groupRef.current) {
-      groupRef.current.position.x = THREE.MathUtils.damp(groupRef.current.position.x, 0, 6, delta);
-
-      // Wide reorientation sweep (vertical → diagonal isometric) as the
-      // object explodes, matching the animejs.com reference's rotation.
-      const baseRotY = Math.PI / 5;
-      const targetRotY = baseRotY + progress * (Math.PI * 0.55);
-      const idleSway = Math.sin(t * 0.4) * 0.03;
-      groupRef.current.rotation.y = THREE.MathUtils.damp(groupRef.current.rotation.y, targetRotY + idleSway, 6, delta);
-
-      const baseRotX = 0.45;
-      const targetRotX = baseRotX + progress * 0.22;
-      const idlePitch = Math.cos(t * 0.5) * 0.015;
-      groupRef.current.rotation.x = THREE.MathUtils.damp(groupRef.current.rotation.x, targetRotX + idlePitch, 6, delta);
+      const idleSway = Math.sin(t * 0.4) * 0.02;
+      groupRef.current.rotation.z = THREE.MathUtils.damp(groupRef.current.rotation.z, idleSway, 6, delta);
     }
+
+    // Two-shot camera blend: lens close-up (progress 0) → top-down
+    // opened-barrel view (progress 1), smoothstep-eased.
+    const shotT = THREE.MathUtils.clamp(progress, 0, 1);
+    const easedT = shotT * shotT * (3 - 2 * shotT);
+
+    const camDir = new THREE.Vector3().lerpVectors(LENS_DIR, TOP_DIR, easedT).normalize();
+    const lookX = THREE.MathUtils.lerp(LENS_LOOK_X, TOP_LOOK_X, easedT);
+    const desiredTarget = new THREE.Vector3(lookX, 0, 0);
+    const desiredPos = desiredTarget.clone().addScaledVector(camDir, CAM_DISTANCE);
+
+    state.camera.position.x = THREE.MathUtils.damp(state.camera.position.x, desiredPos.x, 6, delta);
+    state.camera.position.y = THREE.MathUtils.damp(state.camera.position.y, desiredPos.y, 6, delta);
+    state.camera.position.z = THREE.MathUtils.damp(state.camera.position.z, desiredPos.z, 6, delta);
+
+    lookTargetRef.current.x = THREE.MathUtils.damp(lookTargetRef.current.x, desiredTarget.x, 6, delta);
+    lookTargetRef.current.y = THREE.MathUtils.damp(lookTargetRef.current.y, desiredTarget.y, 6, delta);
+    lookTargetRef.current.z = THREE.MathUtils.damp(lookTargetRef.current.z, desiredTarget.z, 6, delta);
+    state.camera.lookAt(lookTargetRef.current);
 
     // Orthographic zoom is pixel-relative (drei's default frustum is
-    // ±size.width/2, ±size.height/2), so a fixed zoom constant renders
-    // at wildly different scales across viewports. Instead pick a target
-    // *world-space half-extent* the object should fill per stage, and
-    // derive zoom from the actual canvas size so the object always
-    // dominates the frame the same way regardless of screen size.
+    // ±size.width/2, ±size.height/2), so derive it from actual canvas
+    // size against a target world-space half-extent per stage, rather
+    // than a fixed zoom constant.
     const shortSide = Math.min(state.size.width, state.size.height);
     const zoomForHalfExtent = (halfExtent: number) => shortSide / 2 / halfExtent;
-
-    let targetHalfExtent: number;
-    let lookAtY: number;
-
-    if (progress < 0.2) {
-      // Overview: whole closed assembly (~4 units across) fills most of frame.
-      targetHalfExtent = isMobile ? 3.0 : 2.3;
-      lookAtY = 0.6;
-    } else if (progress < 0.8) {
-      const u = (progress - 0.2) / 0.6;
-      targetHalfExtent = THREE.MathUtils.lerp(isMobile ? 3.0 : 2.3, isMobile ? 2.2 : 1.7, u);
-      lookAtY = THREE.MathUtils.lerp(0.6, 2.0, u);
-    } else {
-      const u = (progress - 0.8) / 0.2;
-      const easedU = u * u * (3 - 2 * u);
-      // Deep zoom onto the Acoustic Ring, echoing the reference's close-up finale.
-      targetHalfExtent = THREE.MathUtils.lerp(isMobile ? 2.2 : 1.7, isMobile ? 1.3 : 0.95, easedU);
-      lookAtY = THREE.MathUtils.lerp(2.0, 4.6, easedU);
-    }
-
-    const targetZoom = zoomForHalfExtent(targetHalfExtent);
-    state.camera.zoom = THREE.MathUtils.damp(state.camera.zoom, targetZoom, 7, delta);
-
-    const camBase = 10;
-    state.camera.position.set(
-      camBase,
-      THREE.MathUtils.damp(state.camera.position.y, camBase + lookAtY, 7, delta),
-      camBase
-    );
-
-    const currentLookTarget = new THREE.Vector3(
-      0,
-      THREE.MathUtils.damp(state.camera.position.y - camBase, lookAtY, 7, delta),
-      0
-    );
-    state.camera.lookAt(currentLookTarget);
+    const baseHalfExtent = THREE.MathUtils.lerp(1.6, 2.8, easedT);
+    const targetHalfExtent = isMobile ? baseHalfExtent * 1.35 : baseHalfExtent;
+    state.camera.zoom = THREE.MathUtils.damp(state.camera.zoom, zoomForHalfExtent(targetHalfExtent), 7, delta);
     state.camera.updateProjectionMatrix();
 
     // Write screen-space coordinates for the diagonal leader lines drawn
@@ -175,13 +166,14 @@ export function EngineAssembly({ onScrollChange, onHoverChange, isWhiteTheme }: 
   return (
     <group ref={groupRef}>
       <CoreShaft isWhiteTheme={isWhiteTheme} />
+      <SpinningWashers isWhiteTheme={isWhiteTheme} />
       {LAYERS.map((layer, idx) => {
         const Layer = layer.Component;
         return (
           <group
             key={layer.id}
             ref={setLayerRef(idx)}
-            position={[0, layer.closedY, 0]}
+            position={[layer.closedX, 0, 0]}
             onPointerOver={(e) => {
               e.stopPropagation();
               setHover(layer.id);
