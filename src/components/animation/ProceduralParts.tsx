@@ -1,68 +1,65 @@
-import { useRef, useEffect, useMemo } from 'react';
+import { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
 // ---------------------------------------------------------------
-// SHARED: flat-shaded toon part with an inverted-hull ink outline.
-// Same technique as frontend/src/components/cartoon/CuteAlexaModel.tsx:
-// a duplicate mesh, scaled up slightly, BackSide-only material.
+// Hairline technical-drafting outline colors (theme-aware) and the
+// two brand accents, reused across every glass part in this object.
 // ---------------------------------------------------------------
-export interface ToonPartProps {
-  color: string;
+const LINE_LIGHT = '#2E2B28';
+const LINE_DARK = '#D9A98A';
+const ACCENT_BLUE = '#3da5e0';
+const ACCENT_EMBER = '#D99A44';
+
+// ---------------------------------------------------------------
+// SHARED: liquid-glass part — real transmission/refraction material
+// (MeshPhysicalMaterial), plus a thin inverted-hull outline (same
+// technique as the app's other toon-shaded parts: a duplicate mesh,
+// scaled up slightly, BackSide-only) so edges stay legible against
+// a transmissive fill instead of dissolving into the background.
+// `roughness` controls clear (barrel/lens, ~0.05) vs frosted
+// (gears/washers, ~0.35) glass.
+// ---------------------------------------------------------------
+export interface GlassPartProps {
   outlineColor: string;
+  roughness?: number;
   outlineScale?: number;
   position?: [number, number, number];
   rotation?: [number, number, number];
   castShadow?: boolean;
-  receiveShadow?: boolean;
   children: React.ReactElement;
 }
 
-export function ToonPart({
-  color,
+export function GlassPart({
   outlineColor,
-  outlineScale = 1.02,
+  roughness = 0.05,
+  outlineScale = 1.015,
   position,
   rotation,
   castShadow,
-  receiveShadow,
   children,
-}: ToonPartProps) {
+}: GlassPartProps) {
   return (
     <group position={position} rotation={rotation}>
-      <mesh castShadow={castShadow} receiveShadow={receiveShadow}>
+      <mesh castShadow={castShadow}>
         {children}
-        <meshBasicMaterial color={color} />
+        <meshPhysicalMaterial
+          color="#ffffff"
+          transmission={1}
+          roughness={roughness}
+          thickness={0.45}
+          ior={1.5}
+          clearcoat={1}
+          clearcoatRoughness={0.08}
+          attenuationColor={outlineColor}
+          attenuationDistance={0.6}
+        />
       </mesh>
       <mesh scale={outlineScale}>
         {children}
-        <meshBasicMaterial color={outlineColor} side={THREE.BackSide} />
+        <meshBasicMaterial color={outlineColor} side={THREE.BackSide} transparent opacity={0.6} />
       </mesh>
     </group>
-  );
-}
-
-// ---------------------------------------------------------------
-// Central shaft — fixed in place, layers slide along it when exploded.
-// Sized to span from the Cloud Base (y=0) to the fully-expanded
-// Acoustic Ring (y=4.8, see LAYERS in EngineAssembly.tsx) plus padding.
-// ---------------------------------------------------------------
-// Hairline technical-drafting palette: body fill sits close to the page
-// background so the object reads mostly through its outline strokes and
-// ring seams, like the animejs.com reference — not flat toy-block color.
-const LINE_LIGHT = '#2E2B28';
-const LINE_DARK = '#D9A98A';
-
-export function CoreShaft({ isWhiteTheme }: { isWhiteTheme: boolean }) {
-  return (
-    <ToonPart
-      color={isWhiteTheme ? '#DED7CC' : '#161412'}
-      outlineColor={isWhiteTheme ? LINE_LIGHT : LINE_DARK}
-      outlineScale={1.015}
-      position={[0, 2.2, 0]}
-    >
-      <cylinderGeometry args={[0.35, 0.35, 6.2, 24]} />
-    </ToonPart>
   );
 }
 
@@ -72,116 +69,89 @@ export interface LayerProps {
 }
 
 // ---------------------------------------------------------------
-// LAYER 1 (top): Acoustic Wave Ring — torus bezel + glass-look lens +
-// instanced pulsing waveform nodes + the one glowing Alexa-blue "AI heart".
+// Central shaft — fixed in place, the gear/lens layers slide along
+// it (world X axis — the barrel lies on its side) as the barrel
+// opens. Spans x=0 (Barrel Base) to x=6.2 (Lens Element fully
+// expanded, see LAYERS in EngineAssembly.tsx), with margin.
 // ---------------------------------------------------------------
-export function AcousticRing({ isWhiteTheme, isHovered }: LayerProps) {
-  const nodesRef = useRef<THREE.InstancedMesh>(null);
-  const glowRef = useRef<THREE.Mesh>(null);
-
-  const bodyColor = isWhiteTheme ? '#E4DDD2' : '#181613';
+export function CoreShaft({ isWhiteTheme }: { isWhiteTheme: boolean }) {
   const lineColor = isWhiteTheme ? LINE_LIGHT : LINE_DARK;
-  const lensColor = isWhiteTheme ? '#F2EDE6' : '#0F0E0C';
-  const glowColor = '#3da5e0';
+  return (
+    <GlassPart outlineColor={lineColor} position={[3.3, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+      <cylinderGeometry args={[0.28, 0.28, 6.8, 24]} />
+    </GlassPart>
+  );
+}
 
-  useFrame((state) => {
-    const t = state.clock.getElapsedTime();
-
-    if (nodesRef.current) {
-      const obj = new THREE.Object3D();
-      for (let i = 0; i < 24; i++) {
-        const angle = (i / 24) * Math.PI * 2;
-        const pulse = 0.06 + Math.abs(Math.sin(t * 2.4 + i * 0.5)) * 0.05;
-        obj.position.set(Math.cos(angle) * 0.95, 0.05, Math.sin(angle) * 0.95);
-        obj.scale.setScalar(pulse);
-        obj.updateMatrix();
-        nodesRef.current.setMatrixAt(i, obj.matrix);
-      }
-      nodesRef.current.instanceMatrix.needsUpdate = true;
-    }
-
-    if (glowRef.current) {
-      const breathe = 1.0 + Math.sin(t * 1.6) * 0.08;
-      const hoverBoost = THREE.MathUtils.damp(glowRef.current.scale.x, breathe * (isHovered ? 1.15 : 1.0), 8, state.clock.getDelta());
-      glowRef.current.scale.setScalar(hoverBoost);
-    }
-  });
+// ---------------------------------------------------------------
+// LAYER (fixed anchor, doesn't move): Barrel Base — the tail-end
+// housing. 4 thin grip-ridge rings for a milled-barrel read.
+// ---------------------------------------------------------------
+export function BarrelBase({ isWhiteTheme }: LayerProps) {
+  const lineColor = isWhiteTheme ? LINE_LIGHT : LINE_DARK;
+  const ridgeXs = [0.55, 0.95, 1.35, 1.75];
 
   return (
     <group>
-      <ToonPart color={bodyColor} outlineColor={lineColor} outlineScale={1.015} castShadow>
-        <torusGeometry args={[1.3, 0.18, 12, 32]} />
-      </ToonPart>
-      <ToonPart color={lensColor} outlineColor={lineColor} outlineScale={1.015} position={[0, 0.1, 0]}>
-        <cylinderGeometry args={[1.1, 1.1, 0.06, 32]} />
-      </ToonPart>
-      <mesh ref={glowRef} position={[0, 0.14, 0]}>
-        <sphereGeometry args={[0.22, 16, 16]} />
-        <meshBasicMaterial color={glowColor} toneMapped={false} />
-      </mesh>
-      <instancedMesh ref={nodesRef} args={[undefined, undefined, 24]}>
-        <sphereGeometry args={[1, 6, 6]} />
-        <meshBasicMaterial color={glowColor} toneMapped={false} />
-      </instancedMesh>
+      <GlassPart outlineColor={lineColor} position={[1.2, 0, 0]} rotation={[0, 0, Math.PI / 2]} castShadow>
+        <cylinderGeometry args={[1.2, 1.35, 2.4, 24]} />
+      </GlassPart>
+      {ridgeXs.map((x) => (
+        <GlassPart key={x} outlineColor={lineColor} outlineScale={1.02} position={[x, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+          <cylinderGeometry args={[1.24, 1.24, 0.06, 24]} />
+        </GlassPart>
+      ))}
     </group>
   );
 }
 
 // ---------------------------------------------------------------
-// LAYER 2: Wake Word Detector — faceted hex drum, static (no idle
-// spin — reads as inert/listening, not running), one ember accent band.
+// SHARED: one gear size — frosted-glass disk + a ring of small
+// flat-shaded teeth (instanced), continuously rotating around the
+// shaft (local X) at its own fixed speed, independent of scroll.
 // ---------------------------------------------------------------
-export function WakeWordDrum({ isWhiteTheme }: LayerProps) {
-  const bodyColor = isWhiteTheme ? '#E4DDD2' : '#181613';
-  const lineColor = isWhiteTheme ? LINE_LIGHT : LINE_DARK;
-  const bandColor = '#D99A44';
-
-  return (
-    <group>
-      <ToonPart color={bodyColor} outlineColor={lineColor} outlineScale={1.015} castShadow>
-        <cylinderGeometry args={[1.2, 1.2, 0.7, 6]} />
-      </ToonPart>
-      <ToonPart color={bandColor} outlineColor={lineColor} outlineScale={1.015} position={[0, 0.36, 0]}>
-        <cylinderGeometry args={[1.22, 1.22, 0.08, 6]} />
-      </ToonPart>
-    </group>
-  );
+interface GearDiskConfig {
+  radius: number;
+  thickness: number;
+  teethCount: number;
+  teethSize: number;
+  rotationSpeed: number;
+  lineColor: string;
 }
 
-// ---------------------------------------------------------------
-// LAYER 3: NLP Matrix — ring of instanced logic blocks around the
-// shaft, whole ring slow-rotates (counter to the Acoustic Ring above).
-// ---------------------------------------------------------------
-export function NlpMatrix({ isWhiteTheme }: LayerProps) {
+function GearDisk({ radius, thickness, teethCount, teethSize, rotationSpeed, lineColor }: GearDiskConfig) {
   const groupRef = useRef<THREE.Group>(null);
-  const blocksRef = useRef<THREE.InstancedMesh>(null);
-  const bodyColor = isWhiteTheme ? '#E4DDD2' : '#181613';
-  const lineColor = isWhiteTheme ? LINE_LIGHT : LINE_DARK;
+  const teethRef = useRef<THREE.InstancedMesh>(null);
 
-  useEffect(() => {
-    if (!blocksRef.current) return;
+  const teethMatrices = useMemo(() => {
+    const matrices: THREE.Matrix4[] = [];
     const obj = new THREE.Object3D();
-    for (let i = 0; i < 16; i++) {
-      const angle = (i / 16) * Math.PI * 2;
-      obj.position.set(Math.cos(angle) * 1.0, 0, Math.sin(angle) * 1.0);
-      obj.rotation.y = -angle;
+    for (let i = 0; i < teethCount; i++) {
+      const angle = (i / teethCount) * Math.PI * 2;
+      obj.position.set(0, Math.cos(angle) * radius, Math.sin(angle) * radius);
+      obj.rotation.x = -angle;
       obj.updateMatrix();
-      blocksRef.current.setMatrixAt(i, obj.matrix);
+      matrices.push(obj.matrix.clone());
     }
-    blocksRef.current.instanceMatrix.needsUpdate = true;
-  }, []);
+    return matrices;
+  }, [teethCount, radius]);
 
   useFrame((_, delta) => {
-    if (groupRef.current) groupRef.current.rotation.y += delta * 0.25;
+    if (groupRef.current) groupRef.current.rotation.x += delta * rotationSpeed;
+    if (teethRef.current && !teethRef.current.userData.initialized) {
+      teethMatrices.forEach((m, i) => teethRef.current!.setMatrixAt(i, m));
+      teethRef.current.instanceMatrix.needsUpdate = true;
+      teethRef.current.userData.initialized = true;
+    }
   });
 
   return (
     <group ref={groupRef}>
-      <ToonPart color={bodyColor} outlineColor={lineColor} outlineScale={1.015} castShadow>
-        <cylinderGeometry args={[1.25, 1.25, 0.45, 20]} />
-      </ToonPart>
-      <instancedMesh ref={blocksRef} args={[undefined, undefined, 16]} castShadow>
-        <boxGeometry args={[0.14, 0.5, 0.14]} />
+      <GlassPart outlineColor={lineColor} roughness={0.35} rotation={[0, 0, Math.PI / 2]}>
+        <cylinderGeometry args={[radius, radius, thickness, 20]} />
+      </GlassPart>
+      <instancedMesh ref={teethRef} args={[undefined, undefined, teethCount]} castShadow>
+        <boxGeometry args={[teethSize * 0.8, teethSize * 1.4, teethSize]} />
         <meshBasicMaterial color={lineColor} />
       </instancedMesh>
     </group>
@@ -189,47 +159,116 @@ export function NlpMatrix({ isWhiteTheme }: LayerProps) {
 }
 
 // ---------------------------------------------------------------
-// LAYER 4 (bottom, fixed anchor): Cloud Action Base — flared foot
-// ring with punched vents, slow-pulsing ground shadow.
-// Vents are solid dark cylinders set into the ring, not real CSG
-// cutouts — ponytail: visual trick, upgrade to real holes (ExtrudeGeometry
-// with a hole path) only if a close-up shot ever needs it.
+// LAYER: Gear Small — deepest, closest to the Barrel Base. Fastest.
 // ---------------------------------------------------------------
-export function CloudBase({ isWhiteTheme }: LayerProps) {
-  const shadowMatRef = useRef<THREE.MeshBasicMaterial>(null);
-  const bodyColor = isWhiteTheme ? '#E4DDD2' : '#181613';
+export function GearSmall({ isWhiteTheme }: LayerProps) {
   const lineColor = isWhiteTheme ? LINE_LIGHT : LINE_DARK;
-  const ventColor = isWhiteTheme ? '#ECE6DF' : '#0A0A0A';
+  return <GearDisk radius={0.65} thickness={0.16} teethCount={12} teethSize={0.1} rotationSpeed={0.6} lineColor={lineColor} />;
+}
 
-  const vents = useMemo(
+// ---------------------------------------------------------------
+// LAYER: Gear Medium — mid-depth, counter-rotates against the others.
+// ---------------------------------------------------------------
+export function GearMedium({ isWhiteTheme }: LayerProps) {
+  const lineColor = isWhiteTheme ? LINE_LIGHT : LINE_DARK;
+  return <GearDisk radius={0.9} thickness={0.2} teethCount={16} teethSize={0.13} rotationSpeed={-0.35} lineColor={lineColor} />;
+}
+
+// ---------------------------------------------------------------
+// LAYER: Gear Large — closest to the lens cap. Biggest, slowest.
+// ---------------------------------------------------------------
+export function GearLarge({ isWhiteTheme }: LayerProps) {
+  const lineColor = isWhiteTheme ? LINE_LIGHT : LINE_DARK;
+  return <GearDisk radius={1.15} thickness={0.24} teethCount={20} teethSize={0.15} rotationSpeed={0.22} lineColor={lineColor} />;
+}
+
+// ---------------------------------------------------------------
+// Always-spinning small-gear texture between the 3 named gears —
+// ambient clockwork detail, not a scroll-driven explode layer. Sits
+// in the x=0.6..3.0 gap and never moves; only rotates.
+// ---------------------------------------------------------------
+export function SpinningWashers({ isWhiteTheme }: { isWhiteTheme: boolean }) {
+  const lineColor = isWhiteTheme ? LINE_LIGHT : LINE_DARK;
+  const ref = useRef<THREE.InstancedMesh>(null);
+
+  const placements = useMemo(
     () =>
-      Array.from({ length: 8 }, (_, i) => {
-        const angle = (i / 8) * Math.PI * 2;
-        return [Math.cos(angle) * 1.75, 0, Math.sin(angle) * 1.75] as [number, number, number];
+      Array.from({ length: 12 }, (_, i) => {
+        const seed = i * 137.5; // golden-angle spread, deterministic
+        const x = 0.6 + ((seed % 240) / 100);
+        const angle = (seed % 360) * (Math.PI / 180);
+        const dist = 0.15 + ((seed % 20) / 100);
+        return {
+          position: new THREE.Vector3(x, Math.cos(angle) * dist, Math.sin(angle) * dist),
+          phase: i * 0.4,
+          speed: 0.9 + (i % 4) * 0.3 * (i % 2 === 0 ? 1 : -1),
+        };
       }),
     []
   );
 
   useFrame((state) => {
-    if (shadowMatRef.current) {
-      shadowMatRef.current.opacity = 0.25 + Math.sin(state.clock.getElapsedTime() * 1.2) * 0.08;
+    if (!ref.current) return;
+    const t = state.clock.getElapsedTime();
+    const obj = new THREE.Object3D();
+    placements.forEach((p, i) => {
+      obj.position.copy(p.position);
+      obj.rotation.x = p.phase + t * p.speed;
+      obj.updateMatrix();
+      ref.current!.setMatrixAt(i, obj.matrix);
+    });
+    ref.current.instanceMatrix.needsUpdate = true;
+  });
+
+  return (
+    <instancedMesh ref={ref} args={[undefined, undefined, placements.length]}>
+      <torusGeometry args={[0.09, 0.025, 6, 10]} />
+      <meshBasicMaterial color={lineColor} transparent opacity={0.7} />
+    </instancedMesh>
+  );
+}
+
+// ---------------------------------------------------------------
+// LAYER (biggest explode travel): Lens Element — 3 concentric clear
+// glass rings + 2 thin colored rim accents + a breathing glow core.
+// This is what the scene opens on in close-up before the camera
+// pulls back to the top view.
+// ---------------------------------------------------------------
+export function LensElement({ isWhiteTheme, isHovered }: LayerProps) {
+  const glowRef = useRef<THREE.Mesh>(null);
+  const lineColor = isWhiteTheme ? LINE_LIGHT : LINE_DARK;
+
+  useFrame((state, delta) => {
+    if (glowRef.current) {
+      const breathe = 1.0 + Math.sin(state.clock.getElapsedTime() * 1.6) * 0.08;
+      const target = breathe * (isHovered ? 1.15 : 1.0);
+      const current = THREE.MathUtils.damp(glowRef.current.scale.x, target, 8, delta);
+      glowRef.current.scale.setScalar(current);
     }
   });
 
   return (
     <group>
-      <ToonPart color={bodyColor} outlineColor={lineColor} outlineScale={1.015} castShadow receiveShadow>
-        <cylinderGeometry args={[1.6, 1.9, 0.5, 24]} />
-      </ToonPart>
-      {vents.map((pos, i) => (
-        <mesh key={i} position={pos}>
-          <cylinderGeometry args={[0.12, 0.12, 0.52, 8]} />
-          <meshBasicMaterial color={ventColor} />
-        </mesh>
-      ))}
-      <mesh position={[0, -0.27, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[2.4, 32]} />
-        <meshBasicMaterial ref={shadowMatRef} color="#000000" transparent opacity={0.3} />
+      <GlassPart outlineColor={lineColor} rotation={[0, 0, Math.PI / 2]}>
+        <torusGeometry args={[1.15, 0.1, 10, 32]} />
+      </GlassPart>
+      <GlassPart outlineColor={lineColor} position={[0.14, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+        <torusGeometry args={[0.85, 0.09, 10, 28]} />
+      </GlassPart>
+      <GlassPart outlineColor={lineColor} position={[0.24, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+        <cylinderGeometry args={[0.55, 0.55, 0.05, 32]} />
+      </GlassPart>
+      <mesh position={[0.05, 0, 0]} rotation={[0, Math.PI / 2, 0]}>
+        <torusGeometry args={[1.0, 0.015, 8, 40]} />
+        <meshBasicMaterial color={ACCENT_BLUE} toneMapped={false} />
+      </mesh>
+      <mesh position={[0.05, 0, 0]} rotation={[0, Math.PI / 2, 0]}>
+        <torusGeometry args={[0.7, 0.012, 8, 40]} />
+        <meshBasicMaterial color={ACCENT_EMBER} toneMapped={false} />
+      </mesh>
+      <mesh ref={glowRef} position={[0.26, 0, 0]}>
+        <sphereGeometry args={[0.14, 16, 16]} />
+        <meshBasicMaterial color={ACCENT_BLUE} toneMapped={false} />
       </mesh>
     </group>
   );
