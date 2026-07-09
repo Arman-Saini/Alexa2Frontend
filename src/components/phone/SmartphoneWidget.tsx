@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
 import { useMic } from '../../hooks/useMic';
 import { simulateApi } from '../../api/simulateApi';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -107,7 +106,7 @@ export function SmartphoneWidget({
   onSummariesChange,
   externalCommand,
   onClearExternalCommand,
-  showExitButton = false,
+  showExitButton: _showExitButton = false,
 }: SmartphoneWidgetProps) {
   const [internalSummaries, setInternalSummaries] = useState<ChatSummary[]>(DEFAULT_SUMMARIES);
   const [typedInput, setTypedInput] = useState('');
@@ -206,6 +205,11 @@ export function SmartphoneWidget({
       unsubscribe();
     };
   }, [wsSubscribe]);
+
+  // Scroll chat to bottom on new message
+  useEffect(() => {
+    activityEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [summaries]);
 
   // Sync clock time
   useEffect(() => {
@@ -493,17 +497,7 @@ export function SmartphoneWidget({
                     <span className="text-[12px] font-bold font-mono tracking-wider text-white">amazon alexa</span>
                   </div>
 
-                  {showExitButton && (
-                    <Link
-                      to="/"
-                      className="w-7 h-7 rounded-full border border-white/10 bg-white/5 hover:bg-white/15 active:bg-white/25 flex items-center justify-center text-white/60 hover:text-white transition-all outline-none"
-                      title="Exit to Dashboard"
-                    >
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </Link>
-                  )}
+
                 </div>
 
                 {/* <div className="flex items-center space-x-3.5 text-white/80">
@@ -792,53 +786,64 @@ export function SmartphoneWidget({
                           </div>
                         </div>
 
-                        {/* RECENT ACTIVITY Section */}
-                        <div className="space-y-2">
-                          <span className="text-[10px] font-mono font-bold text-white/40 tracking-widest uppercase">Recent Activity</span>
-                          <div className="space-y-2.5">
+                        {/* CHAT INTERFACE (iMessage style) */}
+                        <div className="space-y-3 flex-1 flex flex-col min-h-[300px]">
+                          <span className="text-[10px] font-mono font-bold text-white/40 tracking-widest uppercase">Conversation</span>
+                          
+                          <div className="flex-1 overflow-y-auto max-h-[350px] rounded-2xl bg-[#0b0c0f] border border-white/[0.03] p-4 flex flex-col gap-3 scrollbar-thin scrollbar-thumb-white/10">
                             <AnimatePresence initial={false}>
-                              {summaries.map((item) => (
-                                <motion.div
-                                  key={item.id}
-                                  initial={{ opacity: 0, y: 8 }}
-                                  animate={{ opacity: 1, y: 0 }}
-                                  exit={{ opacity: 0 }}
-                                  transition={{ duration: 0.2 }}
-                                  className="p-3 rounded-xl bg-[#141419]/90 border border-white/[0.04] flex items-start gap-2.5 relative overflow-hidden"
-                                >
-                                  <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-white/20" />
+                              {[...summaries].reverse().map((item) => (
+                                <div key={item.id} className="flex flex-col gap-1.5 w-full">
                                   
-                                  <div className="flex-1 min-w-0 pl-1">
-                                    <div className="flex items-center justify-between text-[8px] font-mono text-white/40 mb-1">
-                                      <span>VOICE COMMAND LOG</span>
-                                      <span>{item.timestamp}</span>
+                                  {/* User Bubble (Right-aligned, Blue) */}
+                                  <motion.div
+                                    initial={{ opacity: 0, scale: 0.95, x: 20 }}
+                                    animate={{ opacity: 1, scale: 1, x: 0 }}
+                                    className="flex flex-col items-end max-w-[85%] self-end"
+                                  >
+                                    <div className="bg-[#007aff] text-white px-4 py-2 rounded-2xl rounded-tr-sm text-xs font-sans leading-relaxed shadow-sm">
+                                      {item.utterance}
                                     </div>
-                                    
-                                    <p className="text-[11px] font-mono font-bold text-white/90 truncate">
-                                      "{item.utterance}"
-                                    </p>
-                                    
-                                    <p className="text-[10.5px] text-[#a0a0a5] mt-1 leading-relaxed">
+                                    <span className="text-[8px] font-mono text-white/30 mt-0.5 mr-1">{item.timestamp}</span>
+                                  </motion.div>
+
+                                  {/* Alexa Bubble (Left-aligned, Gray) */}
+                                  <motion.div
+                                    initial={{ opacity: 0, scale: 0.95, x: -20 }}
+                                    animate={{ opacity: 1, scale: 1, x: 0 }}
+                                    className="flex flex-col items-start max-w-[85%] self-start"
+                                  >
+                                    <div className="bg-[#24252a] text-white px-4 py-2 rounded-2xl rounded-tl-sm text-xs font-sans leading-relaxed border border-white/[0.02] shadow-sm">
                                       {item.response === 'Analyzing command...' ? (
                                         <span className="flex items-center gap-1.5 text-white/50 italic">
-                                          <span className="animate-spin h-3 w-3 border-2 border-white/40 border-t-transparent rounded-full" />
+                                          <span className="animate-spin h-3.5 w-3.5 border-2 border-white/30 border-t-transparent rounded-full" />
                                           Analyzing...
                                         </span>
                                       ) : (
                                         item.response
                                       )}
-                                    </p>
-                                  </div>
-                                </motion.div>
+                                    </div>
+                                    
+                                    {/* Stats (Latency / Cost) */}
+                                    {item.response !== 'Analyzing command...' && (
+                                      <div className="flex items-center gap-2 text-[8px] font-mono text-white/30 mt-0.5 ml-1">
+                                        <span>Alexa</span>
+                                        {item.latency > 0 && <span>• {item.latency}ms</span>}
+                                        {item.cost > 0 && <span>• ${item.cost.toFixed(4)}</span>}
+                                      </div>
+                                    )}
+                                  </motion.div>
+                                  
+                                </div>
                               ))}
                             </AnimatePresence>
 
                             {summaries.length === 0 && (
-                              <div className="p-4 rounded-xl border border-dashed border-white/5 text-center text-[10px] text-white/30">
-                                No recent command logs.
+                              <div className="flex-1 flex items-center justify-center text-center p-8">
+                                <span className="text-[10px] text-white/30 font-mono">No messages yet. Try saying "turn on living room light"</span>
                               </div>
                             )}
-                            
+
                             <div ref={activityEndRef} />
                           </div>
                         </div>

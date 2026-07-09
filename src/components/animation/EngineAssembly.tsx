@@ -6,10 +6,10 @@ import * as THREE from 'three';
 import { easedExplodeProgress, layerTargetY } from '../../utils/explodeMath';
 import {
   CoreShaft,
-  AcousticRing,
-  WakeWordDrum,
-  NlpMatrix,
-  CloudBase,
+  LensElement,
+  GearUpper,
+  GearLower,
+  BarrelBase,
   type LayerProps,
 } from './ProceduralParts';
 
@@ -27,14 +27,12 @@ interface LayerDef {
   Component: React.ComponentType<LayerProps>;
 }
 
-// Bottom-to-top spatial order. Cloud Base is the fixed anchor (offsets 0/0).
-// Adding a 5th layer later: one more entry here, one more component in
-// ProceduralParts.tsx — no change to the math or camera staging below.
+// Bottom-to-top spatial order. Barrel Base is the fixed anchor (offsets 0/0).
 const LAYERS: LayerDef[] = [
-  { id: 'cloud', label: 'Cloud Action Base', closedY: 0.0, expandedY: 0.0, Component: CloudBase },
-  { id: 'nlp', label: 'NLP Matrix', closedY: 0.42, expandedY: 1.6, Component: NlpMatrix },
-  { id: 'wake', label: 'Wake Word Detector', closedY: 0.84, expandedY: 3.2, Component: WakeWordDrum },
-  { id: 'acoustic', label: 'Acoustic Wave Ring', closedY: 1.26, expandedY: 4.8, Component: AcousticRing },
+  { id: 'base', label: 'Barrel Base', closedY: 0.0, expandedY: 0.0, Component: BarrelBase },
+  { id: 'gearLower', label: 'Lower Gear', closedY: 0.42, expandedY: 1.6, Component: GearLower },
+  { id: 'gearUpper', label: 'Upper Gear', closedY: 0.84, expandedY: 3.2, Component: GearUpper },
+  { id: 'lens', label: 'Lens Element', closedY: 1.26, expandedY: 4.8, Component: LensElement },
 ];
 
 export function EngineAssembly({ onScrollChange, onHoverChange, isWhiteTheme }: EngineAssemblyProps) {
