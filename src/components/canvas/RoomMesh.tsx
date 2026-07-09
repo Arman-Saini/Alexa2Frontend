@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import { type ThreeEvent, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useAppStore } from '../../store/store';
+import { useActStore } from '../../store/actStore';
 import type { Room } from '../../types';
 
 // Scenario → rooms that get a colored floor tint overlay
@@ -77,7 +78,11 @@ export function RoomMesh({ room, isActive, isHovered }: RoomMeshProps) {
   const handleClick = (e: ThreeEvent<MouseEvent>) => {
     if (ui.isPlacementMode) return;
     e.stopPropagation();
-    setActiveRoom(isActive ? null : room.id);
+    const nextActive = !isActive;
+    setActiveRoom(nextActive ? room.id : null);
+    if (nextActive) {
+      useActStore.getState().triggerXray(room.id);
+    }
   };
   const handleOver = (e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation();

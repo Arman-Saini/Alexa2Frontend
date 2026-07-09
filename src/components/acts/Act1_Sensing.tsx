@@ -26,7 +26,7 @@ const SECTIONS: SensingSection[] = [
 ];
 
 /**
- * Act 1 — narrates how HomeSense senses the home. Scroll-content act;
+ * Act 1 — narrates how Hearth senses the home. Scroll-content act;
  * each section reveals on scroll via ScrollReveal.
  */
 export function Act1_Sensing() {

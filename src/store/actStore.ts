@@ -14,18 +14,27 @@ import type { ScenarioPlan } from '../api/scenarioBuilderApi';
 // not-yet-built ticket , this file only exposes the actions it will call.
 
 export type ActId = 0 | 1 | 2 | 3;
-export type LensVariant = 'brain' | 'scenario' | 'module';
+export type LensVariant = 'brain' | 'scenario' | 'module' | 'phone';
 
 export interface TriggerContext {
   deviceId?: string;
   roomId?: string;
   scenarioText?: string;
   traceId?: string;
+  phoneTrace?: {
+    tier_label: string;
+    latency_ms: number;
+    cost_usd: number;
+    path: string[];
+  };
+  phoneExplanation?: string;
+  module?: any;
 }
 
 export interface XRayState {
   active: boolean;
   targetId: string | null;
+  lensVariant?: LensVariant;
 }
 
 export interface LensPanelState {
@@ -48,7 +57,7 @@ export interface ActState {
   scenarioPlanError: string | null;
 
   goToAct: (id: ActId, ctx?: TriggerContext) => void;
-  triggerXray: (targetId: string) => void;
+  triggerXray: (targetId: string, lensVariant?: LensVariant) => void;
   openLens: (variant: LensVariant, originPoint?: { x: number; y: number }) => void;
   closeLens: () => void;
   resetToRest: () => void;
@@ -80,8 +89,8 @@ export const useActStore = create<ActState>()((set) => ({
       triggerContext: ctx ?? null,
     }),
 
-  triggerXray: (targetId) =>
-    set({ xray: { active: true, targetId } }),
+  triggerXray: (targetId, lensVariant) =>
+    set({ xray: { active: true, targetId, lensVariant } }),
 
   openLens: (variant, originPoint) =>
     set({

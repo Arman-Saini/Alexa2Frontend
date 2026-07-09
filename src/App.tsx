@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { DigitalTwinCanvas } from './components/canvas/DigitalTwinCanvas';
 import { ActShell } from './components/acts/ActShell';
 import { EcosystemPage } from './components/ecosystem/EcosystemPage';
+import { useStoryStore } from './store/storyStore';
+import { StoryScroll } from './components/story/StoryScroll';
 
 type Route = 'home' | 'ecosystem';
 
@@ -11,6 +13,7 @@ function routeFromHash(): Route {
 
 export default function App() {
   const [route, setRoute] = useState<Route>(routeFromHash());
+  const mode = useStoryStore((s) => s.mode);
 
   useEffect(() => {
     const handler = () => setRoute(routeFromHash());
@@ -27,7 +30,7 @@ export default function App() {
       <div style={{ position: 'absolute', inset: 0 }}>
         <DigitalTwinCanvas />
       </div>
-      <ActShell />
+      {mode === 'story' ? <StoryScroll /> : <ActShell />}
     </div>
   );
 }

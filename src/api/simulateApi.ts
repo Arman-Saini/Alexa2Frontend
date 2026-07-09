@@ -24,6 +24,9 @@ export const simulateApi = {
 
   powerCut: () =>
     apiClient.post<SimulateResult>(endpoints.simulatePowerCut, homeBody()),
+
+  voiceCommand: (utterance: string, homeId = env.HOME_ID) =>
+    apiClient.post<any>(endpoints.simulateVoiceCommand, { home_id: homeId, utterance }),
 };
 
-export type SimulateEndpoint = keyof typeof simulateApi;
+export type SimulateEndpoint = 'studyMode' | 'nightSafetyCheck' | 'powerCut';

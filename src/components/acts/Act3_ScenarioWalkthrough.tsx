@@ -11,7 +11,7 @@ interface Act3_ScenarioWalkthroughProps {
 
 /**
  * Act 3 — the scenario walkthrough. Shows what the user asked, then the
- * Bedrock-generated step-by-step plan explaining how HomeSense resolved it.
+ * Bedrock-generated step-by-step plan explaining how Hearth resolved it.
  */
 export function Act3_ScenarioWalkthrough({ plan, loading }: Act3_ScenarioWalkthroughProps) {
   const scenarioText = useActStore((s) => s.triggerContext?.scenarioText);

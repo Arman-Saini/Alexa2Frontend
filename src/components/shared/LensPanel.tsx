@@ -5,7 +5,7 @@ export interface LensPanelProps {
   open: boolean;
   onClose?: () => void;
   originPoint?: { x: number; y: number };
-  variant?: 'brain' | 'scenario' | 'module';
+  variant?: 'brain' | 'scenario' | 'module' | 'phone';
   size?: 'sm' | 'md' | 'lg' | 'full';
   children: React.ReactNode;
 }

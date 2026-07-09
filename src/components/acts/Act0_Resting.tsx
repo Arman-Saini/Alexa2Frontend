@@ -62,7 +62,7 @@ export function Act0_Resting() {
             marginTop: 'var(--space-4)',
           }}
         >
-          HomeSense reads every room in real time and reasons about what's happening — so it can act
+          Hearth reads every room in real time and reasons about what's happening — so it can act
           before you have to ask.
         </p>
       </div>

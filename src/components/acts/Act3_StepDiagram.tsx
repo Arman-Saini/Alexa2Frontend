@@ -23,7 +23,7 @@ export function Act3_StepDiagram({ plan, loading }: Act3_StepDiagramProps) {
   if (!plan) {
     return (
       <p style={{ fontFamily: 'var(--font-body)', color: 'var(--text-tertiary)', fontSize: 13 }}>
-        Ask HomeSense something to see it walked through step by step.
+        Ask Hearth something to see it walked through step by step.
       </p>
     );
   }

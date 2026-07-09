@@ -4,7 +4,7 @@ import { Act2_OntologyGraph } from './Act2_OntologyGraph';
 import { Act2_TraceReadout } from './Act2_TraceReadout';
 
 /**
- * Act 2 — "how HomeSense thinks." The creative centerpiece: raw sensor
+ * Act 2 — "how Hearth thinks." The creative centerpiece: raw sensor
  * signal resolving into semantic meaning through Entity -> State ->
  * Environment, the real shape of broker-style ontology reasoning.
  */

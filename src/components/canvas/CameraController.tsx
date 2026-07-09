@@ -3,6 +3,8 @@ import { useThree, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useAppStore } from '../../store/store';
 import { sharedCameraRef, cameraTransitionRef } from './cameraRef';
+import { useStoryStore } from '../../store/storyStore';
+import { getStoryCameraState } from './storyCameraPath';
 
 // Tuned for the 26×20 (1 unit = 1 m) floor plan (2× scale).
 const ISO_DIST = 28;
@@ -80,9 +82,20 @@ export function CameraController() {
   // Expose camera for drag-drop raycasting outside Canvas
   useEffect(() => { sharedCameraRef.current = camera; }, [camera]);
 
+  const mode = useStoryStore((s) => s.mode);
+  const storyProgress = useStoryStore((s) => s.storyProgress);
+
   useFrame((_, delta) => {
-    // cameraTransitionRef is cleared by OrbitControls onStart , user interaction wins
-    if (!cameraTransitionRef.current) return;
+    if (mode === 'story') {
+      const state = getStoryCameraState(storyProgress);
+      targetPos.current.copy(state.position);
+      targetLook.current.copy(state.target);
+      targetZoom.current = state.zoom;
+      cameraTransitionRef.current = true;
+    } else {
+      // cameraTransitionRef is cleared by OrbitControls onStart , user interaction wins
+      if (!cameraTransitionRef.current) return;
+    }
 
     const t = 1 - Math.exp(-0.014 * 60 * delta);
 
@@ -99,7 +112,7 @@ export function CameraController() {
 
     const posClose  = camera.position.distanceTo(targetPos.current) < 0.08;
     const zoomClose = Math.abs((camera as THREE.OrthographicCamera).zoom - targetZoom.current) < 0.4;
-    if (posClose && zoomClose) {
+    if (posClose && zoomClose && mode !== 'story') {
       cameraTransitionRef.current = false;
     }
   });

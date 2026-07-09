@@ -16,11 +16,11 @@ const SERVERS: ServerBox[] = [
 const EXPLAINER_CARDS = [
   {
     title: 'Host',
-    body: "HomeSense Core is the Host — the one surface a judge (or a homeowner) actually talks to. It owns the conversation and decides which integration a request belongs to. You never talk to Bookkeeper directly; you talk to HomeSense, and HomeSense routes.",
+    body: "Hearth Core is the Host — the one surface a judge (or a homeowner) actually talks to. It owns the conversation and decides which integration a request belongs to. You never talk to Bookkeeper directly; you talk to Hearth, and Hearth routes.",
   },
   {
     title: 'Client',
-    body: "Inside the Host, a Client is the connection HomeSense keeps open to each integration — one per Server. It's the same client shape whether it's talking to the real Bookkeeper ledger or, conceptually, to Zomato. Adding a new integration means adding a Client, not rewriting HomeSense.",
+    body: "Inside the Host, a Client is the connection Hearth keeps open to each integration — one per Server. It's the same client shape whether it's talking to the real Bookkeeper ledger or, conceptually, to Zomato. Adding a new integration means adding a Client, not rewriting Hearth.",
   },
   {
     title: 'Server',
@@ -28,13 +28,13 @@ const EXPLAINER_CARDS = [
   },
   {
     title: 'Why it matters',
-    body: "Without a shared protocol, N apps integrating with M services means N×M bespoke connectors. MCP collapses that to N + M — HomeSense implements the Host/Client side once, and every integration only has to speak Server. That's why Bookkeeper wasn't a one-off hack, and why Zomato or Swiggy could plug in the same way without touching HomeSense's core.",
+    body: "Without a shared protocol, N apps integrating with M services means N×M bespoke connectors. MCP collapses that to N + M — Hearth implements the Host/Client side once, and every integration only has to speak Server. That's why Bookkeeper wasn't a one-off hack, and why Zomato or Swiggy could plug in the same way without touching Hearth's core.",
   },
 ];
 
 /**
  * Plain-language Host/Client/Server explainer grounded in the app's real
- * Bookkeeper integration, plus a restrained CSS "bus" diagram: HomeSense
+ * Bookkeeper integration, plus a restrained CSS "bus" diagram: Hearth
  * Core (Host+Client) at the top, connected down to each Server.
  */
 export function MCPExplainer() {
@@ -53,7 +53,7 @@ export function MCPExplainer() {
             Why this isn't a one-off hack
           </h2>
           <p style={{ fontFamily: 'var(--font-body)', fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-            HomeSense's integration architecture follows the same shape as the Model Context Protocol —
+            Hearth's integration architecture follows the same shape as the Model Context Protocol —
             a Host talks through Clients to any number of Servers, each exposing the same kind of Tools
             and Resources. Bookkeeper is the real one running today; the others below show how the same
             door opens for anything else.
@@ -67,7 +67,7 @@ export function MCPExplainer() {
           <GlassCard padding="sm" glow="ember" className="text-center">
             <div style={{ padding: '0 var(--space-4)' }}>
               <div style={{ fontFamily: 'var(--font-display)', fontSize: '16px', color: 'var(--text-primary)' }}>
-                HomeSense Core
+                Hearth Core
               </div>
               <div style={{ fontFamily: 'var(--font-body)', fontSize: '11px', color: 'var(--ember-500)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
                 Host + Client

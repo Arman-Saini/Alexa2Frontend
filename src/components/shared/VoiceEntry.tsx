@@ -7,7 +7,7 @@ export interface VoiceEntryProps {
 }
 
 /**
- * "Ask HomeSense..." input/mic affordance — primary entry point for voice commands.
+ * "Ask Hearth..." input/mic affordance — primary entry point for voice commands.
  * Combines typed input with Web Speech API for voice capture.
  * Shows subtle "listening" state with pulsing glow ring.
  *
@@ -98,7 +98,7 @@ export function VoiceEntry({ onSubmit }: VoiceEntryProps) {
           value={displayText}
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
-          placeholder="Ask HomeSense..."
+          placeholder="Ask Hearth..."
           disabled={listening}
           style={{
             flex: 1,

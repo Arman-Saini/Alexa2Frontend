@@ -12,3 +12,5 @@ export type { TraceBadgeProps, ActorLaneProps } from './TraceBadge';
 
 export { VoiceEntry } from './VoiceEntry';
 export type { VoiceEntryProps } from './VoiceEntry';
+
+export { DemoControls } from './DemoControls';

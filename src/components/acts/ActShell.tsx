@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { useActStore } from '../../store/actStore';
 import { useScenarioPlan } from '../../hooks/useScenarioPlan';
-import { LensPanel } from '../shared/LensPanel';
+import { LensPanel, DemoControls } from '../shared';
 import { ActNav } from './ActNav';
 import { Act0_Resting } from './Act0_Resting';
 import { Act1_Sensing } from './Act1_Sensing';
@@ -9,6 +9,9 @@ import { Act2_CentralBrain } from './Act2_CentralBrain';
 import { Act2_TraceReadout } from './Act2_TraceReadout';
 import { Act3_ScenarioWalkthrough } from './Act3_ScenarioWalkthrough';
 import { Act3_StepDiagram } from './Act3_StepDiagram';
+import { PhoneMockup } from '../phone/PhoneMockup';
+import { PhoneTraceReadout } from '../phone/PhoneTraceReadout';
+import { ModuleCartridge } from '../ecosystem/ModuleCartridge';
 
 const ACT_TRANSITION = { duration: 0.6, ease: [0.16, 1, 0.3, 1] as const };
 
@@ -22,6 +25,7 @@ export function ActShell() {
   const currentAct = useActStore((s) => s.currentAct);
   const lensPanel = useActStore((s) => s.lensPanel);
   const closeLens = useActStore((s) => s.closeLens);
+  const triggerContext = useActStore((s) => s.triggerContext);
   const { plan, loading } = useScenarioPlan();
 
   return (
@@ -60,12 +64,17 @@ export function ActShell() {
           {lensPanel.variant === 'scenario' && (
             <Act3_StepDiagram plan={plan} loading={loading} />
           )}
-          {lensPanel.variant === 'module' && (
-            <p style={{ fontFamily: 'var(--font-body)', color: 'var(--text-secondary)' }}>
-              Module detail coming soon.
-            </p>
+          {lensPanel.variant === 'phone' && <PhoneTraceReadout />}
+          {lensPanel.variant === 'module' && triggerContext?.module && (
+            <ModuleCartridge module={triggerContext.module} />
           )}
         </LensPanel>
+      </div>
+
+      {/* Floating interactive mode HUD overlays */}
+      <div style={{ pointerEvents: 'auto' }}>
+        <PhoneMockup />
+        <DemoControls />
       </div>
     </div>
   );

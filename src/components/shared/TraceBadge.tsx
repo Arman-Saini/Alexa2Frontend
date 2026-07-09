@@ -7,7 +7,7 @@ export const ACTOR_META: Record<
   { label: string; color: string }
 > = {
   user: { label: 'You', color: 'var(--copper-500)' },
-  alexa: { label: 'HomeSense', color: 'var(--ember-500)' },
+  alexa: { label: 'Hearth', color: 'var(--ember-500)' },
   device: { label: 'Device', color: 'var(--text-secondary)' },
   cloud: { label: 'Cloud', color: 'var(--void-600)' }, // Muted blue-gray tone in void palette
   app: { label: 'App', color: 'var(--text-secondary)' },

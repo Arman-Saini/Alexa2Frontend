@@ -25,6 +25,36 @@ interface Bounds {
 const DEFAULT_OBJECT_SIZE = new THREE.Vector3(1.1, 1.6, 1.1);
 
 function resolveBounds(targetId: string, rooms: Room[], placedObjects: PlacedObject[]): Bounds | null {
+  if (targetId === 'house' && rooms.length > 0) {
+    let minX = Infinity, maxX = -Infinity;
+    let minY = 0, maxY = -Infinity;
+    let minZ = Infinity, maxZ = -Infinity;
+    rooms.forEach((r) => {
+      const w = r.width;
+      const h = r.height ?? 3.2;
+      const d = r.depth;
+      const x = r.position.x;
+      const z = r.position.z;
+      const rMinX = x - w / 2;
+      const rMaxX = x + w / 2;
+      const rMinZ = z - d / 2;
+      const rMaxZ = z + d / 2;
+      if (rMinX < minX) minX = rMinX;
+      if (rMaxX > maxX) maxX = rMaxX;
+      if (rMinZ < minZ) minZ = rMinZ;
+      if (rMaxZ > maxZ) maxZ = rMaxZ;
+      if (h > maxY) maxY = h;
+    });
+    const size = new THREE.Vector3(maxX - minX, maxY - minY, maxZ - minZ);
+    const center = new THREE.Vector3((minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2);
+    return {
+      center,
+      size,
+      min: new THREE.Vector3(minX, minY, minZ),
+      max: new THREE.Vector3(maxX, maxY, maxZ),
+    };
+  }
+
   const room = rooms.find((r) => r.id === targetId);
   if (room) {
     const size = new THREE.Vector3(room.width, room.height ?? 3.2, room.depth);
@@ -98,9 +128,10 @@ export function XRayEffect() {
         const proj = bounds.center.clone().project(camera);
         const xPct = ((proj.x + 1) / 2) * 100;
         const yPct = ((1 - proj.y) / 2) * 100;
-        useActStore.getState().openLens('scenario', { x: xPct, y: yPct });
+        const variant = xray.lensVariant || 'scenario';
+        useActStore.getState().openLens(variant, { x: xPct, y: yPct });
         // No dedicated single-field reset action on the real store , clear just xray.
-        useActStore.setState({ xray: { active: false, targetId: null } });
+        useActStore.setState({ xray: { active: false, targetId: null, lensVariant: undefined } });
       },
     });
 
