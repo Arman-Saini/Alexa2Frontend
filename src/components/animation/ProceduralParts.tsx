@@ -223,7 +223,17 @@ export function SpinningWashers({ isWhiteTheme }: { isWhiteTheme: boolean }) {
   return (
     <instancedMesh ref={ref} args={[undefined, undefined, placements.length]}>
       <torusGeometry args={[0.09, 0.025, 6, 10]} />
-      <meshBasicMaterial color={lineColor} transparent opacity={0.7} />
+      <meshPhysicalMaterial
+        color="#ffffff"
+        transmission={1}
+        roughness={0.35}
+        thickness={0.45}
+        ior={1.5}
+        clearcoat={1}
+        clearcoatRoughness={0.08}
+        attenuationColor={lineColor}
+        attenuationDistance={0.6}
+      />
     </instancedMesh>
   );
 }
