@@ -601,7 +601,21 @@ export const useAppStore = create<AppState>()(
       }),
       {
         name: 'alexa-twin-v9', // bumped: window mask toggle + yOffset guard for object anchors
-        storage: createJSONStorage(() => localStorage),
+        storage: createJSONStorage(() => {
+          try {
+            if (typeof window !== 'undefined' && window.localStorage) {
+              return window.localStorage;
+            }
+          } catch {}
+          return {
+            getItem: () => null,
+            setItem: () => {},
+            removeItem: () => {},
+            clear: () => {},
+            length: 0,
+            key: () => null,
+          } as unknown as Storage;
+        }),
         partialize: (state) => ({
           placedObjects: state.placedObjects,
           doorOverrides: state.doorOverrides,

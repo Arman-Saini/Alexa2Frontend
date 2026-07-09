@@ -51,7 +51,7 @@ function stopKeepAlive() {
   if (keepAliveTimer) { clearInterval(keepAliveTimer); keepAliveTimer = null; }
 }
 
-function fallbackSpeak(text: string, onEnd: () => void) {
+export function fallbackSpeak(text: string, onEnd: () => void) {
   if (!window.speechSynthesis) { onEnd(); return; }
   window.speechSynthesis.cancel();
   const utt = new SpeechSynthesisUtterance(text);

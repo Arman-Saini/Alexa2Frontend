@@ -47,9 +47,9 @@ describe('resolveAnchor', () => {
     expect(z).toBeCloseTo(-2);
   });
 
-  it('resolves ceiling anchor at y=3', () => {
+  it('resolves ceiling anchor at y=3.5', () => {
     const [x, y, z] = resolveAnchor({ type: 'ceiling' }, lr, {});
-    expect(y).toBe(3);
+    expect(y).toBe(3.5);
     expect(x).toBeCloseTo(2.5);
     expect(z).toBeCloseTo(-2);
   });
