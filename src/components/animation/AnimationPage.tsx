@@ -4,10 +4,10 @@ import { Link } from 'react-router-dom';
 import { HeroCanvas } from './HeroCanvas';
 
 const TOP_RIGHT_LABELS = [
-  { id: 'acoustic', text: 'ACOUSTIC' },
-  { id: 'wake', text: 'WAKE-WORD' },
-  { id: 'nlp', text: 'NLP MATRIX' },
-  { id: 'cloud', text: 'CLOUD ACTION' },
+  { id: 'base', text: 'BARREL' },
+  { id: 'gearLarge', text: 'GEAR — LARGE' },
+  { id: 'gearSmall', text: 'GEAR — SMALL' },
+  { id: 'lens', text: 'LENS ELEMENT' },
 ];
 
 const BOTTOM_LEFT_LABELS = ['LATENCY', 'INTENT', 'ENTITY', 'RESPONSE', 'PIPELINE'];
