@@ -1,102 +1,130 @@
-import { ScrollReveal } from '../shared/ScrollReveal';
+import { useEffect, useState } from 'react';
 import { GlassCard } from '../shared/GlassCard';
+import { useTourStore } from '../../store/tourStore';
+import { useAppStore } from '../../store/store';
 
 interface SensingSection {
   headline: string;
   body: string;
+  roomId: string | null;
+  say: string;
 }
 
 const SECTIONS: SensingSection[] = [
   {
-    headline: 'Every room reports state continuously',
-    body: 'Living room, kitchen, bathroom, office, and bedroom each stream their own telemetry — lights, fans, locks, and thermostats all check in, not just when something changes.',
+    headline: 'I watch every room',
+    body: 'Living room, kitchen, bathroom, office, bedroom — each one checks in with me all the time, not just when something changes.',
+    roomId: null,
+    say: "I'm always watching — every room, all the time.",
   },
   {
-    headline: 'Presence and motion draw the shape of a day',
-    body: 'Motion sensors and door contacts turn footsteps and open doors into a live picture of where people are, so the house knows the difference between empty and quiet.',
+    headline: 'I notice when you move',
+    body: "Motion and open doors tell me where people are, so I know the difference between empty and quiet.",
+    roomId: 'kitchen',
+    say: 'I can tell when someone walks into the kitchen.',
   },
   {
-    headline: 'Environment readings feed a shared context',
-    body: 'Temperature, humidity, air quality, and power draw from devices like the kitchen thermostat and smart plug are pooled into one context, not read in isolation.',
+    headline: 'I feel the room, too',
+    body: 'Temperature, humidity, and air quality all feed into one picture of how the house feels right now.',
+    roomId: 'master-bedroom',
+    say: "I can feel if a room's getting too warm — like the bedroom, right now.",
   },
   {
-    headline: 'Safety signals get first priority',
-    body: 'Smoke detectors, doorbells, and grid-health readings are sensed on the same stream as everything else — but weighted to reach the brain fastest.',
+    headline: 'Safety comes first',
+    body: 'Smoke alarms and doorbells get to me fastest of all — nothing waits in line behind small stuff.',
+    roomId: null,
+    say: "If something's actually wrong, I hear about it first.",
   },
 ];
 
 /**
- * Act 1 — narrates how Hearth senses the home. Scroll-content act;
- * each section reveals on scroll via ScrollReveal.
+ * Act 1 — "Sensing". One section active at a time (not all 4 at once),
+ * each paired with a highlight on the matching part of the twin via the
+ * existing setActiveRoom action — no new highlight mechanism.
  */
 export function Act1_Sensing() {
+  const [active, setActive] = useState(0);
+
+  useEffect(() => {
+    const section = SECTIONS[active];
+    useTourStore.getState().setReply(section.say);
+    useAppStore.getState().setActiveRoom(section.roomId);
+  }, [active]);
+
+  useEffect(() => {
+    return () => useAppStore.getState().setActiveRoom(null);
+  }, []);
+
   return (
     <div
       style={{
         position: 'absolute',
         inset: 0,
-        overflowY: 'auto',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        padding: 'var(--space-24) var(--space-8) var(--space-24)',
+        justifyContent: 'center',
+        padding: 'var(--space-8)',
         gap: 'var(--space-6)',
       }}
     >
-      <ScrollReveal>
-        <h2
-          style={{
-            fontFamily: 'var(--font-display)',
-            fontWeight: 700,
-            fontSize: 'clamp(1.75rem, 4vw, 2.75rem)',
-            color: 'var(--text-primary)',
-            textAlign: 'center',
-            margin: 0,
-            maxWidth: 640,
-          }}
-        >
-          The sensing layer
-        </h2>
-      </ScrollReveal>
-
-      <div
+      <h2
         style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-          gap: 'var(--space-6)',
-          maxWidth: 960,
-          width: '100%',
-          marginTop: 'var(--space-8)',
+          fontFamily: 'var(--font-display)',
+          fontWeight: 700,
+          fontSize: 'clamp(1.75rem, 4vw, 2.75rem)',
+          color: 'var(--text-primary)',
+          textAlign: 'center',
+          margin: 0,
+          maxWidth: 640,
         }}
       >
-        {SECTIONS.map((section, i) => (
-          <ScrollReveal key={section.headline} delay={i * 0.08}>
-            <GlassCard padding="md">
-              <h3
-                style={{
-                  fontFamily: 'var(--font-display)',
-                  fontWeight: 600,
-                  fontSize: '1.1rem',
-                  color: 'var(--text-primary)',
-                  margin: 0,
-                  marginBottom: 'var(--space-2)',
-                }}
-              >
-                {section.headline}
-              </h3>
-              <p
-                style={{
-                  fontFamily: 'var(--font-body)',
-                  fontSize: '0.9rem',
-                  color: 'var(--text-secondary)',
-                  margin: 0,
-                  lineHeight: 1.5,
-                }}
-              >
-                {section.body}
-              </p>
-            </GlassCard>
-          </ScrollReveal>
+        Always sensing
+      </h2>
+
+      <GlassCard padding="md" className="max-w-md">
+        <h3
+          style={{
+            fontFamily: 'var(--font-display)',
+            fontWeight: 600,
+            fontSize: '1.1rem',
+            color: 'var(--text-primary)',
+            margin: 0,
+            marginBottom: 'var(--space-2)',
+          }}
+        >
+          {SECTIONS[active].headline}
+        </h3>
+        <p
+          style={{
+            fontFamily: 'var(--font-body)',
+            fontSize: '0.9rem',
+            color: 'var(--text-secondary)',
+            margin: 0,
+            lineHeight: 1.5,
+          }}
+        >
+          {SECTIONS[active].body}
+        </p>
+      </GlassCard>
+
+      <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+        {SECTIONS.map((_, i) => (
+          <button
+            key={i}
+            type="button"
+            onClick={() => setActive(i)}
+            aria-label={`Section ${i + 1}`}
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: '50%',
+              border: 'none',
+              padding: 0,
+              backgroundColor: i === active ? 'var(--ember-500)' : 'var(--void-border)',
+              cursor: 'pointer',
+            }}
+          />
         ))}
       </div>
     </div>
