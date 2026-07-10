@@ -1,9 +1,11 @@
 import { Link } from 'react-router-dom';
 import { SmartphoneWidget } from './SmartphoneWidget';
+import { AmbientBackdrop } from '../shared/AmbientBackdrop';
 
 export function SmartphoneOnlyPage() {
   return (
     <div className="relative w-screen h-screen overflow-hidden flex md:items-center md:justify-center bg-[#090909] select-none text-text-primary font-sans">
+      <AmbientBackdrop />
 
       {/* Floating Home Back Button */}
       <Link
