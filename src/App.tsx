@@ -11,6 +11,7 @@ import { CompanionPage } from './components/phone/CompanionPage';
 import { SmartphoneOnlyPage } from './components/phone/SmartphoneOnlyPage';
 import { SmartphoneWidget } from './components/phone/SmartphoneWidget';
 import { AmbientBackdrop } from './components/shared/AmbientBackdrop';
+import { useInteractionEffects } from './hooks/useInteractionEffects';
 import { useIsMobileViewport } from './hooks/useIsMobileViewport';
 import { useStoryStore } from './store/storyStore';
 import { StoryScroll } from './components/story/StoryScroll';
@@ -18,6 +19,7 @@ import { StoryScroll } from './components/story/StoryScroll';
 function Home() {
   const mode = useStoryStore((s) => s.mode);
   const isMobile = useIsMobileViewport();
+  useInteractionEffects();
 
   if (isMobile) {
     // Real phone-width viewport: the phone app IS the whole experience —
