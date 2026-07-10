@@ -1,14 +1,22 @@
+import { useEffect } from 'react';
 import { ScrollReveal } from '../shared/ScrollReveal';
 import { GlassCard } from '../shared/GlassCard';
 import { Act2_OntologyGraph } from './Act2_OntologyGraph';
 import { Act2_TraceReadout } from './Act2_TraceReadout';
+import { useTourStore } from '../../store/tourStore';
 
 /**
- * Act 2 — "how Hearth thinks." The creative centerpiece: raw sensor
- * signal resolving into semantic meaning through Entity -> State ->
- * Environment, the real shape of broker-style ontology reasoning.
+ * Act 2 — "Brain". Same visual centerpiece (Act2_OntologyGraph) and the
+ * same de-emphasized trace footnote, just plainer headline copy — no
+ * "resolves into a recognized entity" language.
  */
 export function Act2_CentralBrain() {
+  useEffect(() => {
+    useTourStore.getState().setReply(
+      "When something happens, I decide what to do — sometimes right away, sometimes I think about it a little more."
+    );
+  }, []);
+
   return (
     <div
       style={{
@@ -33,7 +41,7 @@ export function Act2_CentralBrain() {
               margin: 0,
             }}
           >
-            The central brain
+            How I decide
           </h2>
           <p
             style={{
@@ -43,9 +51,8 @@ export function Act2_CentralBrain() {
               marginTop: 'var(--space-3)',
             }}
           >
-            A reading doesn't stay a number for long. It resolves into a recognized entity, that entity
-            carries a state, and states combine into an understanding of what's actually happening in the
-            home.
+            Every sensor reading turns into something I understand — is a light on, is someone home,
+            is the stove too hot — so I can act on what's actually happening, not just raw numbers.
           </p>
         </div>
       </ScrollReveal>
