@@ -30,7 +30,6 @@ export function CartoonHudAvatar() {
     <div style={{ position: 'relative', width: 160, height: 160 }}>
       <Canvas
         camera={{ position: [0, 1.2, 4.2], fov: 40 }}
-        frameloop="demand"
         style={{ background: 'transparent' }}
         gl={{ antialias: true, powerPreference: 'low-power' }}
       >
