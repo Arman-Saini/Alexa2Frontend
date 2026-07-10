@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { useActStore } from '../../store/actStore';
 import { useScenarioPlan } from '../../hooks/useScenarioPlan';
-import { LensPanel, DemoControls } from '../shared';
+import { LensPanel } from '../shared';
 import { ActNav } from './ActNav';
 import { Act0_Resting } from './Act0_Resting';
 import { Act1_Sensing } from './Act1_Sensing';
@@ -9,9 +9,9 @@ import { Act2_CentralBrain } from './Act2_CentralBrain';
 import { Act2_TraceReadout } from './Act2_TraceReadout';
 import { Act3_ScenarioWalkthrough } from './Act3_ScenarioWalkthrough';
 import { Act3_StepDiagram } from './Act3_StepDiagram';
-import { PhoneMockup } from '../phone/PhoneMockup';
 import { PhoneTraceReadout } from '../phone/PhoneTraceReadout';
 import { ModuleCartridge } from '../ecosystem/ModuleCartridge';
+import { HudDock } from '../hud/HudDock';
 
 const ACT_TRANSITION = { duration: 0.6, ease: [0.16, 1, 0.3, 1] as const };
 
@@ -72,10 +72,7 @@ export function ActShell() {
       </div>
 
       {/* Floating interactive mode HUD overlays */}
-      <div style={{ pointerEvents: 'auto' }}>
-        <PhoneMockup />
-        <DemoControls />
-      </div>
+      <HudDock />
     </div>
   );
 }
