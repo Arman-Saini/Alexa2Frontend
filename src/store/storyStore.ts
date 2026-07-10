@@ -11,8 +11,10 @@ export interface StoryState {
 }
 
 export const useStoryStore = create<StoryState>()((set) => ({
-  // Defaulting mode to 'story' so users start in story mode, but can transition to 'interactive'
-  mode: 'story',
+  // Defaults straight into the interactive tour — StoryScroll ('story' mode)
+  // is no longer the entry gate, it's reachable only via restartStory() or
+  // an explicit setState, kept working for anyone who wants it directly.
+  mode: 'interactive',
   storyProgress: 0,
 
   setStoryProgress: (progress) =>
