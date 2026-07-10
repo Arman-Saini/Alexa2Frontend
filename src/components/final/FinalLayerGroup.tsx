@@ -77,15 +77,15 @@ export function LayerGroup({ index, ledColor, scrollProgress }: LayerGroupProps)
 
   // Compute trace progression factor (0.0 to 1.0) starting at scroll 0.70, peaking at 0.73, plateauing until 0.82, and returning to 0 at 0.85
   const traceProgress = useMemo(() => {
-    if (scrollProgress < 0.70) return 0;
-    if (scrollProgress < 0.73) {
-      return (scrollProgress - 0.70) / 0.03;
+    if (scrollProgress < 0.52) return 0;
+    if (scrollProgress < 0.54) {
+      return (scrollProgress - 0.52) / 0.02;
     }
-    if (scrollProgress < 0.82) {
+    if (scrollProgress < 0.57) {
       return 1.0;
     }
-    if (scrollProgress < 0.85) {
-      return 1.0 - (scrollProgress - 0.82) / 0.03;
+    if (scrollProgress < 0.60) {
+      return 1.0 - (scrollProgress - 0.57) / 0.03;
     }
     return 0;
   }, [scrollProgress]);
@@ -186,8 +186,8 @@ export function LayerGroup({ index, ledColor, scrollProgress }: LayerGroupProps)
       const t = (s - 0.20) / 0.20;
       targetX = 0;
       targetY = -index * 1.2 * t; 
-    } else if (s < 0.85) {
-      // Phase 3-6: Horizontal Splay (0.40 -> 0.85)
+    } else if (s < 0.60) {
+      // Phase 3-6: Horizontal Splay (0.40 -> 0.60)
       // Splay completes at scroll 0.50 and remains splayed.
       const splayT = s < 0.50 ? (s - 0.40) / 0.10 : 1.0;
       const splayX = (index - 2.5) * 6.5;
@@ -195,21 +195,21 @@ export function LayerGroup({ index, ledColor, scrollProgress }: LayerGroupProps)
       targetX = THREE.MathUtils.lerp(0, splayX, splayT);
       targetY = THREE.MathUtils.lerp(-index * 1.2, 0, splayT);
     } else {
-      // Phase 7: Sequential Joining (0.85 -> 1.00) - stack downwards under base plate
+      // Phase 7: Sequential Joining (0.60 -> 1.00) - stack downwards under base plate
       const splayX = (index - 2.5) * 6.5;
       
       if (index === 0) {
         targetX = 0;
         targetY = 0;
       } else {
-        const start = 0.85 + (index - 1) * 0.03;
-        const end = start + 0.03;
+        const start = 0.60 + (index - 1) * 0.08;
+        const end = start + 0.08;
         
         if (s < start) {
           targetX = splayX;
           targetY = 0;
         } else if (s < end) {
-          const t = (s - start) / 0.03;
+          const t = (s - start) / 0.08;
           const eased = THREE.MathUtils.smoothstep(t, 0, 1);
           targetX = THREE.MathUtils.lerp(splayX, 0, eased);
           targetY = THREE.MathUtils.lerp(0, -index * 0.22, eased);
@@ -220,7 +220,7 @@ export function LayerGroup({ index, ledColor, scrollProgress }: LayerGroupProps)
       }
     }
 
-    const lambda = s >= 0.85 ? 4.0 : 8;
+    const lambda = s >= 0.60 ? 4.0 : 8;
     currentX.current = THREE.MathUtils.damp(currentX.current, targetX, lambda, delta);
     currentY.current = THREE.MathUtils.damp(currentY.current, targetY, lambda, delta);
 
@@ -1218,7 +1218,7 @@ export function LayerGroup({ index, ledColor, scrollProgress }: LayerGroupProps)
                   fontFamily: 'monospace',
                   fontSize: '9px',
                   fontWeight: 700,
-                  backgroundColor: scrollProgress < 0.6 ? 'rgba(10,10,12,0.85)' : 'rgba(20,19,18,0.85)',
+                  backgroundColor: scrollProgress < 0.60 ? 'rgba(10,10,12,0.85)' : 'rgba(20,19,18,0.85)',
                   color: '#3bf574',
                   whiteSpace: 'nowrap',
                 }}
@@ -1427,8 +1427,8 @@ export function LayerGroup({ index, ledColor, scrollProgress }: LayerGroupProps)
               style={{
                 width: '210px',
                 borderColor: 'rgba(74, 65, 55, 0.2)',
-                backgroundColor: scrollProgress < 0.6 ? 'rgba(15,15,17,0.85)' : 'rgba(255, 255, 255, 0.78)',
-                color: scrollProgress < 0.6 ? '#e0dbd5' : '#1a1816',
+                backgroundColor: (scrollProgress >= 0.52 && scrollProgress < 0.60) ? 'rgba(255, 255, 255, 0.78)' : 'rgba(15,15,17,0.85)',
+                color: (scrollProgress >= 0.52 && scrollProgress < 0.60) ? '#1a1816' : '#e0dbd5',
                 textAlign: index < 3 ? 'right' : 'left',
                 alignItems: index < 3 ? 'flex-end' : 'flex-start',
               }}

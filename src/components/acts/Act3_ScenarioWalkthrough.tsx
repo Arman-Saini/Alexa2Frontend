@@ -61,6 +61,7 @@ export function Act3_ScenarioWalkthrough() {
           padding: 'var(--space-6)',
           borderRadius: 24,
           border: '1px solid rgba(255, 255, 255, 0.25)',
+          backgroundColor: 'var(--glass-bg)',
           boxShadow:
             '0 8px 32px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.3)',
         }}

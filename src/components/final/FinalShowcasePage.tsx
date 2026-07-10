@@ -82,10 +82,10 @@ export function FinalShowcasePage() {
       return 0.0;
     } else if (s < 0.25) {
       return (s - 0.10) / 0.15;
-    } else if (s < 0.85) {
+    } else if (s < 0.60) {
       return 1.0;
     } else {
-      return Math.max(0, 1.0 - (s - 0.85) / 0.15);
+      return Math.max(0, 1.0 - (s - 0.60) / 0.15);
     }
   }, [dismantleSequenceActive, cpuScrollProgress, explodedProgress]);
 
@@ -167,7 +167,7 @@ export function FinalShowcasePage() {
     // Increase duration specifically when joining back together or returning to split view
     const duration = targetProgress === 1.0 
       ? 7000 
-      : (targetProgress === 0.65 && startProgress > 0.75 ? 4500 : 2500);
+      : (targetProgress === 0.50 && startProgress > 0.60 ? 4500 : 2500);
 
     const animateCpu = (now: number) => {
       const elapsed = now - startTime;
@@ -209,10 +209,10 @@ export function FinalShowcasePage() {
   ], []);
 
   const currentStepIdx = useMemo(() => {
-    if (cpuScrollProgress < 0.60) return 0;
-    if (cpuScrollProgress < 0.70) return 1;
-    if (cpuScrollProgress < 0.80) return 2;
-    if (cpuScrollProgress < 0.90) return 3;
+    if (cpuScrollProgress < 0.68) return 0;
+    if (cpuScrollProgress < 0.76) return 1;
+    if (cpuScrollProgress < 0.84) return 2;
+    if (cpuScrollProgress < 0.92) return 3;
     return 4;
   }, [cpuScrollProgress]);
 
@@ -233,10 +233,10 @@ export function FinalShowcasePage() {
     if (s >= 0.25) {
       if (s < 0.35) {
         t = (s - 0.25) / 0.10;
-      } else if (s < 0.85) {
+      } else if (s < 0.60) {
         t = 1.0;
-      } else if (s < 0.91) {
-        t = 1.0 - (s - 0.85) / 0.06;
+      } else if (s < 0.66) {
+        t = 1.0 - (s - 0.60) / 0.06;
       }
     }
 
@@ -329,19 +329,19 @@ export function FinalShowcasePage() {
 
           <button
             onClick={() => {
-              if (cpuScrollProgress > 0.75) {
+              if (cpuScrollProgress > 0.60) {
                 animateToProgress(0.50); // back to split
               } else {
                 animateToProgress(1.0); // to joined
               }
             }}
             className={`px-3 py-1 rounded-full font-mono text-[9px] md:text-[10px] uppercase tracking-wider transition-all duration-200 ${
-              dismantleSequenceActive && cpuScrollProgress > 0.75
+              dismantleSequenceActive && cpuScrollProgress > 0.60
                 ? 'bg-[#3bf574]/20 border border-[#3bf574]/50 text-[#3bf574] font-bold'
                 : 'text-white/70 hover:text-white hover:bg-white/5'
             }`}
           >
-            {cpuScrollProgress > 0.75 ? 'Back to Split View' : 'Go to Joined State'}
+            {cpuScrollProgress > 0.60 ? 'Back to Split View' : 'Go to Joined State'}
           </button>
         </div>
 
@@ -616,7 +616,7 @@ export function FinalShowcasePage() {
       )}
 
       {/* ── SYSTEM PIPELINE RUNTIME CARD (JOINING PHASE) ── */}
-      {dismantleSequenceActive && cpuScrollProgress >= 0.50 && (
+      {dismantleSequenceActive && cpuScrollProgress >= 0.60 && (
         <div
           className="fixed left-6 md:left-12 top-[20%] w-[90%] max-w-[340px] p-5 md:p-6 rounded-xl border backdrop-blur-md transition-all duration-300 shadow-xl z-30"
           style={{

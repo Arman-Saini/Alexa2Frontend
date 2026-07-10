@@ -95,16 +95,16 @@ export function FinalArchitectureStack({
       const explodedProgress = s / 0.20;
       targetY = THREE.MathUtils.lerp(debugCpuOffsetY, debugCpuPhase2Y, explodedProgress);
       targetGrpPos.set(0, targetY, 0);
-    } else if (s < 0.80) {
+    } else if (s < 0.60) {
       // Floats up from Phase 2 start Y offset to Resting Y offset during Profile Sweep (s = 0.20 to 0.50)
       const t = Math.min(1, (s - 0.20) / 0.30);
       targetY = THREE.MathUtils.lerp(debugCpuPhase2Y, debugCpuRestingY, t);
       targetGrpPos.set(0, targetY, 0);
-    } else if (s < 0.90) {
+    } else if (s < 0.80) {
       targetY = debugCpuRestingY;
       targetGrpPos.set(0, targetY, 0);
     } else {
-      const tClose = (s - 0.90) / 0.10;
+      const tClose = (s - 0.60) / 0.40;
       targetY = THREE.MathUtils.lerp(debugCpuRestingY, debugCpuOffsetY, tClose);
       targetGrpPos.set(0, targetY, 0);
     }
@@ -153,8 +153,8 @@ export function FinalArchitectureStack({
 
       targetGrpRot.set(THREE.MathUtils.lerp(Math.PI / 2, 0, splayT), 0, 0);
     }
-    else if (s < 0.80) {
-      // PHASE 4-6: Plateaus (Scroll 0.50 -> 0.80)
+    else if (s < 0.60) {
+      // PHASE 4-6: Plateaus (Scroll 0.50 -> 0.60)
       targetCamPos.set(0, 30, 0.001);
       targetZoomVal = 130; // Closer top-down splay details view
       targetCameraUp.set(0, 0, -1);
@@ -162,9 +162,9 @@ export function FinalArchitectureStack({
       
       targetGrpRot.set(0, 0, 0);
     }
-    else if (s < 0.90) {
-      // PHASE 5 (reverse of Phase 3): Unsplay — top-down collapses back to orbit view (0.80 -> 0.90)
-      const unSplayT = (s - 0.80) / 0.10;
+    else if (s < 0.80) {
+      // PHASE 5 (reverse of Phase 3): Unsplay — top-down collapses back to orbit view (0.60 -> 0.80)
+      const unSplayT = (s - 0.60) / 0.20;
 
       targetCamPos.set(
         THREE.MathUtils.lerp(0, 8, unSplayT),
@@ -178,8 +178,8 @@ export function FinalArchitectureStack({
       targetGrpRot.set(THREE.MathUtils.lerp(0, Math.PI / 2, unSplayT), 0, 0);
     }
     else {
-      // PHASE 6 (reverse of Phase 2→1): De-orbit back to front view (0.90 -> 1.00)
-      const tReturn = (s - 0.90) / 0.10;
+      // PHASE 6 (reverse of Phase 2→1): De-orbit back to front view (0.80 -> 1.00)
+      const tReturn = (s - 0.80) / 0.20;
       const angle = (1.0 - tReturn) * (Math.PI / 2); // mirrors entry orbit angle
       const radius = 8;
 
@@ -300,15 +300,15 @@ export function FinalArchitectureStack({
       } else if (s < 0.57) {
         // Fade out as white section begins
         material.opacity = Math.max(0, 1 - (s - 0.51) / 0.06);
-      } else if (s < 0.84) {
+      } else if (s < 0.74) {
         // Hidden during white section
         material.opacity = 0;
-      } else if (s < 0.90) {
+      } else if (s < 0.80) {
         // Fade back in during unsplay return
-        material.opacity = (s - 0.84) / 0.06;
+        material.opacity = (s - 0.74) / 0.06;
       } else {
         // Fade out as de-orbit completes — fully gone by s=1.0
-        material.opacity = Math.max(0, 1 - (s - 0.90) / 0.10);
+        material.opacity = Math.max(0, 1 - (s - 0.80) / 0.20);
       }
       material.visible = material.opacity > 0;
     }

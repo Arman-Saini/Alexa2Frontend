@@ -138,11 +138,12 @@ function createFilterSVG(id: string): FilterRefs {
     <defs>
       <filter id="${id}" color-interpolation-filters="sRGB" x="-38%" y="-188%" width="176%" height="476%">
         <feImage result="map" preserveAspectRatio="none" />
-        <feDisplacementMap in="SourceGraphic" in2="map" xChannelSelector="R" yChannelSelector="B" result="dispRed" data-channel="red" />
+        <feGaussianBlur in="SourceGraphic" stdDeviation="20" result="blurred" />
+        <feDisplacementMap in="blurred" in2="map" xChannelSelector="R" yChannelSelector="B" result="dispRed" data-channel="red" />
         <feColorMatrix in="dispRed" type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="red" />
-        <feDisplacementMap in="SourceGraphic" in2="map" xChannelSelector="R" yChannelSelector="B" result="dispGreen" data-channel="green" />
+        <feDisplacementMap in="blurred" in2="map" xChannelSelector="R" yChannelSelector="B" result="dispGreen" data-channel="green" />
         <feColorMatrix in="dispGreen" type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" result="green" />
-        <feDisplacementMap in="SourceGraphic" in2="map" xChannelSelector="R" yChannelSelector="B" result="dispBlue" data-channel="blue" />
+        <feDisplacementMap in="blurred" in2="map" xChannelSelector="R" yChannelSelector="B" result="dispBlue" data-channel="blue" />
         <feColorMatrix in="dispBlue" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="blue" />
         <feBlend in="red" in2="green" mode="screen" result="rg" />
         <feBlend in="rg" in2="blue" mode="screen" result="output" />

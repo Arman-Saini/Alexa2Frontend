@@ -64,6 +64,7 @@ export function Act0_Resting() {
           padding: 'var(--space-8)',
           borderRadius: 28,
           border: '1px solid rgba(255, 255, 255, 0.25)',
+          backgroundColor: 'var(--glass-bg)',
           boxShadow:
             '0 8px 32px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.3)',
         }}
