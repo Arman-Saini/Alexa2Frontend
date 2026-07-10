@@ -12,10 +12,19 @@ const CHORDS: number[][] = [
 ];
 const BEAT_MS = 550; // ~109 bpm swing feel
 
-function scheduleChord() {
+// Disco chord progression, faster and brighter - Cmaj7 → Am7 → Fmaj7 → G7
+const DISCO_CHORDS: number[][] = [
+  [130.81, 164.81, 196, 246.94], // Cmaj7
+  [110, 138.59, 164.81, 207.65], // Am7
+  [87.31, 110, 130.81, 164.81],  // Fmaj7
+  [98, 123.47, 146.83, 185.00],  // G7
+];
+const DISCO_BEAT_MS = 300; // ~200 bpm four-on-the-floor feel
+
+function scheduleChord(chords: number[][], beatMs: number) {
   if (!ctx) return;
   const now = ctx.currentTime;
-  const chord = CHORDS[Math.floor(beatIndex / 4) % CHORDS.length];
+  const chord = chords[Math.floor(beatIndex / 4) % chords.length];
   const beat = beatIndex % 4;
 
   // Bass note (every beat)
@@ -24,9 +33,9 @@ function scheduleChord() {
   bass.type = 'sine';
   bass.frequency.setValueAtTime(chord[beat % chord.length], now);
   bassG.gain.setValueAtTime(0.18, now);
-  bassG.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+  bassG.gain.exponentialRampToValueAtTime(0.001, now + beatMs / 1000 * 0.8);
   bass.connect(bassG); bassG.connect(ctx.destination);
-  bass.start(now); bass.stop(now + 0.45);
+  bass.start(now); bass.stop(now + beatMs / 1000 * 0.8);
 
   // Chord hit on beats 1 and 3
   if (beat === 0 || beat === 2) {
@@ -36,9 +45,9 @@ function scheduleChord() {
       osc.type = 'triangle';
       osc.frequency.setValueAtTime(freq, now);
       g.gain.setValueAtTime(0.06, now);
-      g.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+      g.gain.exponentialRampToValueAtTime(0.001, now + beatMs / 1000 * 0.7);
       osc.connect(g); g.connect(ctx!.destination);
-      osc.start(now); osc.stop(now + 0.4);
+      osc.start(now); osc.stop(now + beatMs / 1000 * 0.7);
     });
   }
 
@@ -56,14 +65,22 @@ function scheduleChord() {
   beatIndex++;
 }
 
-export function playJazz() {
+function startPlayback(chords: number[][], beatMs: number) {
   if (ctx) return;
   try {
     ctx = new AudioContext();
     beatIndex = 0;
-    scheduleChord();
-    schedulerHandle = setInterval(scheduleChord, BEAT_MS);
+    scheduleChord(chords, beatMs);
+    schedulerHandle = setInterval(() => scheduleChord(chords, beatMs), beatMs);
   } catch { /* browser may block without user gesture */ }
+}
+
+export function playJazz() {
+  startPlayback(CHORDS, BEAT_MS);
+}
+
+export function playDisco() {
+  startPlayback(DISCO_CHORDS, DISCO_BEAT_MS);
 }
 
 export function stopJazz() {
