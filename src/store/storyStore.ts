@@ -11,10 +11,8 @@ export interface StoryState {
 }
 
 export const useStoryStore = create<StoryState>()((set) => ({
-  // Defaults straight into the interactive tour — StoryScroll ('story' mode)
-  // is no longer the entry gate, it's reachable only via restartStory() or
-  // an explicit setState, kept working for anyone who wants it directly.
-  mode: 'interactive',
+  // Defaults to story scroll walkthrough so users see the initial guided tiers scroll
+  mode: 'story',
   storyProgress: 0,
 
   setStoryProgress: (progress) =>

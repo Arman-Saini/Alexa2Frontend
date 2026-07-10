@@ -112,7 +112,7 @@ export function Act0_Resting() {
         <button
           data-anime
           type="button"
-          onClick={() => goToAct(3)}
+          onClick={() => goToAct(1)}
           style={{
             marginTop: 'var(--space-6)',
             background: 'var(--copper-500)',
@@ -127,7 +127,7 @@ export function Act0_Resting() {
             opacity: 0,
           }}
         >
-          Try a scenario →
+          Start tour →
         </button>
         <Link
           data-anime

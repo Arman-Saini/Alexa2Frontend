@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useActStore, type ActId } from '../../store/actStore';
+import { useStoryStore } from '../../store/storyStore';
 import { DemoControls } from '../shared/DemoControls';
 
 const ACT_LABELS: Record<Exclude<ActId, 'freeplay'>, string> = {
@@ -95,7 +96,10 @@ export function ActNav() {
 
       <button
         type="button"
-        onClick={resetToRest}
+        onClick={() => {
+          resetToRest();
+          useStoryStore.getState().restartStory();
+        }}
         style={{
           fontFamily: 'var(--font-body)',
           fontSize: 11,

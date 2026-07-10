@@ -4,6 +4,7 @@ import { GlassCard } from '../shared/GlassCard';
 import { Act2_OntologyGraph } from './Act2_OntologyGraph';
 import { Act2_TraceReadout } from './Act2_TraceReadout';
 import { useTourStore } from '../../store/tourStore';
+import { useActStore } from '../../store/actStore';
 
 /**
  * Act 2 — "Brain". Same visual centerpiece (Act2_OntologyGraph) and the
@@ -32,7 +33,7 @@ export function Act2_CentralBrain() {
       }}
     >
       <ScrollReveal>
-        <div style={{ textAlign: 'center', maxWidth: 680, pointerEvents: 'auto' }}>
+        <div style={{ textAlign: 'center', maxWidth: 680, pointerEvents: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-3)' }}>
           <h2
             style={{
               fontFamily: 'var(--font-display)',
@@ -50,11 +51,30 @@ export function Act2_CentralBrain() {
               fontSize: '0.95rem',
               color: 'var(--text-secondary)',
               marginTop: 'var(--space-3)',
+              margin: 0,
             }}
           >
             Every sensor reading turns into something I understand — is a light on, is someone home,
             is the stove too hot — so I can act on what's actually happening, not just raw numbers.
           </p>
+          <button
+            type="button"
+            onClick={() => useActStore.getState().goToAct(3)}
+            style={{
+              marginTop: 'var(--space-2)',
+              background: 'var(--copper-500)',
+              color: 'var(--void-950)',
+              border: 'none',
+              fontFamily: 'var(--font-display)',
+              fontWeight: 600,
+              fontSize: '13px',
+              padding: 'var(--space-2) var(--space-5)',
+              borderRadius: 'var(--r-md)',
+              cursor: 'pointer',
+            }}
+          >
+            Next: Try a command →
+          </button>
         </div>
       </ScrollReveal>
 

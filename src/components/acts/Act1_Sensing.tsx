@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTourStore } from '../../store/tourStore';
 import { useAppStore } from '../../store/store';
+import { useActStore } from '../../store/actStore';
 import { useLiquidGlass } from '../../hooks/useLiquidGlass';
 
 interface SensingSection {
@@ -156,6 +157,25 @@ export function Act1_Sensing() {
           />
         ))}
       </div>
+
+      <button
+        type="button"
+        onClick={() => useActStore.getState().goToAct(2)}
+        style={{
+          marginTop: 'var(--space-2)',
+          background: 'var(--copper-500)',
+          color: 'var(--void-950)',
+          border: 'none',
+          fontFamily: 'var(--font-display)',
+          fontWeight: 600,
+          fontSize: '13px',
+          padding: 'var(--space-2) var(--space-5)',
+          borderRadius: 'var(--r-md)',
+          cursor: 'pointer',
+        }}
+      >
+        Next: How I decide →
+      </button>
       </div>
     </div>
   );

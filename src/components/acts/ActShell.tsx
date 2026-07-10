@@ -44,7 +44,7 @@ export function ActShell() {
           style={{
             position: 'absolute',
             inset: 0,
-            pointerEvents: typeof currentAct === 'number' ? 'auto' : 'none',
+            pointerEvents: 'none',
           }}
         >
           {currentAct === 0 && <Act0_Resting />}
