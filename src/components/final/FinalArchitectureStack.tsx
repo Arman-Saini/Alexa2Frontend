@@ -114,14 +114,25 @@ export function FinalArchitectureStack({
     targetCameraUp.set(0, 1, 0);
     targetLookAt.set(0, 0, 0);
 
-    if (s < 0.20) {
-      // PHASE 1: Rise and Flip (Scroll 0.0 -> 0.20, raised camera to view CPU inside Alexa)
+    if (s < 0.08) {
+      // NEW PHASE: Zoom In (Scroll 0.0 -> 0.08, camera zooms in from 100 to 200)
+      const t = s / 0.08;
+      targetCamPos.set(0, 1.4, 8);
+      targetZoomVal = THREE.MathUtils.lerp(100, 200, t);
+      targetCameraUp.set(0, 1, 0);
+      targetLookAt.set(0, targetY, 0);
+
+      targetGrpRot.set(0, 0, 0);
+    }
+    else if (s < 0.20) {
+      // PHASE 1: Rise and Flip (Scroll 0.08 -> 0.20, raised camera to view CPU inside Alexa)
+      const t = (s - 0.08) / 0.12;
       targetCamPos.set(0, 1.4, 8);
       targetZoomVal = 200;
       targetCameraUp.set(0, 1, 0);
       targetLookAt.set(0, targetY, 0);
 
-      targetGrpRot.set(THREE.MathUtils.lerp(0, Math.PI / 2, s / 0.20), 0, 0);
+      targetGrpRot.set(THREE.MathUtils.lerp(0, Math.PI / 2, t), 0, 0);
     } 
     else if (s < 0.40) {
       // PHASE 2: Orbit Camera (Scroll 0.20 -> 0.40, raised camera)
@@ -177,9 +188,9 @@ export function FinalArchitectureStack({
 
       targetGrpRot.set(THREE.MathUtils.lerp(0, Math.PI / 2, unSplayT), 0, 0);
     }
-    else {
-      // PHASE 6 (reverse of Phase 2→1): De-orbit back to front view (0.80 -> 1.00)
-      const tReturn = (s - 0.80) / 0.20;
+    else if (s < 0.92) {
+      // PHASE 6 (reverse of Phase 2→1): De-orbit back to front view (0.80 -> 0.92)
+      const tReturn = (s - 0.80) / 0.12;
       const angle = (1.0 - tReturn) * (Math.PI / 2); // mirrors entry orbit angle
       const radius = 8;
 
@@ -188,11 +199,21 @@ export function FinalArchitectureStack({
         THREE.MathUtils.lerp(1.7, 1.4, tReturn),
         radius * Math.cos(angle)
       );
-      targetZoomVal = THREE.MathUtils.lerp(240, 200, tReturn);
+      targetZoomVal = 200;
       targetCameraUp.set(0, 1, 0);
       targetLookAt.set(0, THREE.MathUtils.lerp(targetY + 0.1, targetY, tReturn), 0);
 
-      targetGrpRot.set(Math.PI / 2, 0, 0);
+      targetGrpRot.set(THREE.MathUtils.lerp(Math.PI / 2, 0, tReturn), 0, 0);
+    }
+    else {
+      // NEW PHASE: Zoom Out (0.92 -> 1.00, camera zooms out from 200 to 100)
+      const t = (s - 0.92) / 0.08;
+      targetCamPos.set(0, 1.4, 8);
+      targetZoomVal = THREE.MathUtils.lerp(200, 100, t);
+      targetCameraUp.set(0, 1, 0);
+      targetLookAt.set(0, targetY, 0);
+
+      targetGrpRot.set(0, 0, 0);
     }
 
     const tBlend = Math.min(1, (elapsed - transitionStartTime.current) / 1.0);

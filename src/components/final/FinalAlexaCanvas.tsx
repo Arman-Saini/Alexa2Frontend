@@ -140,7 +140,7 @@ export function FinalAlexaCanvas({
   return (
     <Canvas
       shadows
-      camera={{ position: [0, 3.2, 9.2], fov: 45 }}
+      camera={{ position: [0, 1.8, 5.0], fov: 45 }}
       style={{ background: 'transparent' }}
       gl={{ powerPreference: 'high-performance', antialias: true }}
     >

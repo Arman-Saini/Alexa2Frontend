@@ -71,7 +71,7 @@ export function FinalShowcasePage() {
   const debugCamPanX = 0.0;
   const debugCamOffsetY = 0.0;
   const debugCamPanZ = 0.0;
-  const debugCamZoom = 110;
+  const debugCamZoom = 200;
   const debugCamYaw = 0.0;
   const debugCamPitch = 0.0;
 
