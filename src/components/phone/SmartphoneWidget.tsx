@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { env } from '../../config/env';
 import { fallbackSpeak } from '../../hooks/useTTS';
+import { useTourStore } from '../../store/tourStore';
 
 
 export interface ChatSummary {
@@ -98,6 +99,8 @@ interface SmartphoneWidgetProps {
   externalCommand?: string;
   onClearExternalCommand?: () => void;
   showExitButton?: boolean;
+  /** Bump this number to force the widget open if it's currently minimized. */
+  forceExpandSignal?: number;
 }
 
 export function SmartphoneWidget({
@@ -107,6 +110,7 @@ export function SmartphoneWidget({
   externalCommand,
   onClearExternalCommand,
   showExitButton: _showExitButton = false,
+  forceExpandSignal,
 }: SmartphoneWidgetProps) {
   const [internalSummaries, setInternalSummaries] = useState<ChatSummary[]>(DEFAULT_SUMMARIES);
   const [typedInput, setTypedInput] = useState('');
@@ -184,19 +188,29 @@ export function SmartphoneWidget({
         setStatus('done');
         setTimeout(() => setStatus('idle'), 1500);
 
+        // Notify the cartoon HUD avatar — one real reply, three surfaces update.
+        useTourStore.getState().setReply(spokenText);
+        useTourStore.getState().setSpeaking(true);
+        const stopSpeaking = () => useTourStore.getState().setSpeaking(false);
+
         // Play the TTS response
         if (audioBase64 && !isMock) {
           try {
             const audio = new Audio(`data:${audioContentType};base64,${audioBase64}`);
+            audio.onended = stopSpeaking;
+            audio.onerror = (err) => {
+              console.warn('Audio play failed, falling back to browser TTS:', err);
+              fallbackSpeak(spokenText, stopSpeaking);
+            };
             audio.play().catch((err) => {
               console.warn('Audio play failed, falling back to browser TTS:', err);
-              fallbackSpeak(spokenText, () => {});
+              fallbackSpeak(spokenText, stopSpeaking);
             });
           } catch (e) {
-            fallbackSpeak(spokenText, () => {});
+            fallbackSpeak(spokenText, stopSpeaking);
           }
         } else {
-          fallbackSpeak(spokenText, () => {});
+          fallbackSpeak(spokenText, stopSpeaking);
         }
       }
     });
@@ -233,6 +247,11 @@ export function SmartphoneWidget({
     }
   }, [externalCommand]);
 
+  useEffect(() => {
+    if (forceExpandSignal !== undefined) setIsMinimized(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [forceExpandSignal]);
+
   const handleSpeechFinal = (text: string) => {
     setTypedInput(text);
     void processCommand(text);
@@ -241,6 +260,7 @@ export function SmartphoneWidget({
   const { listening, liveText, toggle } = useMic(handleSpeechFinal);
 
   useEffect(() => {
+    useTourStore.getState().setListening(listening);
     if (listening) {
       setStatus('listening');
     } else if (status === 'listening') {
