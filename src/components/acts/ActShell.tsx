@@ -46,9 +46,7 @@ export function ActShell() {
           {currentAct === 0 && <Act0_Resting />}
           {currentAct === 1 && <Act1_Sensing />}
           {currentAct === 2 && <Act2_CentralBrain />}
-          {currentAct === 3 && (
-            <Act3_ScenarioWalkthrough plan={plan} loading={loading} />
-          )}
+          {currentAct === 3 && <Act3_ScenarioWalkthrough />}
         </motion.div>
       </AnimatePresence>
 
