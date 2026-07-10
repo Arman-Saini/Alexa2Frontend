@@ -1,248 +1,259 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { HeroCanvas } from './HeroCanvas';
+import { createTimeline } from 'animejs';
 
 type ExpressionType = 'resting' | 'happy' | 'curious' | 'wink' | 'sleepy' | 'dizzy' | 'excited' | 'sad' | 'yawning';
 type LedModeType = 'solid' | 'pulse' | 'wave' | 'off';
 
-interface ColorOption {
-  name: string;
-  value: string;
-}
-
-const BODY_COLORS: ColorOption[] = [
-  { name: 'Matte Charcoal', value: '#2e323b' },
-  { name: 'Ghibli Forest', value: '#244d47' },
-  { name: 'Doraemon Blue', value: '#3a7ca5' },
-  { name: 'Pippo Yellow', value: '#e9b44c' },
-  { name: 'Retro Cream', value: '#e2d5c3' },
-  { name: 'Sakura Pink', value: '#e2959d' },
-];
-
-const LED_COLORS: ColorOption[] = [
-  { name: 'Alexa Aqua', value: '#00f3ff' },
-  { name: 'Ember Orange', value: '#ff9233' },
-  { name: 'Forest Green', value: '#3bf574' },
-  { name: 'Void Violet', value: '#d254ff' },
-  { name: 'Sakura Pink', value: '#ff66b2' },
-];
-
-const EXPRESSIONS: { type: ExpressionType; label: string; face: string }[] = [
-  { type: 'happy', label: 'Happy', face: '⌒ ‿ ⌒' },
-  { type: 'resting', label: 'Default Resting Face', face: '・ ‿ ・' },
-  { type: 'curious', label: 'Curious', face: '・ o ・' },
-  { type: 'wink', label: 'Wink', face: '⌒ ‿ o' },
-  { type: 'sleepy', label: 'Sleepy', face: '＞ ｏ ＞' },
-  { type: 'yawning', label: 'Yawning', face: '￣ ｏ ￣' },
-  { type: 'dizzy', label: 'Dizzy', face: 'x ‿ x' },
-  { type: 'excited', label: 'Excited', face: '^ ‿ ^' },
-  { type: 'sad', label: 'Sad', face: '∪ ‿ ∪' },
-];
-
-const TOP_RIGHT_LABELS = [
-  { id: 'head', text: 'TOP DOME (HINGE OPEN)' },
-  { id: 'lens', text: 'T0/T1 SENSORY REFLEX (EDGE)' },
-  { id: 'gearLarge', text: 'T2 EDGE MASTER CORE (AZ3)' },
-  { id: 'gearSmall', text: 'APP VAULT PLUGINS (KHATA/SWIGGY)' },
-  { id: 'base', text: 'T3 CLOUD SYNAPSE (BEDROCK)' },
-];
-
 export function AnimationPage() {
   const [expression, setExpression] = useState<ExpressionType>('resting');
-  const [bodyColor, setBodyColor] = useState<string>('#2e323b');
+  const [bodyColor, setBodyColor] = useState<string>('#2e323b'); // switches between grey and white
   const [ledColor, setLedColor] = useState<string>('#00f3ff');
   const [ledMode, setLedMode] = useState<LedModeType>('pulse');
-  const [outlineThickness, setOutlineThickness] = useState<number>(1.3);
+  const [outlineThickness] = useState<number>(1.3);
+  
+  // React state for render-level animations in the model
   const [explodedProgress, setExplodedProgress] = useState<number>(0.0);
   const [isPanelOpen, setIsPanelOpen] = useState<boolean>(false);
-  const [isSpeaking, setIsSpeaking] = useState<boolean>(false);
-  const [isSinging, setIsSinging] = useState<boolean>(false);
 
-  // Auto-explode animation state
-  const [isExploding, setIsExploding] = useState(false);
+  // Local scrolling container ref to bypass index.css overflow lock
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // Cache values to prevent React re-renders on every scroll pixel
+  const prevMetricsRef = useRef({
+    expression: 'resting' as ExpressionType,
+    bodyColor: '#2e323b',
+    ledColor: '#00f3ff',
+    ledMode: 'pulse' as LedModeType,
+  });
+
+  // Ref containing camera and Y rotation values updated by Anime.js timeline
+  const animValuesRef = useRef({
+    explodedProgress: 0,
+    robotRotationY: 0,
+    cameraX: 0,
+    cameraY: 1.4,
+    cameraZ: 5.2,
+    lookAtX: 0,
+    lookAtY: 0.3,
+    lookAtZ: 0,
+    panelOpenProgress: 0,
+    chipPopProgress: 0,
+  });
 
   useEffect(() => {
-    let frameId: number;
-    if (isExploding) {
-      const animate = () => {
-        setExplodedProgress((prev) => {
-          if (prev >= 1.0) {
-            setIsExploding(false);
-            return 1.0;
-          }
-          frameId = requestAnimationFrame(animate);
-          return Math.min(1.0, prev + 0.04);
-        });
-      };
-      frameId = requestAnimationFrame(animate);
+    // Setup target object for Anime.js
+    const animeTargets = {
+      explodedProgress: 0,
+      robotRotationY: 0,
+      cameraX: 0,
+      cameraY: 1.4,
+      cameraZ: 5.2,
+      lookAtX: 0,
+      lookAtY: 0.3,
+      lookAtZ: 0,
+      panelOpenProgress: 0,
+      chipPopProgress: 0,
+    };
+
+    // Create the timeline
+    const tl = createTimeline({
+      autoplay: false,
+      defaults: { ease: 'linear' },
+      onUpdate: () => {
+        // Sync states to trigger React re-renders for positions in JSX
+        setExplodedProgress(animeTargets.explodedProgress);
+        setIsPanelOpen(animeTargets.panelOpenProgress > 0.5);
+
+        // Sync values to ref for high-performance useFrame updates
+        animValuesRef.current.explodedProgress = animeTargets.explodedProgress;
+        animValuesRef.current.robotRotationY = animeTargets.robotRotationY;
+        animValuesRef.current.cameraX = animeTargets.cameraX;
+        animValuesRef.current.cameraY = animeTargets.cameraY;
+        animValuesRef.current.cameraZ = animeTargets.cameraZ;
+        animValuesRef.current.lookAtX = animeTargets.lookAtX;
+        animValuesRef.current.lookAtY = animeTargets.lookAtY;
+        animValuesRef.current.lookAtZ = animeTargets.lookAtZ;
+        animValuesRef.current.panelOpenProgress = animeTargets.panelOpenProgress;
+        animValuesRef.current.chipPopProgress = animeTargets.chipPopProgress;
+      }
+    });
+
+    // Timeline Choreography:
+    // 0 to 400: Explode the mecha robot vertically, rotate Y slightly, camera pans up
+    tl.add(animeTargets, {
+      explodedProgress: 0.8,
+      robotRotationY: Math.PI * 0.12, // slight rotation for isometric depth
+      cameraX: 0.8,
+      cameraY: 2.0,
+      cameraZ: 4.6,
+      lookAtX: 0,
+      lookAtY: 0.5,
+      lookAtZ: 0,
+      panelOpenProgress: 0.0,
+      chipPopProgress: 0.3,
+      duration: 400,
+    })
+    // 400 to 1000: CPU pops out fully, camera zooms in close looking down
+    .add(animeTargets, {
+      explodedProgress: 1.0,
+      robotRotationY: Math.PI * 0.22,
+      cameraX: 1.1,
+      cameraY: 2.5,
+      cameraZ: 3.8,
+      lookAtX: 0,
+      lookAtY: 0.7,
+      lookAtZ: 0.1,
+      panelOpenProgress: 0.0,
+      chipPopProgress: 1.0,
+      duration: 600,
+    });
+
+    const handleScroll = () => {
+      const el = scrollContainerRef.current;
+      if (!el) return;
+      const scrollableHeight = el.scrollHeight - el.clientHeight;
+      if (scrollableHeight <= 0) return;
+      
+      const scrollPercent = el.scrollTop / scrollableHeight;
+      tl.seek(scrollPercent * tl.duration);
+
+      // Determine expressions, colors and backgrounds
+      let nextExpr: ExpressionType = 'resting';
+      let nextBodyColor = '#2e323b'; // grey
+      let nextLedColor = '#00f3ff';
+      let nextLedMode: LedModeType = 'pulse';
+      let nextBgColor = '#161514';
+      let nextTextColor = '#F2EDE6';
+      let nextSubtextColor = '#B8AFA4';
+
+      if (scrollPercent < 0.25) {
+        nextExpr = 'resting';
+        nextBodyColor = '#2e323b'; // grey
+        nextLedColor = '#00f3ff';
+        nextLedMode = 'pulse';
+        nextBgColor = '#161514';
+        nextTextColor = '#F2EDE6';
+        nextSubtextColor = '#B8AFA4';
+      } else if (scrollPercent < 0.5) {
+        nextExpr = 'curious';
+        nextBodyColor = '#2e323b'; // grey
+        nextLedColor = '#e9b44c';
+        nextLedMode = 'wave';
+        nextBgColor = '#161514';
+        nextTextColor = '#F2EDE6';
+        nextSubtextColor = '#B8AFA4';
+      } else if (scrollPercent < 0.75) {
+        nextExpr = 'dizzy'; // dizzy face
+        nextBodyColor = '#ece6df'; // switches to white
+        nextLedColor = '#ff9233';
+        nextLedMode = 'solid';
+        nextBgColor = '#ECE6DF'; // light theme background
+        nextTextColor = '#1a1b20';
+        nextSubtextColor = '#5E5A54';
+      } else {
+        nextExpr = 'dizzy';
+        nextBodyColor = '#ffffff'; // pure white
+        nextLedColor = '#d254ff';
+        nextLedMode = 'pulse';
+        nextBgColor = '#ECE6DF';
+        nextTextColor = '#1a1b20';
+        nextSubtextColor = '#5E5A54';
+      }
+
+      // Smoothly update DOM classes/styles directly for high performance
+      const pageContainer = document.getElementById('animation-page-container');
+      if (pageContainer) {
+        pageContainer.style.backgroundColor = nextBgColor;
+        pageContainer.style.color = nextTextColor;
+        pageContainer.style.setProperty('--theme-subtext', nextSubtextColor);
+      }
+
+      // Update React states only when values cross boundaries to avoid lag
+      const prev = prevMetricsRef.current;
+      if (prev.expression !== nextExpr) {
+        prev.expression = nextExpr;
+        setExpression(nextExpr);
+      }
+      if (prev.bodyColor !== nextBodyColor) {
+        prev.bodyColor = nextBodyColor;
+        setBodyColor(nextBodyColor);
+      }
+      if (prev.ledColor !== nextLedColor) {
+        prev.ledColor = nextLedColor;
+        setLedColor(nextLedColor);
+      }
+      if (prev.ledMode !== nextLedMode) {
+        prev.ledMode = nextLedMode;
+        setLedMode(nextLedMode);
+      }
+    };
+
+    const containerEl = scrollContainerRef.current;
+    if (containerEl) {
+      containerEl.addEventListener('scroll', handleScroll, { passive: true });
     }
-    return () => cancelAnimationFrame(frameId);
-  }, [isExploding]);
+    
+    // Initial mapping
+    handleScroll();
 
-  const triggerAssemble = () => {
-    setIsExploding(false);
-    const animate = () => {
-      setExplodedProgress((prev) => {
-        if (prev <= 0.0) {
-          return 0.0;
-        }
-        requestAnimationFrame(animate);
-        return Math.max(0.0, prev - 0.04);
-      });
-    };
-    requestAnimationFrame(animate);
-  };
-
-  // Synchronize window scroll wheel events with explodedProgress
-  useEffect(() => {
-    const handleWheel = (e: WheelEvent) => {
-      // Ignore scroll events inside the sidebar
-      if (e.target && (e.target as HTMLElement).closest('.overflow-y-auto')) {
-        return;
-      }
-      setExplodedProgress((prev) => {
-        const delta = e.deltaY * 0.0015;
-        return Math.max(0, Math.min(1, prev + delta));
-      });
-    };
-    window.addEventListener('wheel', handleWheel, { passive: true });
-    return () => window.removeEventListener('wheel', handleWheel);
-  }, []);
-
-  // Synchronize window touch move swipe events on mobile
-  useEffect(() => {
-    let touchStart = 0;
-    const handleTouchStart = (e: TouchEvent) => {
-      touchStart = e.touches[0].clientY;
-    };
-    const handleTouchMove = (e: TouchEvent) => {
-      if (e.target && (e.target as HTMLElement).closest('.overflow-y-auto')) {
-        return;
-      }
-      const touchEnd = e.touches[0].clientY;
-      const delta = (touchStart - touchEnd) * 0.004;
-      touchStart = touchEnd;
-      setExplodedProgress((prev) => Math.max(0, Math.min(1, prev + delta)));
-    };
-    window.addEventListener('touchstart', handleTouchStart);
-    window.addEventListener('touchmove', handleTouchMove);
     return () => {
-      window.removeEventListener('touchstart', handleTouchStart);
-      window.removeEventListener('touchmove', handleTouchMove);
+      if (containerEl) {
+        containerEl.removeEventListener('scroll', handleScroll);
+      }
     };
   }, []);
-
-  const activeBodyColorName = BODY_COLORS.find((c) => c.value === bodyColor)?.name || 'Custom';
-  const activeLedColorName = LED_COLORS.find((c) => c.value === ledColor)?.name || 'Custom';
-
-  const isWhiteTheme = explodedProgress > 0.25;
-  const labelsVisible = explodedProgress > 0.15;
 
   return (
     <div
-      className="relative w-screen h-screen overflow-hidden flex flex-col md:flex-row select-none text-[#F2EDE6] font-sans transition-colors duration-700"
-      style={{ backgroundColor: isWhiteTheme ? '#ECE6DF' : '#0B0B0C' }}
+      ref={scrollContainerRef}
+      id="animation-page-container"
+      className="relative w-screen h-screen overflow-y-auto select-none font-sans"
+      style={{
+        backgroundColor: '#161514',
+        color: '#F2EDE6',
+        transition: 'background-color 0.6s cubic-bezier(0.16, 1, 0.3, 1), color 0.6s cubic-bezier(0.16, 1, 0.3, 1)',
+      }}
     >
-      {/* Grid backdrop */}
+      {/* 1. Background Paper Texture Overlay */}
       <div
-        className="absolute inset-0 transition-opacity duration-700 pointer-events-none z-0"
+        className="fixed inset-0 opacity-[0.03] pointer-events-none z-0 mix-blend-overlay"
         style={{
-          opacity: isWhiteTheme ? 0.08 : 0.04,
-          backgroundImage: `
-            linear-gradient(to right, ${isWhiteTheme ? '#000000' : '#ffffff'} 1px, transparent 1px),
-            linear-gradient(to bottom, ${isWhiteTheme ? '#000000' : '#ffffff'} 1px, transparent 1px)
-          `,
-          backgroundSize: '40px 40px',
+          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`,
         }}
       />
 
-      {/* Top-Left Header */}
-      <header className="absolute top-0 left-0 right-0 z-30 flex items-center justify-between px-6 py-4 pointer-events-none md:px-8">
+      {/* 2. Top-Left Fixed Header */}
+      <header className="fixed top-0 left-0 right-0 z-30 flex items-center justify-between px-6 py-4 pointer-events-none md:px-8">
         <div className="flex items-center space-x-3 pointer-events-auto">
-          <div className="w-2.5 h-2.5 rounded-full bg-[#00f3ff] animate-pulse" />
+          <div className="w-2.5 h-2.5 rounded-full bg-[#3a7ca5] animate-pulse" />
           <span
-            className="text-xs font-bold tracking-[0.2em] font-mono transition-colors duration-700"
-            style={{ color: isWhiteTheme ? '#5E5A54' : '#B8AFA4' }}
+            className="text-xs font-bold tracking-[0.2em] font-mono text-[#B8AFA4]"
+            style={{ color: 'var(--theme-subtext, #B8AFA4)' }}
           >
-            ALEXA.BLUEPRINT.ENGINE
+            ALEXA.SYSTEM.CORE
           </span>
         </div>
-        <Link
-          to="/"
-          className="pointer-events-auto flex items-center space-x-2 px-4 py-1.5 text-xs font-mono tracking-wider transition-all duration-200 border border-[#4a4137] bg-black/30 hover:bg-[#C08662]/10 hover:border-[#C08662] hover:text-[#C08662]"
-        >
-          <span>← BACK TO CONSOLE</span>
-        </Link>
+        <div className="flex items-center space-x-3 pointer-events-auto">
+          <Link
+            to="/cpuanimation"
+            className="flex items-center space-x-2 px-4 py-1.5 text-xs font-mono tracking-wider transition-all duration-200 border border-[var(--copper-700)] bg-[var(--void-900)] hover:bg-[var(--copper-500)]/10 hover:border-[var(--copper-500)] hover:text-[var(--copper-300)]"
+          >
+            <span>ANIME.JS CPU CASCADE →</span>
+          </Link>
+          <Link
+            to="/"
+            className="flex items-center space-x-2 px-4 py-1.5 text-xs font-mono tracking-wider transition-all duration-200 border border-[#4a4137] bg-black/30 hover:bg-[#C08662]/10 hover:border-[#C08662] hover:text-[#C08662]"
+          >
+            <span>← BACK TO CONSOLE</span>
+          </Link>
+        </div>
       </header>
 
-      {/* Top-Right Label Stack for Exploded Parts (linked to 3D groups) */}
-      <nav className="absolute top-16 right-8 z-30 flex flex-col items-end gap-2 font-mono text-[10px] tracking-[0.2em] uppercase">
-        {TOP_RIGHT_LABELS.map((item, i) => (
-          <span
-            key={item.id}
-            id={`leader-anchor-${item.id}`}
-            className="transition-all duration-500"
-            style={{
-              color: isWhiteTheme ? '#5E5A54' : '#a1a1aa',
-              opacity: labelsVisible ? 1 : 0,
-              transform: labelsVisible ? 'translateX(0)' : 'translateX(8px)',
-              transitionDelay: `${i * 60}ms`,
-            }}
-          >
-            {item.text}
-          </span>
-        ))}
-      </nav>
-
-      {/* 3D Canvas Area */}
-      <div className="relative w-full md:w-[60%] h-[50vh] md:h-full flex items-center justify-center z-10">
-        <style dangerouslySetInnerHTML={{__html: `
-          @keyframes floatNote1 {
-            0% { transform: translate(0, 0) scale(0.6); opacity: 0; }
-            15% { opacity: 1; }
-            85% { opacity: 0.8; }
-            100% { transform: translate(-60px, -200px) scale(1.3) rotate(-30deg); opacity: 0; }
-          }
-          @keyframes floatNote2 {
-            0% { transform: translate(0, 0) scale(0.6); opacity: 0; }
-            15% { opacity: 1; }
-            85% { opacity: 0.8; }
-            100% { transform: translate(80px, -220px) scale(1.3) rotate(45deg); opacity: 0; }
-          }
-          @keyframes floatNote3 {
-            0% { transform: translate(0, 0) scale(0.6); opacity: 0; }
-            15% { opacity: 1; }
-            85% { opacity: 0.8; }
-            100% { transform: translate(-30px, -240px) scale(1.2) rotate(15deg); opacity: 0; }
-          }
-          .singing-note-1 { animation: floatNote1 1.2s infinite linear; }
-          .singing-note-2 { animation: floatNote2 1.5s infinite linear; }
-          .singing-note-3 { animation: floatNote3 1.0s infinite linear; }
-
-          @keyframes floatZzz1 {
-            0% { transform: translate(0, 0) scale(0.6); opacity: 0; }
-            15% { opacity: 1; }
-            85% { opacity: 0.8; }
-            100% { transform: translate(60px, -180px) scale(1.4) rotate(15deg); opacity: 0; }
-          }
-          @keyframes floatZzz2 {
-            0% { transform: translate(0, 0) scale(0.5); opacity: 0; }
-            20% { opacity: 1; }
-            80% { opacity: 0.8; }
-            100% { transform: translate(90px, -220px) scale(1.5) rotate(35deg); opacity: 0; }
-          }
-          @keyframes floatZzz3 {
-            0% { transform: translate(0, 0) scale(0.6); opacity: 0; }
-            15% { opacity: 1; }
-            85% { opacity: 0.8; }
-            100% { transform: translate(35px, -140px) scale(1.2) rotate(-10deg); opacity: 0; }
-          }
-          .sleepy-zzz-1 { animation: floatZzz1 2.2s infinite linear; }
-          .sleepy-zzz-2 { animation: floatZzz2 2.6s infinite linear; }
-          .sleepy-zzz-3 { animation: floatZzz3 1.8s infinite linear; }
-        `}} />
-
-        <div className="absolute inset-0">
+      {/* 3. Sticky 3D WebGL Canvas Area (Left Side) */}
+      <div className="fixed top-0 left-0 w-full md:w-[50%] h-screen z-10 flex items-center justify-center pointer-events-none">
+        <div className="w-full h-full pointer-events-auto">
           <HeroCanvas
             expression={expression}
             bodyColor={bodyColor}
@@ -252,365 +263,108 @@ export function AnimationPage() {
             explodedProgress={explodedProgress}
             isPanelOpen={isPanelOpen}
             setIsPanelOpen={setIsPanelOpen}
-            isSpeaking={isSpeaking}
-            isSinging={isSinging}
-            isWhiteTheme={isWhiteTheme}
+            isSpeaking={false}
+            isSinging={false}
+            animValuesRef={animValuesRef}
           />
         </div>
 
-        {/* Diagonal leader lines from model coordinates to HTML labels */}
-        <svg className="absolute inset-0 z-20 pointer-events-none w-full h-full">
-          {TOP_RIGHT_LABELS.map((item) => (
-            <line
-              key={item.id}
-              id={`leader-line-${item.id}`}
-              x1="0"
-              y1="0"
-              x2="0"
-              y2="0"
-              stroke={isWhiteTheme ? '#2E2B28' : '#00f3ff'}
-              strokeWidth="1"
-              opacity="0"
-            />
-          ))}
-        </svg>
-
-        {/* Floating Singing Notes */}
-        {isSinging && (
-          <div className="absolute inset-0 z-20 pointer-events-none flex items-center justify-center">
-            <div className="relative w-10 h-10 -translate-y-16">
-              <span className="absolute text-2xl text-[#f1c40f] singing-note-1 select-none font-bold" style={{ animationDelay: '0s' }}>♪</span>
-              <span className="absolute text-3xl text-[#3da5e0] singing-note-2 select-none font-bold" style={{ animationDelay: '0.8s' }}>♫</span>
-              <span className="absolute text-2xl text-[#e05353] singing-note-3 select-none font-bold" style={{ animationDelay: '1.5s' }}>♬</span>
-            </div>
-          </div>
-        )}
-
-        {/* Floating Sleepy Zzzs */}
-        {(expression === 'yawning' || expression === 'sleepy') && (
-          <div className="absolute inset-0 z-20 pointer-events-none flex items-center justify-center">
-            <div className="relative w-10 h-10 -translate-y-24 translate-x-12">
-              <span className="absolute text-xl text-[#3da5e0] sleepy-zzz-1 select-none font-mono font-bold" style={{ animationDelay: '0s' }}>Z</span>
-              <span className="absolute text-2xl text-[#cce6ff] sleepy-zzz-2 select-none font-mono font-bold" style={{ animationDelay: '0.7s' }}>z</span>
-              <span className="absolute text-sm text-[#00f3ff] sleepy-zzz-3 select-none font-mono font-bold" style={{ animationDelay: '1.4s' }}>z</span>
-            </div>
-          </div>
-        )}
-
-        {/* Floating Speaking Bubble */}
-        {isSpeaking && (
-          <div className="absolute top-[22%] right-[8%] z-20 max-w-[240px] px-4 py-3 border border-[#3da5e0] bg-[#0c1620]/95 text-[#F2EDE6] rounded-xl font-mono text-xs shadow-lg animate-bounce pointer-events-none">
-            <div className="text-[10px] text-[#3da5e0] mb-1 font-bold">ALEXA SPEAKING:</div>
-            <div className="leading-relaxed">"Beep boop! Core components separated. Analyzing Intent & Latency parameters! ✦"</div>
-          </div>
-        )}
-
-        {/* Floating Singing Bubble */}
-        {isSinging && (
-          <div className="absolute top-[22%] right-[8%] z-20 max-w-[240px] px-4 py-3 border border-[#f1c40f] bg-[#1f190a]/95 text-[#F2EDE6] rounded-xl font-mono text-xs shadow-lg animate-bounce pointer-events-none">
-            <div className="text-[10px] text-[#f1c40f] mb-1 font-bold">ALEXA SINGING:</div>
-            <div className="leading-relaxed">"♪ Dismantled core, hear the sound~ Cogs and optics spin around~ ♬"</div>
-          </div>
-        )}
-
         {/* Viewport Floating Info */}
         <div
-          className="absolute bottom-6 left-6 right-6 flex justify-between text-[10px] font-mono pointer-events-none transition-colors duration-700"
-          style={{ color: isWhiteTheme ? '#5E5A54' : '#7A7168' }}
+          className="absolute bottom-6 left-6 text-[10px] font-mono pointer-events-none"
+          style={{ color: 'var(--theme-subtext, #7A7168)' }}
         >
-          <div>DRAG TO ROTATE • SCROLL MOUSE OVER CANVAS TO DISMANTLE CORE</div>
-          <div>SCROLL PROGRESS: {Math.round(explodedProgress * 100)}%</div>
-        </div>
-
-        {/* Floating Expression Bubble */}
-        <div
-          className="absolute top-20 left-6 z-20 px-3 py-1.5 border border-[#3b3a37] bg-black/40 rounded-md pointer-events-none transition-all duration-300"
-          style={{ opacity: explodedProgress > 0 ? 0 : 1 }}
-        >
-          <div className="text-[9px] font-mono text-[#7A7168] uppercase tracking-wider mb-0.5">CURRENT MOOD</div>
-          <div className="text-sm font-semibold tracking-wider font-mono text-[#e9b44c]">
-            {expression.toUpperCase()} {EXPRESSIONS.find(e => e.type === expression)?.face}
-          </div>
+          SCROLL DOWN TO DECONSTRUCT CORE
         </div>
       </div>
 
-      {/* Controls Sidebar */}
-      <div className="w-full md:w-[40%] h-[50vh] md:h-full z-20 flex flex-col border-t md:border-t-0 md:border-l border-[#2E2822] bg-[#121110]/95 backdrop-blur-xl">
-        {/* Title */}
-        <div className="px-6 pt-20 pb-4 border-b border-[#2E2822]">
-          <h1 className="text-3xl font-display text-[#F2EDE6] leading-none mb-1">
-            Mecha Twin Lab
-          </h1>
-          <p className="text-xs font-mono text-[#7A7168] tracking-wide uppercase">
-            Future Gadget #008 • Blueprint Engine
-          </p>
-        </div>
+      {/* 4. Scrolling content blocks (Right Side) */}
+      <div className="relative ml-auto w-full md:w-[50%] z-20 flex flex-col pointer-events-none">
+        
+        {/* Section 1: Intro */}
+        <section className="h-screen w-full flex flex-col justify-center px-6 md:px-16 border-b border-transparent">
+          <div className="max-w-md">
+            <span
+              className="text-xs font-mono tracking-[0.2em] uppercase mb-2 block"
+              style={{ color: ledColor }}
+            >
+              CHAPTER 01
+            </span>
+            <h1 className="text-4xl md:text-5xl font-display leading-none mb-6 font-bold">
+              Mecha Blueprint
+            </h1>
+            <p
+              className="text-xs md:text-sm font-mono leading-relaxed"
+              style={{ color: 'var(--theme-subtext, #B8AFA4)' }}
+            >
+              Welcome to the digital twin blueprint engine. This model displays the structural mechanics of the Alexa device procedurally. Scroll down to trigger the split-open sequence.
+            </p>
+          </div>
+        </section>
 
-        {/* Scrollable Control Elements */}
-        <div className="flex-1 overflow-y-auto px-6 py-6 space-y-8 select-none">
-          {/* Section A: Expressions Grid */}
-          <section className="space-y-3">
-            <h3 className="text-xs font-mono text-[#C08662] uppercase tracking-[0.15em] font-semibold">
-              1. Synthesizer Expression
-            </h3>
-            <div className="grid grid-cols-4 gap-2">
-              {EXPRESSIONS.map((item) => (
-                <button
-                  key={item.type}
-                  onClick={() => setExpression(item.type)}
-                  className={`flex flex-col items-center justify-between p-2 rounded-md border text-center transition-all duration-200 ${
-                    expression === item.type
-                      ? 'bg-[#C08662]/15 border-[#C08662] text-[#F2EDE6]'
-                      : 'bg-black/20 border-[#2E2822] text-[#7A7168] hover:border-[#4a4137] hover:text-[#B8AFA4]'
-                  }`}
-                >
-                  <span className="text-xs font-mono font-bold mb-2">{item.face}</span>
-                  <span className="text-[9px] font-mono tracking-wider uppercase">{item.type}</span>
-                </button>
-              ))}
-            </div>
-          </section>
+        {/* Section 2: Chassis Breakdown */}
+        <section className="h-screen w-full flex flex-col justify-center px-6 md:px-16 border-b border-transparent">
+          <div className="max-w-md">
+            <span
+              className="text-xs font-mono tracking-[0.2em] uppercase mb-2 block"
+              style={{ color: ledColor }}
+            >
+              CHAPTER 02
+            </span>
+            <h2 className="text-3xl md:text-4xl font-display leading-none mb-6 font-bold">
+              Chassis Breakdown
+            </h2>
+            <p
+              className="text-xs md:text-sm font-mono leading-relaxed"
+              style={{ color: 'var(--theme-subtext, #B8AFA4)' }}
+            >
+              As the chassis separates vertically, it exposes internal modules sliding on chrome shafts. Concentric logic gears and the acoustic beamforming iris separate in 3D space.
+            </p>
+          </div>
+        </section>
 
-          {/* Section B: Customization Laboratory */}
-          <section className="space-y-4">
-            <h3 className="text-xs font-mono text-[#C08662] uppercase tracking-[0.15em] font-semibold">
-              2. Structural Customization
-            </h3>
+        {/* Section 3: Color Transformation */}
+        <section className="h-screen w-full flex flex-col justify-center px-6 md:px-16 border-b border-transparent">
+          <div className="max-w-md">
+            <span
+              className="text-xs font-mono tracking-[0.2em] uppercase mb-2 block"
+              style={{ color: ledColor }}
+            >
+              CHAPTER 03
+            </span>
+            <h2 className="text-3xl md:text-4xl font-display leading-none mb-6 font-bold">
+              Material Shift
+            </h2>
+            <p
+              className="text-xs md:text-sm font-mono leading-relaxed"
+              style={{ color: 'var(--theme-subtext, #B8AFA4)' }}
+            >
+              The mecha casing transforms from dark grey to a premium retro white. Simultaneously, the screen displays a dizzy debug face and the head hemisphere hinges back.
+            </p>
+          </div>
+        </section>
 
-            {/* Body Shell Colors */}
-            <div className="space-y-2">
-              <div className="flex justify-between text-[11px] font-mono">
-                <span className="text-[#B8AFA4]">BODY SHELL COLOR</span>
-                <span className="text-[#e9b44c] font-bold">{activeBodyColorName.toUpperCase()}</span>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {BODY_COLORS.map((col) => (
-                  <button
-                    key={col.value}
-                    onClick={() => setBodyColor(col.value)}
-                    className={`w-7 h-7 rounded-full border-2 transition-transform duration-150 ${
-                      bodyColor === col.value ? 'scale-110 border-[#F2EDE6]' : 'border-black/50 hover:scale-105'
-                    }`}
-                    style={{ backgroundColor: col.value }}
-                    title={col.name}
-                  />
-                ))}
-              </div>
-            </div>
+        {/* Section 4: CPU Core */}
+        <section className="h-screen w-full flex flex-col justify-center px-6 md:px-16">
+          <div className="max-w-md">
+            <span
+              className="text-xs font-mono tracking-[0.2em] uppercase mb-2 block"
+              style={{ color: ledColor }}
+            >
+              CHAPTER 04
+            </span>
+            <h2 className="text-3xl md:text-4xl font-display leading-none mb-6 font-bold">
+              Confidenz CPU
+            </h2>
+            <p
+              className="text-xs md:text-sm font-mono leading-relaxed"
+              style={{ color: 'var(--theme-subtext, #B8AFA4)' }}
+            >
+              The core localized coprocessor node pops out of the motherboard housing. A cyan holographic sensor sweeps above the processor, reading state inputs in real-time.
+            </p>
+          </div>
+        </section>
 
-            {/* LED Light Customization */}
-            <div className="space-y-3 pt-2">
-              <div className="flex justify-between text-[11px] font-mono">
-                <span className="text-[#B8AFA4]">LED COLOR RING</span>
-                <span className="text-[#e9b44c] font-bold">{activeLedColorName.toUpperCase()}</span>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {LED_COLORS.map((col) => (
-                  <button
-                    key={col.value}
-                    onClick={() => setLedColor(col.value)}
-                    className={`w-7 h-7 rounded-full border-2 transition-transform duration-150 ${
-                      ledColor === col.value ? 'scale-110 border-[#F2EDE6]' : 'border-black/50 hover:scale-105'
-                    }`}
-                    style={{ backgroundColor: col.value }}
-                    title={col.name}
-                  />
-                ))}
-              </div>
-
-              {/* LED Ring Mode */}
-              <div className="pt-2">
-                <div className="text-[10px] font-mono text-[#7A7168] uppercase tracking-wider mb-2">LED GLOW SIGNAL</div>
-                <div className="grid grid-cols-4 gap-1.5 font-mono text-[9px] tracking-widest">
-                  {(['wave', 'pulse', 'solid', 'off'] as LedModeType[]).map((mode) => (
-                    <button
-                      key={mode}
-                      onClick={() => setLedMode(mode)}
-                      className={`py-1.5 border rounded uppercase ${
-                        ledMode === mode
-                          ? 'border-[#C08662] bg-[#C08662]/10 text-[#F2EDE6]'
-                          : 'border-[#2E2822] bg-black/10 text-[#7A7168] hover:text-[#B8AFA4]'
-                      }`}
-                    >
-                      {mode}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* Section C: Cel Outline & Dismantle Engine */}
-          <section className="space-y-4">
-            <h3 className="text-xs font-mono text-[#C08662] uppercase tracking-[0.15em] font-semibold">
-              3. Blueprint Schematic Controls
-            </h3>
-
-            {/* Cel Outline Thickness */}
-            <div className="space-y-2">
-              <div className="flex justify-between text-[11px] font-mono">
-                <span className="text-[#B8AFA4]">CARTOON OUTLINE THICKNESS</span>
-                <span>{(outlineThickness).toFixed(2)}x</span>
-              </div>
-              <input
-                type="range"
-                min="0.0"
-                max="2.5"
-                step="0.1"
-                value={outlineThickness}
-                onChange={(e) => setOutlineThickness(parseFloat(e.target.value))}
-                className="w-full h-1 bg-[#2E2822] rounded-lg appearance-none cursor-pointer"
-              />
-            </div>
-
-            {/* Electrical Back Panel Door */}
-            <div className="space-y-2 pt-1 pb-2">
-              <div className="flex justify-between text-[11px] font-mono">
-                <span className="text-[#B8AFA4]">ELECTRICAL BACK PANEL</span>
-                <span className={isPanelOpen ? 'text-[#e9b44c] font-bold' : 'text-[#7A7168]'}>
-                  {isPanelOpen ? 'OPEN' : 'CLOSED'}
-                </span>
-              </div>
-              <button
-                onClick={() => setIsPanelOpen(!isPanelOpen)}
-                className={`w-full py-2 text-xs font-mono border rounded uppercase transition-colors ${
-                  isPanelOpen
-                    ? 'border-[#e9b44c] bg-[#e9b44c]/10 text-[#F2EDE6]'
-                    : 'border-[#2E2822] bg-black/10 text-[#7A7168] hover:text-[#B8AFA4] hover:border-[#4a4137]'
-                }`}
-              >
-                {isPanelOpen ? 'Close Panel Door' : 'Open Panel Door'}
-              </button>
-            </div>
-
-            {/* Vocal Mimic Speaking */}
-            <div className="space-y-2 pt-1 pb-2 border-t border-[#2E2822]">
-              <div className="flex justify-between text-[11px] font-mono">
-                <span className="text-[#B8AFA4]">VOCAL MIMIC VOICE</span>
-                <span className={isSpeaking ? 'text-[#3da5e0] font-bold' : 'text-[#7A7168]'}>
-                  {isSpeaking ? 'SPEAKING ACTIVE' : 'SILENT'}
-                </span>
-              </div>
-              <button
-                onClick={() => {
-                  setIsSinging(false);
-                  setIsSpeaking(!isSpeaking);
-                }}
-                className={`w-full py-2 text-xs font-mono border rounded uppercase transition-colors ${
-                  isSpeaking
-                    ? 'border-[#3da5e0] bg-[#3da5e0]/10 text-[#F2EDE6]'
-                    : 'border-[#2E2822] bg-black/10 text-[#7A7168] hover:text-[#B8AFA4] hover:border-[#4a4137]'
-                }`}
-              >
-                {isSpeaking ? 'Stop Speaking' : 'Mimic Speaking Voice'}
-              </button>
-            </div>
-
-            {/* Vocal Mimic Singing */}
-            <div className="space-y-2 pt-1 pb-2 border-t border-[#2E2822]">
-              <div className="flex justify-between text-[11px] font-mono">
-                <span className="text-[#B8AFA4]">VOCAL MIMIC SINGING</span>
-                <span className={isSinging ? 'text-[#f1c40f] font-bold' : 'text-[#7A7168]'}>
-                  {isSinging ? 'SINGING ACTIVE' : 'SILENT'}
-                </span>
-              </div>
-              <button
-                onClick={() => {
-                  setIsSpeaking(false);
-                  setIsSinging(!isSinging);
-                }}
-                className={`w-full py-2 text-xs font-mono border rounded uppercase transition-colors ${
-                  isSinging
-                    ? 'border-[#f1c40f] bg-[#f1c40f]/10 text-[#F2EDE6]'
-                    : 'border-[#2E2822] bg-black/10 text-[#7A7168] hover:text-[#B8AFA4] hover:border-[#4a4137]'
-                }`}
-              >
-                {isSinging ? 'Stop Singing' : 'Mimic Singing Voice'}
-              </button>
-            </div>
-
-            {/* Exploded View Blueprint (Controlled by scroll too!) */}
-            <div className="space-y-3 pt-2 border-t border-[#2E2822]">
-              <div className="flex justify-between text-[11px] font-mono">
-                <span className="text-[#B8AFA4]">EXPLODED BLUEPRINT SHIFT</span>
-                <span>{Math.round(explodedProgress * 100)}%</span>
-              </div>
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.01"
-                value={explodedProgress}
-                onChange={(e) => {
-                  setIsExploding(false);
-                  setExplodedProgress(parseFloat(e.target.value));
-                }}
-                className="w-full h-1 bg-[#2E2822] rounded-lg appearance-none cursor-pointer"
-              />
-
-              {/* Quick Trigger Buttons */}
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setIsExploding(true)}
-                  className={`flex-1 py-2 text-xs font-mono border rounded uppercase transition-colors ${
-                    explodedProgress >= 0.95
-                      ? 'border-[#7A7168] text-[#7A7168] cursor-not-allowed'
-                      : 'border-[#3a7ca5]/50 bg-[#3a7ca5]/10 hover:bg-[#3a7ca5]/20 hover:border-[#3a7ca5] text-[#F2EDE6]'
-                  }`}
-                  disabled={explodedProgress >= 0.95}
-                >
-                  Dismantle Core
-                </button>
-                <button
-                  onClick={triggerAssemble}
-                  className={`flex-1 py-2 text-xs font-mono border rounded uppercase transition-colors ${
-                    explodedProgress <= 0.05
-                      ? 'border-[#7A7168] text-[#7A7168] cursor-not-allowed'
-                      : 'border-[#C08662]/50 bg-[#C08662]/10 hover:bg-[#C08662]/20 hover:border-[#C08662] text-[#F2EDE6]'
-                  }`}
-                  disabled={explodedProgress <= 0.05}
-                >
-                  Assemble Core
-                </button>
-              </div>
-            </div>
-          </section>
-
-          {/* Section D: Mecha Blueprint Info Panel */}
-          <section className="p-4 border border-[#4a4137]/30 bg-[#1e1c1a]/50 rounded-lg space-y-2">
-            <div className="flex items-center space-x-2 pb-1 border-b border-[#2E2822]">
-              <svg className="w-3.5 h-3.5 text-[#e9b44c]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="10" />
-                <line x1="12" y1="16" x2="12" y2="12" />
-                <line x1="12" y1="8" x2="12.01" y2="8" />
-              </svg>
-              <h4 className="text-[11px] font-mono text-[#e9b44c] font-bold uppercase tracking-wider">
-                System Blueprint Readouts
-              </h4>
-            </div>
-            <div className="grid grid-cols-2 gap-y-1.5 text-[10px] font-mono text-[#B8AFA4]">
-              <div>CLASSIFICATION:</div>
-              <div className="text-right text-[#F2EDE6]">Blueprint Engine Assistant</div>
-
-              <div>CHASSIS COLOR:</div>
-              <div className="text-right text-[#F2EDE6] uppercase">{bodyColor}</div>
-
-              <div>LED SYSTEM:</div>
-              <div className="text-right text-[#F2EDE6] uppercase">{ledColor} ({ledMode})</div>
-
-              <div>DOCK STAND:</div>
-              <div className="text-right text-[#F2EDE6]">Magnetic Riveted Plate</div>
-
-              <div>INTERFACE DRIVER:</div>
-              <div className="text-right text-[#F2EDE6]">Positronic Emissive UI</div>
-            </div>
-          </section>
-        </div>
-
-        {/* Footer info */}
-        <div className="px-6 py-4 border-t border-[#2E2822] text-center text-[9px] font-mono text-[#7A7168]">
-          Ghibli & Doraemon Movie Aesthetic Redesign Project • 2026
-        </div>
       </div>
     </div>
   );

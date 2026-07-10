@@ -28,10 +28,11 @@ export function Act2_CentralBrain() {
         alignItems: 'center',
         padding: 'var(--space-24) var(--space-8) var(--space-24)',
         gap: 'var(--space-8)',
+        pointerEvents: 'none',
       }}
     >
       <ScrollReveal>
-        <div style={{ textAlign: 'center', maxWidth: 680 }}>
+        <div style={{ textAlign: 'center', maxWidth: 680, pointerEvents: 'auto' }}>
           <h2
             style={{
               fontFamily: 'var(--font-display)',
@@ -58,13 +59,15 @@ export function Act2_CentralBrain() {
       </ScrollReveal>
 
       <ScrollReveal delay={0.1}>
-        <GlassCard padding="lg" className="w-full" glow="ember">
-          <Act2_OntologyGraph />
-        </GlassCard>
+        <div style={{ pointerEvents: 'auto', width: '100%' }}>
+          <GlassCard padding="lg" className="w-full" glow="ember">
+            <Act2_OntologyGraph />
+          </GlassCard>
+        </div>
       </ScrollReveal>
 
       <ScrollReveal delay={0.18}>
-        <div style={{ alignSelf: 'flex-end', marginRight: 'var(--space-4)' }}>
+        <div style={{ alignSelf: 'flex-end', marginRight: 'var(--space-4)', pointerEvents: 'auto' }}>
           <Act2_TraceReadout />
         </div>
       </ScrollReveal>

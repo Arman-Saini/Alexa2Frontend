@@ -135,16 +135,33 @@ export function getAppModules(realModules: AppStoreModule[]): AppStoreItem[] {
     : [
         {
           id: 'bookkeeper',
-          name: 'Bookkeeper Ledger',
+          name: 'Amazon Bookkeeper',
           category: 'app',
           description:
-            'Real-time ledger tracking Indian smart home expenses (dhobi, milk, papers). Speaks MCP to settle accounts.',
+            'Digitizes unorganized local commerce (laundry, milk, house help) via natural voice logs. Settle accounts instantly via Amazon Pay UPI.',
           status: 'live',
-          author: 'Hearth Certified',
-          capabilities: ['Dhobi and Milk Expense Tracking', 'Web3 Account Settlement', 'Direct Agentic Accounting Interface'],
+          author: 'Amazon Alexa',
+          capabilities: ['Ambient Voice Logging', 'Unified Local Vendor Tally', 'Amazon Pay UPI 1-Click Settle'],
           rules: ['Record milk quantity and cost in the local ledger daily', 'Audit ledger records automatically weekly'],
         },
       ];
 
-  return [...bookkeeperList, ...normalizedReal, ...MOCK_APPS];
+  const hasFresh = normalizedReal.some((m) => m.id === 'amazon-fresh');
+  const freshList: AppStoreItem[] = hasFresh
+    ? []
+    : [
+        {
+          id: 'amazon-fresh',
+          name: 'Amazon Fresh',
+          category: 'app',
+          description:
+            'Order groceries automatically. Linked with Amazon Pay for seamless billing.',
+          status: 'live',
+          author: 'Amazon Alexa',
+          capabilities: ['Automatic Grocery Ordering', '10-Minute Express Delivery', 'Inventory Sync'],
+          rules: ['Order fresh milk when stock drops below 1 liter'],
+        },
+      ];
+
+  return [...bookkeeperList, ...freshList, ...normalizedReal, ...MOCK_APPS];
 }

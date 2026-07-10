@@ -9,6 +9,7 @@ import {
   type KhataSettleResponse,
 } from '../api/khataApi';
 import { ApiError } from '../api/client';
+import { useWebSocket } from './useWebSocket';
 
 export interface UseBookkeeper {
   ledger: KhataLedgerResponse | null;
@@ -17,6 +18,7 @@ export interface UseBookkeeper {
   logEntry: (utterance: string) => Promise<KhataLogResponse>;
   refetchLedger: () => Promise<void>;
   settle: () => Promise<KhataSettleResponse>;
+  resetLedger: () => Promise<void>;
 }
 
 export function useBookkeeper(): UseBookkeeper {
@@ -49,5 +51,28 @@ export function useBookkeeper(): UseBookkeeper {
     return khataApi.settle();
   }, []);
 
-  return { ledger, loading, error, logEntry, refetchLedger, settle };
+  const resetLedger = useCallback(async (): Promise<void> => {
+    setLoading(true);
+    setError(null);
+    try {
+      await khataApi.reset();
+      await refetchLedger();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to reset ledger.');
+    } finally {
+      setLoading(false);
+    }
+  }, [refetchLedger]);
+
+  const { subscribe } = useWebSocket();
+  useEffect(() => {
+    const unsubscribe = subscribe((msg) => {
+      if (msg.type === 'khata_entry') {
+        void refetchLedger();
+      }
+    });
+    return unsubscribe;
+  }, [subscribe, refetchLedger]);
+
+  return { ledger, loading, error, logEntry, refetchLedger, settle, resetLedger };
 }

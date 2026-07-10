@@ -97,7 +97,7 @@ export function BookkeeperVendorRow({ vendorLedger }: BookkeeperVendorRowProps) 
               {label}
             </div>
             <div style={{ fontFamily: 'var(--font-body)', fontSize: '12px', color: 'var(--text-tertiary)' }}>
-              {vendorLedger.vendor_hi}
+              Local ledger tracked
             </div>
           </div>
         </div>

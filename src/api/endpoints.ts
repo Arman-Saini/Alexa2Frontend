@@ -89,4 +89,5 @@ export const endpoints = {
   khataLog: (homeId = h) => `/api/homes/${homeId}/khata/log`,
   khataLedger: (homeId = h) => `/api/homes/${homeId}/khata/ledger`,
   khataSettle: (homeId = h) => `/api/homes/${homeId}/khata/settle`,
+  khataReset: (homeId = h) => `/api/homes/${homeId}/khata/reset`,
 } as const;

@@ -3,7 +3,10 @@ import { DigitalTwinCanvas } from './components/canvas/DigitalTwinCanvas';
 import { ActShell } from './components/acts/ActShell';
 import { EcosystemPage } from './components/ecosystem/EcosystemPage';
 import { AnimationPage } from './components/animation/AnimationPage';
+import { CpuAnimationPage } from './components/animation/CpuAnimationPage';
 import { CuteAlexaPage } from './components/cartoon/CuteAlexaPage';
+import { FinalPage } from './components/final/FinalPage';
+import { FinalShowcasePage } from './components/final/FinalShowcasePage';
 import { CompanionPage } from './components/phone/CompanionPage';
 import { SmartphoneOnlyPage } from './components/phone/SmartphoneOnlyPage';
 import { SmartphoneWidget } from './components/phone/SmartphoneWidget';
@@ -46,10 +49,13 @@ export default function App() {
         <Route path="/" element={<Home />} />
         <Route path="/ecosystem" element={<EcosystemPage />} />
         <Route path="/animation" element={<AnimationPage />} />
+        <Route path="/cpuanimation" element={<CpuAnimationPage />} />
         <Route path="/ani" element={<Navigate to="/animation" replace />} />
         <Route path="/cartoon" element={<CuteAlexaPage />} />
         <Route path="/companion" element={<CompanionPage />} />
         <Route path="/smartphone" element={<SmartphoneOnlyPage />} />
+        <Route path="/final" element={<FinalPage />} />
+        <Route path="/showcase" element={<FinalShowcasePage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

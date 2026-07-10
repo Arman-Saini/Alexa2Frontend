@@ -48,6 +48,18 @@ export interface TtsResponse {
 
 // ── API functions ─────────────────────────────────────────────────────────────
 
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64String = (reader.result as string).split(',')[1];
+      resolve(base64String);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
 export const voiceApi = {
   // Send typed text to the backend STT pipeline (mock mode , no real audio upload)
   transcribeMockText: (text: string, autoRoute = true, homeId?: string) =>
@@ -61,12 +73,17 @@ export const voiceApi = {
     }, { timeoutMs: 45_000 }),
 
   // Upload a real audio Blob recorded from the browser mic
-  transcribeAudio: (audioBlob: Blob, autoRoute = true) => {
-    const form = new FormData();
-    form.append('audio', audioBlob, 'voice.webm');
-    form.append('auto_route', String(autoRoute));
-    form.append('language', 'en-IN');
-    return apiClient.postForm<TranscribeResponse>(endpoints.transcribe, form);
+  transcribeAudio: async (audioBlob: Blob, autoRoute = true, homeId?: string) => {
+    const base64 = await blobToBase64(audioBlob);
+    return apiClient.post<TranscribeResponse>(endpoints.transcribe, {
+      audio_base64: base64,
+      auto_route: autoRoute,
+      language: 'en-IN',
+      home_id: homeId || 'demo_home_001',
+      speaker_id: 'owner_1',
+      voice_response: true,
+      mime_type: audioBlob.type || 'audio/webm',
+    }, { timeoutMs: 45_000 });
   },
 
   // Text-to-speech , returns audio URL or base64

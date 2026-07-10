@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
-import { GlassCard } from '../shared/GlassCard';
+import { useEffect, useRef, useState } from 'react';
 import { useTourStore } from '../../store/tourStore';
 import { useAppStore } from '../../store/store';
+import { useLiquidGlass } from '../../hooks/useLiquidGlass';
 
 interface SensingSection {
   headline: string;
@@ -44,6 +44,10 @@ const SECTIONS: SensingSection[] = [
  */
 export function Act1_Sensing() {
   const [active, setActive] = useState(0);
+  const headlineGlassRef = useRef<HTMLDivElement>(null);
+  const glassRef = useRef<HTMLDivElement>(null);
+  useLiquidGlass(headlineGlassRef, { borderRadius: 24, scale: -100, frost: 0.08 });
+  useLiquidGlass(glassRef, { borderRadius: 24, scale: -100, frost: 0.08 });
 
   useEffect(() => {
     const section = SECTIONS[active];
@@ -66,23 +70,48 @@ export function Act1_Sensing() {
         justifyContent: 'center',
         padding: 'var(--space-8)',
         gap: 'var(--space-6)',
+        pointerEvents: 'none',
       }}
     >
-      <h2
+      {/* Rest of viewport passes through to OrbitControls; only this
+          content stack captures clicks. */}
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-6)', pointerEvents: 'auto' }}>
+      <div
+        ref={headlineGlassRef}
         style={{
-          fontFamily: 'var(--font-display)',
-          fontWeight: 700,
-          fontSize: 'clamp(1.75rem, 4vw, 2.75rem)',
-          color: 'var(--text-primary)',
-          textAlign: 'center',
-          margin: 0,
-          maxWidth: 640,
+          padding: 'var(--space-4) var(--space-8)',
+          borderRadius: 24,
+          border: '1px solid rgba(255, 255, 255, 0.25)',
+          boxShadow:
+            '0 8px 32px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.3)',
         }}
       >
-        Always sensing
-      </h2>
+        <h2
+          style={{
+            fontFamily: 'var(--font-display)',
+            fontWeight: 700,
+            fontSize: 'clamp(1.75rem, 4vw, 2.75rem)',
+            color: 'var(--text-primary)',
+            textAlign: 'center',
+            margin: 0,
+            maxWidth: 640,
+          }}
+        >
+          Always sensing
+        </h2>
+      </div>
 
-      <GlassCard padding="md" className="max-w-md">
+      <div
+        ref={glassRef}
+        className="max-w-md"
+        style={{
+          padding: 'var(--space-6)',
+          borderRadius: 24,
+          border: '1px solid rgba(255, 255, 255, 0.25)',
+          boxShadow:
+            '0 8px 32px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.3)',
+        }}
+      >
         <h3
           style={{
             fontFamily: 'var(--font-display)',
@@ -106,7 +135,7 @@ export function Act1_Sensing() {
         >
           {SECTIONS[active].body}
         </p>
-      </GlassCard>
+      </div>
 
       <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
         {SECTIONS.map((_, i) => (
@@ -126,6 +155,7 @@ export function Act1_Sensing() {
             }}
           />
         ))}
+      </div>
       </div>
     </div>
   );

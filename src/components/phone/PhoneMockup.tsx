@@ -129,7 +129,7 @@ export function PhoneMockup() {
     }
   };
 
-  const { listening, liveText, toggle } = useMic((finalText) => {
+  const { listening, liveText, toggle, isProcessing } = useMic((finalText) => {
     setTextInput(finalText);
     void handleCommandSubmit(finalText);
   });
@@ -137,10 +137,12 @@ export function PhoneMockup() {
   useEffect(() => {
     if (listening) {
       setStatus('listening');
-    } else if (status === 'listening') {
+    } else if (isProcessing) {
+      setStatus('processing');
+    } else if (status === 'listening' || status === 'processing') {
       setStatus('idle');
     }
-  }, [listening]);
+  }, [listening, isProcessing]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

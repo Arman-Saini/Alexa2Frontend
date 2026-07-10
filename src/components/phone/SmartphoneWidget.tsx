@@ -6,47 +6,23 @@ import { useWebSocket } from '../../hooks/useWebSocket';
 import { env } from '../../config/env';
 import { fallbackSpeak } from '../../hooks/useTTS';
 import { useTourStore } from '../../store/tourStore';
-
+import { useAppStore } from '../../store/store';
+import { useBookkeeper } from '../../hooks/useBookkeeper';
+import { useEcosystemStore } from '../../store/ecosystemStore';
 
 export interface ChatSummary {
   id: string;
   timestamp: string;
   utterance: string;
   response: string;
-  status: 'success' | 'warning' | 'info';
+  status: 'success' | 'warning' | 'info' | 'error';
   latency: number;
   cost: number;
+  /** Which processing tier handled this command */
+  tier?: 'T0·local' | 'T1·local' | 'T3·cloud';
 }
 
-export const DEFAULT_SUMMARIES: ChatSummary[] = [
-  {
-    id: '1',
-    timestamp: 'just now',
-    utterance: 'Set the living room to movie mode',
-    response: 'Movie Night active: dimmed lights, TV on, blinds closed.',
-    status: 'success',
-    latency: 280,
-    cost: 0.0018,
-  },
-  {
-    id: '2',
-    timestamp: '15m ago',
-    utterance: 'Is the bedroom window open?',
-    response: 'All windows in the bedroom are securely closed.',
-    status: 'info',
-    latency: 120,
-    cost: 0.0006,
-  },
-  {
-    id: '3',
-    timestamp: '1h ago',
-    utterance: 'Turn off idle appliances',
-    response: 'Shut down study monitor and kitchen lights. Saved 180W.',
-    status: 'success',
-    latency: 410,
-    cost: 0.0032,
-  }
-];
+export const DEFAULT_SUMMARIES: ChatSummary[] = [];
 
 interface SkillApp {
   id: string;
@@ -67,6 +43,22 @@ const INITIAL_SKILLS: SkillApp[] = [
     installed: true,
   },
   {
+    id: 'amazon-fresh',
+    name: 'Amazon Fresh',
+    developer: 'Amazon Alexa',
+    description: 'Order groceries automatically. Linked with Amazon Pay for seamless billing.',
+    rating: '4.8 ★ (24,192 reviews)',
+    installed: false,
+  },
+  {
+    id: 'bookkeeper',
+    name: 'Amazon Bookkeeper',
+    developer: 'Amazon Alexa',
+    description: 'Digitizes unorganized local commerce (dhobi, milk, maid) via Hinglish voice logs. Settle accounts instantly via Amazon Pay UPI.',
+    rating: '4.9 ★ (12,854 reviews)',
+    installed: true,
+  },
+  {
     id: 'ecobee',
     name: 'Ecobee Smart Thermostat',
     developer: 'Ecobee Inc.',
@@ -82,14 +74,6 @@ const INITIAL_SKILLS: SkillApp[] = [
     rating: '4.7 ★ (31,080 reviews)',
     installed: false,
   },
-  {
-    id: 'sonos',
-    name: 'Sonos Sound System',
-    developer: 'Sonos Inc.',
-    description: 'Stream music across multi-room speakers, group zones, and adjust treble or base settings hands-free.',
-    rating: '4.9 ★ (14,562 reviews)',
-    installed: false,
-  }
 ];
 
 interface SmartphoneWidgetProps {
@@ -121,6 +105,47 @@ export function SmartphoneWidget({
   const [isMinimized, setIsMinimized] = useState(false);
   const [currentScreen, setCurrentScreen] = useState<'home' | 'store'>('home');
   const [skills, setSkills] = useState<SkillApp[]>(INITIAL_SKILLS);
+
+  // Amazon Fresh & Amazon Bookkeeper state
+  const [latestFreshOrder, setLatestFreshOrder] = useState<{ orderId: string; items: any[]; eta: number; status: string } | null>(null);
+  const [payModalOpen, setPayModalOpen] = useState(false);
+  const [paymentStep, setPaymentStep] = useState<'details' | 'processing' | 'success'>('details');
+
+  const { ledger, loading: ledgerLoading, error: ledgerError, settle: settleLedger, resetLedger } = useBookkeeper();
+
+  const getVendorIcon = (v: string) => {
+    switch (v) {
+      case 'doodhwala': return '🥛';
+      case 'dhobi': return '👕';
+      case 'maid': return '🧹';
+      case 'newspaper': return '📰';
+      default: return '👤';
+    }
+  };
+
+  const getVendorName = (v: string) => {
+    switch (v) {
+      case 'doodhwala': return 'Milkman';
+      case 'dhobi': return 'Laundry';
+      case 'maid': return 'House Help';
+      case 'newspaper': return 'Newspaper';
+      default: return v;
+    }
+  };
+
+  const ledgerVendors = ledger?.vendors.map(v => ({
+    vendor: v.vendor,
+    icon: getVendorIcon(v.vendor),
+    name: getVendorName(v.vendor),
+    name_hi: v.vendor_hi,
+    total: v.subtotal_inr,
+    entriesCount: v.entries.length
+  })) || [];
+
+  const ledgerGrandTotal = ledger?.vendors.reduce((sum, v) => sum + v.subtotal_inr, 0) ?? 0;
+
+  const isFreshEnabled = skills.find(s => s.id === 'amazon-fresh')?.installed;
+  const isBookkeeperEnabled = skills.find(s => s.id === 'bookkeeper')?.installed;
   
   const summaries = customSummaries !== undefined ? customSummaries : internalSummaries;
   const setSummaries = (newSummaries: ChatSummary[] | ((prev: ChatSummary[]) => ChatSummary[])) => {
@@ -166,6 +191,7 @@ export function SmartphoneWidget({
                     status: 'success',
                     latency,
                     cost,
+                    tier: 'T3·cloud' as const,
                   }
                 : s
             );
@@ -179,6 +205,7 @@ export function SmartphoneWidget({
                 status: 'success',
                 latency,
                 cost,
+                tier: 'T3·cloud' as const,
               },
               ...prev,
             ];
@@ -189,7 +216,7 @@ export function SmartphoneWidget({
         setTimeout(() => setStatus('idle'), 1500);
 
         // Notify the cartoon HUD avatar — one real reply, three surfaces update.
-        useTourStore.getState().setReply(spokenText);
+        useTourStore.getState().setReply(spokenText, 'phone');
         useTourStore.getState().setSpeaking(true);
         const stopSpeaking = () => useTourStore.getState().setSpeaking(false);
 
@@ -211,6 +238,20 @@ export function SmartphoneWidget({
           }
         } else {
           fallbackSpeak(spokenText, stopSpeaking);
+        }
+      } else if (msg.type === 'event_result') {
+        const payload = msg.payload ?? {};
+        const { result, tier } = payload as any;
+        if (tier === 'T3' && result?.tool_calls) {
+          const freshOrder = result.tool_calls.find((tc: any) => tc.tool_name === 'order_amazon_now');
+          if (freshOrder) {
+            setLatestFreshOrder({
+              orderId: freshOrder.tool_output?.order_id || `AMZ-NOW-${Date.now()}`,
+              items: freshOrder.tool_input?.items || [],
+              eta: freshOrder.tool_output?.eta_minutes || 10,
+              status: 'ORDER_CONFIRMED'
+            });
+          }
         }
       }
     });
@@ -257,16 +298,18 @@ export function SmartphoneWidget({
     void processCommand(text);
   };
 
-  const { listening, liveText, toggle } = useMic(handleSpeechFinal);
+  const { listening, liveText, toggle, isProcessing } = useMic(handleSpeechFinal);
 
   useEffect(() => {
     useTourStore.getState().setListening(listening);
     if (listening) {
       setStatus('listening');
-    } else if (status === 'listening') {
+    } else if (isProcessing) {
+      setStatus('processing');
+    } else if (status === 'listening' || status === 'processing') {
       setStatus('idle');
     }
-  }, [listening]);
+  }, [listening, isProcessing]);
 
   const processCommand = async (utterance: string) => {
     if (!utterance.trim()) return;
@@ -286,6 +329,107 @@ export function SmartphoneWidget({
     };
 
     setSummaries((prev) => [pendingSummary, ...prev]);
+
+    const isFreshEnabled = skills.find(s => s.id === 'amazon-fresh')?.installed;
+    const isBookkeeperEnabled = skills.find(s => s.id === 'bookkeeper')?.installed;
+
+    const lowerUtterance = utterance.toLowerCase();
+    
+    // Check for Amazon Fresh queries
+    const isFreshQuery = lowerUtterance.includes('milk') || lowerUtterance.includes('grocery') || lowerUtterance.includes('fresh') || lowerUtterance.includes('inventory');
+    if (isFreshQuery && !isFreshEnabled) {
+      const mockResponse = "Amazon Fresh integration is currently disabled. Please go to the Skills & Apps tab and enable Amazon Fresh to automate grocery ordering.";
+      setSummaries((prev) =>
+        prev.map((s) =>
+          s.id === newId
+            ? {
+                ...s,
+                response: mockResponse,
+                status: 'error',
+                latency: 40,
+                cost: 0,
+              }
+            : s
+        )
+      );
+      setStatus('done');
+      fallbackSpeak(mockResponse, () => {});
+      setTimeout(() => setStatus('idle'), 1200);
+      setTypedInput('');
+      return;
+    }
+
+    // Check for Bookkeeper queries
+    const isBookkeeperQuery = lowerUtterance.includes('doodhwala') || lowerUtterance.includes('dhobi') || lowerUtterance.includes('maid') || lowerUtterance.includes('newspaper') || lowerUtterance.includes('hisab') || lowerUtterance.includes('khata');
+    if (isBookkeeperQuery && !isBookkeeperEnabled) {
+      const mockResponse = "Amazon Bookkeeper is currently disabled. Please go to the Skills & Apps tab and enable Amazon Bookkeeper to log unorganized local transactions.";
+      setSummaries((prev) =>
+        prev.map((s) =>
+          s.id === newId
+            ? {
+                ...s,
+                response: mockResponse,
+                status: 'error',
+                latency: 40,
+                cost: 0,
+              }
+            : s
+        )
+      );
+      setStatus('done');
+      fallbackSpeak(mockResponse, () => {});
+      setTimeout(() => setStatus('idle'), 1200);
+      setTypedInput('');
+      return;
+    }
+
+    // ── T0 / T1 LOCAL NLU — try before touching backend/LLM ─────────────────
+    // runLocalCommand runs the commandProcessor and updates the 3D digital twin.
+    // If it matches, we resolve entirely in-browser in <5ms — zero cloud cost.
+    const t0Start = performance.now();
+    const localResult = useAppStore.getState().runLocalCommand(utterance);
+    const t0LatencyMs = Math.round(performance.now() - t0Start);
+
+    if (localResult.matched && localResult.tier !== 'BACKEND_NEEDED') {
+      // Announce via tour store (cartoon avatar speaks)
+      useTourStore.getState().setReply(localResult.response, 'phone');
+      useTourStore.getState().setSpeaking(true);
+      fallbackSpeak(localResult.response, () => useTourStore.getState().setSpeaking(false));
+
+      // Update energy / device metrics based on actual twin state changes
+      const devicesChangedOn  = localResult.updates.filter(u => u.changes.isOn === true).length;
+      const devicesChangedOff = localResult.updates.filter(u => u.changes.isOn === false).length;
+      if (devicesChangedOff > 0) {
+        setEnergyNow((prev) => Math.max(100, prev - devicesChangedOff * 18));
+        setActiveDevices((prev) => Math.max(0, prev - devicesChangedOff));
+      }
+      if (devicesChangedOn > 0) {
+        setEnergyNow((prev) => Math.min(600, prev + devicesChangedOn * 22));
+        setActiveDevices((prev) => Math.min(24, prev + devicesChangedOn));
+      }
+
+      const tierLabel: ChatSummary['tier'] = localResult.tier === 'T0_LOCAL' ? 'T0·local' : 'T1·local';
+
+      setSummaries((prev) =>
+        prev.map((s) =>
+          s.id === newId
+            ? {
+                ...s,
+                response: localResult.response,
+                status: 'success',
+                latency: t0LatencyMs,
+                cost: 0,
+                tier: tierLabel,
+              }
+            : s
+        )
+      );
+      setStatus('done');
+      setTypedInput('');
+      setTimeout(() => setStatus('idle'), 1200);
+      return;
+    }
+    // ── End local NLU — escalate to backend ─────────────────────────────────
 
     // Send via WebSocket first
     const wsSent = wsSend({
@@ -332,6 +476,7 @@ export function SmartphoneWidget({
                 status: 'success',
                 latency,
                 cost,
+                tier: 'T3·cloud',
               }
             : s
         )
@@ -391,6 +536,13 @@ export function SmartphoneWidget({
         if (s.id === skillId) {
           const nextState = !s.installed;
           
+          // Sync with Hearth Ecosystem Store
+          if (nextState) {
+            useEcosystemStore.getState().markInstalled(skillId);
+          } else {
+            useEcosystemStore.getState().markUninstalled(skillId);
+          }
+
           // Log inside Recent Activity
           const newId = Date.now().toString();
           const logSummary: ChatSummary = {
@@ -409,6 +561,77 @@ export function SmartphoneWidget({
         return s;
       })
     );
+  };
+
+  const handleSimulateInventoryDrop = async () => {
+    setStatus('processing');
+    try {
+      const response = await simulateApi.simulateInventoryDrop();
+      const data = response.data;
+      if (data?.supervisor_result) {
+        const freshOrder = data.supervisor_result.tool_calls?.find((tc: any) => tc.tool_name === 'order_amazon_now');
+        if (freshOrder) {
+          setLatestFreshOrder({
+            orderId: freshOrder.tool_output?.order_id || `AMZ-NOW-${Date.now()}`,
+            items: freshOrder.tool_input?.items || [],
+            eta: freshOrder.tool_output?.eta_minutes || 10,
+            status: 'ORDER_CONFIRMED'
+          });
+        }
+      }
+      
+      const logSummary: ChatSummary = {
+        id: Date.now().toString(),
+        timestamp: 'just now',
+        utterance: 'Simulate low grocery stock',
+        response: 'Milk inventory dropped below 1L. Placing automatic refill order via Amazon Fresh.',
+        status: 'warning',
+        latency: 120,
+        cost: 0.000035,
+        tier: 'T3·cloud',
+      };
+      setSummaries((prev) => [logSummary, ...prev]);
+
+      // Notify HUD
+      useTourStore.getState().setReply('Milk is running low. Ordering a fresh bottle via Amazon Fresh now.', 'phone');
+      useTourStore.getState().setSpeaking(true);
+      setTimeout(() => useTourStore.getState().setSpeaking(false), 3000);
+      
+    } catch (err) {
+      console.error('Inventory drop simulation failed:', err);
+    } finally {
+      setStatus('idle');
+    }
+  };
+
+  const handleSettlePayment = async () => {
+    setPaymentStep('processing');
+    try {
+      await settleLedger();
+      await resetLedger();
+      setPaymentStep('success');
+
+      // Add to conversation logs
+      const logSummary: ChatSummary = {
+        id: Date.now().toString(),
+        timestamp: 'just now',
+        utterance: 'Settle local accounts',
+        response: `Paid ₹${ledgerGrandTotal} outstanding balance via Amazon Pay UPI. Ledger settled to ₹0.`,
+        status: 'success',
+        latency: 180,
+        cost: 0,
+        tier: 'T0·local',
+      };
+      setSummaries((prev) => [logSummary, ...prev]);
+
+      // Notify HUD
+      useTourStore.getState().setReply(`Tally paid. All vendor balances settled to zero.`, 'phone');
+      useTourStore.getState().setSpeaking(true);
+      setTimeout(() => useTourStore.getState().setSpeaking(false), 3000);
+    } catch (err) {
+      console.error('Settle payment failed:', err);
+      setPaymentStep('details');
+    }
   };
 
   const handleTextSubmit = (e: React.FormEvent) => {
@@ -435,7 +658,7 @@ export function SmartphoneWidget({
             className="fixed bottom-0 left-6 w-[280px] sm:w-[300px] h-[48px] rounded-t-xl rounded-b-none bg-[#0c0c0f]/95 border-t border-x border-white/[0.08] shadow-[0_-8px_32px_rgba(0,0,0,0.5)] flex items-center justify-between px-4 cursor-pointer select-none z-50 hover:border-white/20 transition-all"
           >
             <span className="text-[11px] font-mono font-bold tracking-wider text-white uppercase select-none">
-              Interact with home
+              Interact with Alexa
             </span>
             <div className="p-1 rounded bg-white/5 text-white/80 hover:text-white transition-all">
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
@@ -453,9 +676,9 @@ export function SmartphoneWidget({
             transition={{ duration: 0.22, ease: 'easeOut' }}
             className="flex flex-col items-center w-full h-full md:w-auto md:h-auto"
           >
-            {/* Top Bar - "Interact with home" header */}
+            {/* Top Bar - "Interact with Alexa" header */}
             <div className="hidden md:flex w-[345px] sm:w-[360px] bg-[#0c0c0f]/90 border border-white/[0.06] rounded-2xl px-4 py-2.5 items-center justify-between mb-3 backdrop-blur-md shadow-md z-40">
-              <span className="text-[11px] font-mono font-bold tracking-wider text-white uppercase">Interact with home</span>
+              <span className="text-[11px] font-mono font-bold tracking-wider text-white uppercase">Interact with Alexa</span>
               <button
                 type="button"
                 onClick={() => setIsMinimized(true)}
@@ -664,6 +887,236 @@ export function SmartphoneWidget({
                           </form>
                         </div>
 
+                        {/* SUGGESTIONS Section */}
+                        <div className="space-y-1.5">
+                          <span className="text-[10px] font-mono font-bold text-white/40 tracking-widest uppercase">Suggestions</span>
+                          <div className="flex flex-col gap-1.5">
+                            {[
+                              "If 4+5 is odd then turn off light in living room",
+                              "If 4+5 is even then turn off light in living room",
+                              "If 2+2 is 4 then turn on living room light"
+                            ].map((sugg) => (
+                              <button
+                                key={sugg}
+                                type="button"
+                                onClick={() => {
+                                  setTypedInput(sugg);
+                                  void processCommand(sugg);
+                                }}
+                                className="flex items-center text-[10.5px] p-2.5 rounded-xl bg-[#141419]/90 border border-white/[0.04] hover:bg-[#1b1b22]/90 hover:border-cyan-500/30 active:scale-98 transition-all text-left text-white/80 cursor-pointer"
+                              >
+                                <span className="mr-2 text-cyan-400">💡</span>
+                                <span>{sugg}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* CHAT INTERFACE (iMessage style) — lives right under the voice
+                            controller now, not buried below Scenes/Rooms/Energy. */}
+                        <div className="space-y-3 flex flex-col">
+                          <span className="text-[10px] font-mono font-bold text-white/40 tracking-widest uppercase">Conversation</span>
+
+                          <div className="overflow-y-auto max-h-[220px] rounded-2xl bg-[#0b0c0f] border border-white/[0.03] p-4 flex flex-col gap-3 scrollbar-thin scrollbar-thumb-white/10">
+                            <AnimatePresence initial={false}>
+                              {[...summaries].reverse().map((item) => (
+                                <div key={item.id} className="flex flex-col gap-1.5 w-full">
+
+                                  {/* User Bubble (Right-aligned, Blue) */}
+                                  <motion.div
+                                    initial={{ opacity: 0, scale: 0.95, x: 20 }}
+                                    animate={{ opacity: 1, scale: 1, x: 0 }}
+                                    className="flex flex-col items-end max-w-[85%] self-end"
+                                  >
+                                    <div className="bg-[#007aff] text-white px-4 py-2 rounded-2xl rounded-tr-sm text-xs font-sans leading-relaxed shadow-sm">
+                                      {item.utterance}
+                                    </div>
+                                    <span className="text-[8px] font-mono text-white/30 mt-0.5 mr-1">{item.timestamp}</span>
+                                  </motion.div>
+
+                                  {/* Alexa Bubble (Left-aligned, Gray) */}
+                                  <motion.div
+                                    initial={{ opacity: 0, scale: 0.95, x: -20 }}
+                                    animate={{ opacity: 1, scale: 1, x: 0 }}
+                                    className="flex flex-col items-start max-w-[85%] self-start"
+                                  >
+                                    <div className="bg-[#24252a] text-white px-4 py-2 rounded-2xl rounded-tl-sm text-xs font-sans leading-relaxed border border-white/[0.02] shadow-sm">
+                                      {item.response === 'Analyzing command...' ? (
+                                        <span className="flex items-center gap-1.5 text-white/50 italic">
+                                          <span className="animate-spin h-3.5 w-3.5 border-2 border-white/30 border-t-transparent rounded-full" />
+                                          Analyzing...
+                                        </span>
+                                      ) : (
+                                        item.response
+                                      )}
+                                    </div>
+
+                                    {/* Stats (Latency / Cost / Tier) */}
+                                    {item.response !== 'Analyzing command...' && (
+                                      <div className="flex items-center gap-2 text-[8px] font-mono text-white/30 mt-0.5 ml-1">
+                                        <span className={
+                                          item.tier === 'T0·local' || item.tier === 'T1·local'
+                                            ? 'text-emerald-400/60'
+                                            : item.tier === 'T3·cloud'
+                                            ? 'text-sky-400/50'
+                                            : 'text-white/30'
+                                        }>
+                                          {item.tier ?? 'Alexa'}
+                                        </span>
+                                        {item.latency > 0 && <span>• {item.latency}ms</span>}
+                                        {item.cost > 0
+                                          ? <span>• ${item.cost.toFixed(4)}</span>
+                                          : item.tier && (item.tier === 'T0·local' || item.tier === 'T1·local')
+                                          ? <span className="text-emerald-400/40">• $0.00</span>
+                                          : null
+                                        }
+                                      </div>
+                                    )}
+                                  </motion.div>
+
+                                </div>
+                              ))}
+                            </AnimatePresence>
+
+                            {summaries.length === 0 && (
+                              <div className="flex items-center justify-center text-center p-6">
+                                <span className="text-[10px] text-white/30 font-mono">No messages yet. Try saying "turn on living room light"</span>
+                              </div>
+                            )}
+
+                            <div ref={activityEndRef} />
+                          </div>
+                        </div>
+
+                        {/* Amazon Fresh Widget */}
+                        {isFreshEnabled && (
+                          <div className="p-4 rounded-xl bg-[#141419]/90 border border-white/[0.04] space-y-3">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="text-emerald-400 text-lg">🌿</span>
+                                <div>
+                                  <h4 className="text-xs font-bold text-white leading-tight">Amazon Fresh</h4>
+                                  <span className="text-[9px] font-mono text-white/40 block mt-0.5">GROCERY TRACKER · AUTO-REFILL</span>
+                                </div>
+                              </div>
+                              <span className="text-[9px] font-mono bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/20 font-bold">ACTIVE</span>
+                            </div>
+                            
+                            {/* Inventory status */}
+                            <div className="grid grid-cols-2 gap-2 text-xs font-sans text-white/80">
+                              <div className="bg-[#1b1c21] border border-[#2c303b] p-2 rounded-lg">
+                                <div className="text-[9px] font-mono text-white/40 uppercase">Milk Inventory</div>
+                                <div className="text-xs font-bold text-white mt-0.5 flex justify-between items-baseline">
+                                  <span>{latestFreshOrder ? "1.0 Liters" : "0.2 Liters"}</span>
+                                  <span className={latestFreshOrder ? "text-emerald-400 text-[9px] font-medium font-sans" : "text-amber-500 text-[9px] font-medium font-sans"}>
+                                    {latestFreshOrder ? "Refilled" : "Low Stock"}
+                                  </span>
+                                </div>
+                                <div className="w-full bg-white/10 h-1.5 rounded-full mt-1.5 overflow-hidden">
+                                  <div className={`h-full ${latestFreshOrder ? "bg-emerald-400 w-full" : "bg-amber-500 w-[20%]"}`} />
+                                </div>
+                              </div>
+                              <div className="bg-[#1b1c21] border border-[#2c303b] p-2 rounded-lg">
+                                <div className="text-[9px] font-mono text-white/40 uppercase">Tomato Inventory</div>
+                                <div className="text-xs font-bold text-white mt-0.5 flex justify-between items-baseline">
+                                  <span>1.2 kg</span>
+                                  <span className="text-emerald-400 text-[9px] font-medium font-sans">Healthy</span>
+                                </div>
+                                <div className="w-full bg-white/10 h-1.5 rounded-full mt-1.5 overflow-hidden">
+                                  <div className="bg-emerald-400 h-full w-[80%]" />
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Active Delivery Status */}
+                            {latestFreshOrder ? (
+                              <div className="bg-sky-500/10 border border-sky-500/20 p-2.5 rounded-lg text-xs font-sans space-y-1">
+                                <div className="flex justify-between font-mono text-[9px] text-sky-400 font-bold uppercase">
+                                  <span>🚚 Order Confirmed</span>
+                                  <span>ETA: {latestFreshOrder.eta} Mins</span>
+                                </div>
+                                <div className="text-[10px] text-white/90">
+                                  Ordered: {latestFreshOrder.items.map((i: any) => `${i.quantity} ${i.unit} of ${i.name}`).join(', ') || 'Milk replenishment'}
+                                </div>
+                                <div className="text-[9px] text-white/40 font-mono">
+                                  Order ID: {latestFreshOrder.orderId} · Paid via Amazon Pay
+                                </div>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={handleSimulateInventoryDrop}
+                                className="w-full py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-[10.5px] font-mono text-white/80 transition-all font-bold cursor-pointer"
+                              >
+                                Trigger Low Milk Refill Simulation
+                              </button>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Amazon Bookkeeper Widget */}
+                        {isBookkeeperEnabled && (
+                          <div className="p-4 rounded-xl bg-[#141419]/90 border border-white/[0.04] space-y-3">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="text-amber-500 text-lg">📒</span>
+                                <div>
+                                  <h4 className="text-xs font-bold text-white leading-tight">Amazon Bookkeeper</h4>
+                                  <span className="text-[9px] font-mono text-white/40 block mt-0.5">LOCAL LEDGER & AMAZON PAY</span>
+                                </div>
+                              </div>
+                              <span className="text-[9px] font-mono bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded-full border border-amber-500/20 font-bold">ACTIVE</span>
+                            </div>
+
+                            {/* Live vendor tally */}
+                            <div className="space-y-1.5">
+                              {ledgerLoading ? (
+                                <div className="text-[10px] font-mono text-white/40 py-2">Syncing ledger...</div>
+                              ) : ledgerError ? (
+                                <div className="text-[10px] font-mono text-red-400/80 py-2">{ledgerError}</div>
+                              ) : ledgerVendors.length === 0 ? (
+                                <div className="text-[10.5px] text-white/50 text-center py-4 bg-white/5 rounded-lg border border-dashed border-white/10 font-sans">
+                                  Ledger settled! All local accounts at ₹0.
+                                </div>
+                              ) : (
+                                <div className="bg-[#1b1c21] border border-[#2c303b] p-3 rounded-lg space-y-2">
+                                  <div className="space-y-1.5">
+                                    {ledgerVendors.map((vendor: any) => (
+                                      <div key={vendor.vendor} className="flex justify-between text-xs font-sans text-white/80">
+                                        <div className="flex items-center gap-1.5">
+                                          <span>{vendor.icon}</span>
+                                          <span className="font-semibold text-white">{vendor.name}</span>
+                                          <span className="text-white/30 text-[10px]">({vendor.entriesCount} entries)</span>
+                                        </div>
+                                        <span className="font-mono text-amber-400 font-bold">₹{vendor.total}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                  
+                                  <div className="border-t border-white/10 pt-2 flex justify-between items-baseline">
+                                    <span className="text-[10.5px] font-display text-white/70">Total Outstanding</span>
+                                    <span className="text-sm font-mono text-amber-500 font-bold">₹{ledgerGrandTotal}</span>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+
+                            {ledgerGrandTotal > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => setPayModalOpen(true)}
+                                className="w-full py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-black rounded-lg text-[11px] font-mono transition-all font-extrabold shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
+                              >
+                                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                  <rect x="2" y="5" width="20" height="14" rx="2" />
+                                  <line x1="2" y1="10" x2="22" y2="10" />
+                                </svg>
+                                SETTLE VIA AMAZON PAY UPI
+                              </button>
+                            )}
+                          </div>
+                        )}
+
                         {/* SCENES Section */}
                         <div className="space-y-2">
                           <span className="text-[10px] font-mono font-bold text-white/40 tracking-widest uppercase">Scenes</span>
@@ -806,68 +1259,6 @@ export function SmartphoneWidget({
                           </div>
                         </div>
 
-                        {/* CHAT INTERFACE (iMessage style) */}
-                        <div className="space-y-3 flex-1 flex flex-col min-h-[300px]">
-                          <span className="text-[10px] font-mono font-bold text-white/40 tracking-widest uppercase">Conversation</span>
-                          
-                          <div className="flex-1 overflow-y-auto max-h-[350px] rounded-2xl bg-[#0b0c0f] border border-white/[0.03] p-4 flex flex-col gap-3 scrollbar-thin scrollbar-thumb-white/10">
-                            <AnimatePresence initial={false}>
-                              {[...summaries].reverse().map((item) => (
-                                <div key={item.id} className="flex flex-col gap-1.5 w-full">
-                                  
-                                  {/* User Bubble (Right-aligned, Blue) */}
-                                  <motion.div
-                                    initial={{ opacity: 0, scale: 0.95, x: 20 }}
-                                    animate={{ opacity: 1, scale: 1, x: 0 }}
-                                    className="flex flex-col items-end max-w-[85%] self-end"
-                                  >
-                                    <div className="bg-[#007aff] text-white px-4 py-2 rounded-2xl rounded-tr-sm text-xs font-sans leading-relaxed shadow-sm">
-                                      {item.utterance}
-                                    </div>
-                                    <span className="text-[8px] font-mono text-white/30 mt-0.5 mr-1">{item.timestamp}</span>
-                                  </motion.div>
-
-                                  {/* Alexa Bubble (Left-aligned, Gray) */}
-                                  <motion.div
-                                    initial={{ opacity: 0, scale: 0.95, x: -20 }}
-                                    animate={{ opacity: 1, scale: 1, x: 0 }}
-                                    className="flex flex-col items-start max-w-[85%] self-start"
-                                  >
-                                    <div className="bg-[#24252a] text-white px-4 py-2 rounded-2xl rounded-tl-sm text-xs font-sans leading-relaxed border border-white/[0.02] shadow-sm">
-                                      {item.response === 'Analyzing command...' ? (
-                                        <span className="flex items-center gap-1.5 text-white/50 italic">
-                                          <span className="animate-spin h-3.5 w-3.5 border-2 border-white/30 border-t-transparent rounded-full" />
-                                          Analyzing...
-                                        </span>
-                                      ) : (
-                                        item.response
-                                      )}
-                                    </div>
-                                    
-                                    {/* Stats (Latency / Cost) */}
-                                    {item.response !== 'Analyzing command...' && (
-                                      <div className="flex items-center gap-2 text-[8px] font-mono text-white/30 mt-0.5 ml-1">
-                                        <span>Alexa</span>
-                                        {item.latency > 0 && <span>• {item.latency}ms</span>}
-                                        {item.cost > 0 && <span>• ${item.cost.toFixed(4)}</span>}
-                                      </div>
-                                    )}
-                                  </motion.div>
-                                  
-                                </div>
-                              ))}
-                            </AnimatePresence>
-
-                            {summaries.length === 0 && (
-                              <div className="flex-1 flex items-center justify-center text-center p-8">
-                                <span className="text-[10px] text-white/30 font-mono">No messages yet. Try saying "turn on living room light"</span>
-                              </div>
-                            )}
-
-                            <div ref={activityEndRef} />
-                          </div>
-                        </div>
-
                       </motion.div>
                     ) : (
                       /* SCREEN 2: Skills App Store */
@@ -989,6 +1380,111 @@ export function SmartphoneWidget({
                     <span>Skills Store</span>
                   </button>
                 </div>
+
+                {/* Amazon Pay UPI Settle Modal */}
+                <AnimatePresence>
+                  {payModalOpen && (
+                    <div className="absolute inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-6">
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.9 }}
+                        className="bg-[#121316] border border-[#232730] rounded-2xl w-full max-w-[260px] overflow-hidden flex flex-col font-sans text-white shadow-2xl"
+                      >
+                        {/* Header */}
+                        <div className="bg-[#2c2d35] p-3 flex items-center justify-between border-b border-[#3b3d4a]">
+                          <div className="flex items-center gap-1">
+                            <span className="text-amber-500 font-bold font-mono tracking-wide text-xs">amazon</span>
+                            <span className="bg-amber-500 text-black px-1.5 py-0.5 rounded text-[9px] font-bold font-sans">pay</span>
+                          </div>
+                          <button
+                            onClick={() => {
+                              setPayModalOpen(false);
+                              setPaymentStep('details');
+                            }}
+                            className="text-white/40 hover:text-white/80 transition-colors text-[10px] font-mono cursor-pointer"
+                          >
+                            CLOSE
+                          </button>
+                        </div>
+
+                        {/* Content based on step */}
+                        {paymentStep === 'details' && (
+                          <div className="p-4 space-y-3 flex-1 flex flex-col justify-between">
+                            <div className="space-y-2">
+                              <div className="text-center">
+                                <span className="text-[9px] font-mono text-white/40 uppercase tracking-widest block">Total UPI Settle</span>
+                                <span className="text-2xl font-mono font-bold text-amber-500">₹{ledgerGrandTotal}</span>
+                              </div>
+                              
+                              <div className="bg-[#1b1c21] p-2 rounded-lg border border-[#2c303b] space-y-1 text-[10px] text-white/70">
+                                <div className="flex justify-between">
+                                  <span>Payee UPI ID:</span>
+                                  <span className="font-mono text-white font-semibold">household@upi</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span>Verified Merchant:</span>
+                                  <span className="text-white font-semibold truncate max-w-[100px]">Hearth Ledger</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span>Bank Account:</span>
+                                  <span className="font-mono text-white">Amazon Pay ICICI</span>
+                                </div>
+                              </div>
+
+                              {/* Mock QR code styling */}
+                              <div className="flex justify-center p-2 bg-white rounded-xl border border-white/10 w-20 h-20 mx-auto">
+                                <svg className="w-full h-full text-black" viewBox="0 0 24 24" fill="currentColor">
+                                  <path d="M2 2h8v8H2V2zm2 2v4h4V4H4zm1 1h2v2H5V5zm9-3h8v8h-8V2zm2 2v4h4V4h-4zm1 1h2v2h-2V5zM2 14h8v8H2v-8zm2 2v4h4v-4H4zm1 1h2v2H5v-2zm13-1h4v2h-4v-2zm3-3h1v1h-1v-1zm-2 2h2v1h-2v-1zm-1-1h1v1h-1v-1zm-2 2h2v1h-2v-1zm5 5h1v1h-1v-1zm-2 0h1v1h-1v-1zm-2 0h1v1h-1v-1zm-1-3h2v1h-2v-1zm3 1h1v1h-1v-1z" />
+                                </svg>
+                              </div>
+                            </div>
+
+                            <button
+                              onClick={handleSettlePayment}
+                              className="w-full py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-black font-mono text-[10.5px] font-black rounded-lg transition-all shadow-lg uppercase tracking-wider cursor-pointer"
+                            >
+                              Approve & Pay UPI
+                            </button>
+                          </div>
+                        )}
+
+                        {paymentStep === 'processing' && (
+                          <div className="p-6 flex flex-col items-center justify-center space-y-3 flex-1 min-h-[220px]">
+                            <div className="animate-spin rounded-full h-8 w-8 border-2 border-amber-500 border-t-transparent" />
+                            <span className="text-[10px] font-mono text-white/60 tracking-wider">Authorizing Payment...</span>
+                          </div>
+                        )}
+
+                        {paymentStep === 'success' && (
+                          <div className="p-5 flex flex-col items-center justify-center text-center space-y-3 flex-1 min-h-[220px]">
+                            <div className="w-10 h-10 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                              </svg>
+                            </div>
+                            <div className="space-y-1">
+                              <h4 className="text-xs font-bold text-white font-sans">Payment Confirmed</h4>
+                              <p className="text-[9px] text-white/50 leading-relaxed font-mono">
+                                Ledger settled successfully.<br/>
+                                Paid via Amazon Pay UPI.
+                              </p>
+                            </div>
+                            <button
+                              onClick={() => {
+                                setPayModalOpen(false);
+                                setPaymentStep('details');
+                              }}
+                              className="px-4 py-1 bg-white/10 hover:bg-white/15 border border-white/10 rounded-md text-[9px] font-mono tracking-wider transition-all cursor-pointer"
+                            >
+                              DONE
+                            </button>
+                          </div>
+                        )}
+                      </motion.div>
+                    </div>
+                  )}
+                </AnimatePresence>
 
                 {/* Bottom swipe bar placeholder inside screen */}
                 <div className="hidden md:flex relative z-40 w-full h-[18px] items-center justify-center pointer-events-none select-none border-t border-white/[0.02] bg-black/45">

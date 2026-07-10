@@ -2,7 +2,7 @@ import { useRef, useMemo, useState, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
-interface EngineAssemblyProps {
+interface FinalAlexaModelProps {
   expression: 'resting' | 'happy' | 'curious' | 'wink' | 'sleepy' | 'dizzy' | 'excited' | 'sad' | 'yawning';
   bodyColor: string;
   ledColor: string;
@@ -15,10 +15,13 @@ interface EngineAssemblyProps {
   setIsPanelOpen: (open: boolean) => void;
   isSpeaking: boolean;
   isSinging: boolean;
-  isWhiteTheme: boolean;
+  dismantleMode?: boolean;
+  cpuScrollProgress?: number;
+  debugMode?: boolean;
+  alexaOpacityOverride?: number;
 }
 
-export function EngineAssembly({
+export function FinalAlexaModel({
   expression,
   bodyColor,
   ledColor,
@@ -30,12 +33,15 @@ export function EngineAssembly({
   setIsPanelOpen,
   isSpeaking,
   isSinging,
-  isWhiteTheme,
-}: EngineAssemblyProps) {
+  dismantleMode = false,
+  cpuScrollProgress = 0,
+  debugMode = false,
+  alexaOpacityOverride,
+}: FinalAlexaModelProps) {
   const robotGroupRef = useRef<THREE.Group>(null);
   const antennaRef = useRef<THREE.Group>(null);
   const ledGroupRef = useRef<THREE.Group>(null);
-  const ledRingRef = useRef<THREE.Group>(null);
+  const ledRingRef = useRef<any>(null);
   const ledLightRef = useRef<THREE.PointLight>(null);
   const eyesGroupRef = useRef<THREE.Group>(null);
   const mouthRef = useRef<THREE.Group>(null);
@@ -52,21 +58,6 @@ export function EngineAssembly({
   const yawnMouthClosedRef = useRef<THREE.Group>(null);
   const lookXRef = useRef(0);
   const lookYRef = useRef(0);
-
-  // Group references for leader lines projection
-  const headRef = useRef<THREE.Group>(null);
-  const lensRef = useRef<THREE.Group>(null);       // T0 Sensory Node
-  const gearLargeRef = useRef<THREE.Group>(null);  // T2 Master Core Node
-  const gearSmallRef = useRef<THREE.Group>(null);  // App Cartridge Node
-  const baseRef = useRef<THREE.Group>(null);       // T3 Cloud Synapse Node
-
-  // Rotating privacy shield
-  const privacyShieldRef = useRef<THREE.Group>(null);
-
-  // Colors parsed to THREE formats
-  const mainColor = useMemo(() => new THREE.Color(bodyColor), [bodyColor]);
-  const outlineColor = useMemo(() => new THREE.Color(isWhiteTheme ? '#2E2B28' : '#141312'), [isWhiteTheme]);
-  const ledThreeColor = useMemo(() => new THREE.Color(ledColor), [ledColor]);
 
   // Procedural singing states to show effort
   const [singingState, setSingingState] = useState({
@@ -87,12 +78,10 @@ export function EngineAssembly({
 
   useEffect(() => {
     if (explodedProgress > 0) {
-      const timer = setTimeout(() => {
-        setShowDizzyCooldown(true);
-        showDizzyCooldownRef.current = true;
-      }, 0);
-      return () => clearTimeout(timer);
+      setShowDizzyCooldown(true);
+      showDizzyCooldownRef.current = true;
     } else if (explodedProgress === 0 && showDizzyCooldownRef.current) {
+      // Dizzy face persists for 2.0 seconds after fully reassembled
       const timer = setTimeout(() => {
         setShowDizzyCooldown(false);
         showDizzyCooldownRef.current = false;
@@ -118,20 +107,22 @@ export function EngineAssembly({
         robotGroupRef.current.rotation.z = danceTiltZ;
         robotGroupRef.current.scale.set(1, 1, 1);
       } else if (expression === 'yawning') {
-        // Squash and stretch scale calculation
+        // Squash and stretch scale calculation (inspired by Las Vegas Sphere waking up in reverse)
         const cycleTime = t % 5.0; // 5-second loop
-        let scaleY: number;
-        let scaleX: number;
-        let scaleZ: number;
-        let hoverHeight: number;
+        let scaleY = 1.0;
+        let scaleX = 1.0;
+        let scaleZ = 1.0;
+        let hoverHeight = 0;
 
         if (cycleTime < 1.0) {
+          // Phase 1: Awake & getting drowsy (0.0s to 1.0s)
           const progress = cycleTime / 1.0;
           scaleY = 1.0;
           scaleX = 1.0;
           scaleZ = 1.0;
           hoverHeight = -progress * 0.04;
         } else if (cycleTime < 1.4) {
+          // Phase 2: Inhale Squash (1.0s to 1.4s)
           const progress = (cycleTime - 1.0) / 0.4;
           const ease = Math.sin((progress * Math.PI) / 2);
           scaleY = 1.0 - ease * 0.12; // down to 0.88
@@ -139,6 +130,7 @@ export function EngineAssembly({
           scaleZ = 1.0 + ease * 0.08;
           hoverHeight = -0.04 - ease * 0.06; // dips down to -0.10
         } else if (cycleTime < 2.0) {
+          // Phase 3: Yawn Stretch Peak (1.4s to 2.0s)
           const progress = (cycleTime - 1.4) / 0.6;
           const ease = Math.sin((progress * Math.PI) / 2);
           const shake = Math.sin(t * 50) * 0.012; // tremor
@@ -147,14 +139,17 @@ export function EngineAssembly({
           scaleZ = 1.08 - ease * 0.26 - shake * 0.5;
           hoverHeight = -0.10 + ease * 0.20; // rises up
         } else if (cycleTime < 2.8) {
+          // Phase 4: Release & Fall into Sleep (2.0s to 2.8s)
           const progress = (cycleTime - 2.0) / 0.8;
           if (progress < 0.4) {
+            // Snap down overshoot
             const p = progress / 0.4;
             scaleY = 1.32 - p * 0.44; // dips to 0.88
             scaleX = 0.82 + p * 0.28; // goes to 1.10
             scaleZ = 0.82 + p * 0.28;
             hoverHeight = 0.10 - p * 0.20; // down to -0.10
           } else {
+            // Settle into sleepy breathing base
             const p = (progress - 0.4) / 0.6;
             scaleY = 0.88 + p * 0.08; // rises to 0.96
             scaleX = 1.10 - p * 0.06; // goes to 1.04
@@ -162,6 +157,7 @@ export function EngineAssembly({
             hoverHeight = -0.10 + p * 0.02; // settles at -0.08
           }
         } else {
+          // Phase 5: Deep Sleep Breathing (2.8s to 5.0s)
           const progress = (cycleTime - 2.8) / 2.2;
           const breathe = Math.sin(progress * Math.PI * 2); // 1 full breath cycle
           scaleY = 0.96 + breathe * 0.025; // pulses between 0.935 and 0.985
@@ -175,6 +171,7 @@ export function EngineAssembly({
         robotGroupRef.current.rotation.set(0, 0, 0);
         robotGroupRef.current.scale.set(scaleX, scaleY, scaleZ);
 
+        // Toggle visibility of yawning eye components
         const isAwakePhase = cycleTime < 0.6;
         if (leftYawnAwakeRef.current) leftYawnAwakeRef.current.visible = isAwakePhase;
         if (leftYawnClosedRef.current) leftYawnClosedRef.current.visible = !isAwakePhase;
@@ -193,12 +190,13 @@ export function EngineAssembly({
         robotGroupRef.current.scale.set(1, 1, 1);
       }
     } else if (robotGroupRef.current) {
+      // In exploded view, reset transformations for clarity
       robotGroupRef.current.position.set(0, 1.1, 0);
       robotGroupRef.current.rotation.set(0, 0, 0);
       robotGroupRef.current.scale.set(1, 1, 1);
     }
 
-    // Antenna wiggle
+    // Antenna wiggle: organic wiggle matching the body sway/hover
     if (antennaRef.current) {
       const wiggleSpeed = isSinging ? 10.0 : (isHovered ? 12 : 4);
       const wiggleAmp = isSinging ? 0.22 : (isHovered ? 0.25 : 0.08);
@@ -206,59 +204,68 @@ export function EngineAssembly({
       antennaRef.current.rotation.x = Math.cos(t * wiggleSpeed * 0.7) * wiggleAmp * 0.5;
     }
 
-    // LED base light ring animations
+    // LED base light ring animations based on mode
     if (ledRingRef.current) {
       if (ledMode === 'off') {
         const ledMaterial = ledRingRef.current.material as THREE.MeshBasicMaterial;
         if (ledMaterial) ledMaterial.opacity = 0.05;
         if (ledLightRef.current) ledLightRef.current.intensity = 0;
-        ledRingRef.current.rotation.z = 0;
+        ledRingRef.current.rotation.y = 0;
       } else if (ledMode === 'solid') {
         const ledMaterial = ledRingRef.current.material as THREE.MeshBasicMaterial;
         if (ledMaterial) ledMaterial.opacity = 1.0;
         if (ledLightRef.current) ledLightRef.current.intensity = 2.0;
-        ledRingRef.current.rotation.z = 0;
+        ledRingRef.current.rotation.y = 0;
       } else if (ledMode === 'pulse') {
         const ledMaterial = ledRingRef.current.material as THREE.MeshBasicMaterial;
         const pulse = 0.5 + Math.sin(t * 3.5) * 0.5;
         if (ledMaterial) ledMaterial.opacity = 0.3 + pulse * 0.7;
         if (ledLightRef.current) ledLightRef.current.intensity = 0.4 + pulse * 1.6;
-        ledRingRef.current.rotation.z = 0;
+        ledRingRef.current.rotation.y = 0;
       } else if (ledMode === 'wave') {
-        ledRingRef.current.rotation.z = -t * 5.0;
+        // Rotating chase pattern (group)
+        ledRingRef.current.rotation.y = -t * 5.0; // spin speed
         if (ledLightRef.current) {
+          // constant bright pulse for the light source
           ledLightRef.current.intensity = 1.8;
         }
       }
     }
 
-    // Smooth door hinging
+    // Smooth door hinging open/close
     if (hingeRef.current) {
       const targetHingeRot = isPanelOpen ? -Math.PI * 0.65 : 0;
       hingeRef.current.rotation.y = THREE.MathUtils.lerp(hingeRef.current.rotation.y, targetHingeRot, 0.12);
     }
 
-    // Smooth chip pop-up
+    // Smooth chip pop-up animation
     if (chipRef.current) {
       const targetChipZ = isPanelOpen ? 0.09 : -0.06;
       chipRef.current.position.z = THREE.MathUtils.lerp(chipRef.current.position.z, targetChipZ, 0.1);
     }
 
-    // Dynamic expression switcher during singing
+    // Dynamic expression switcher during singing to show passion and effort
     if (isSinging) {
       if (isBlinking) setIsBlinking(false);
+
+      // Slower expression changes (every 2.2 seconds) to mimic singing phrasing bars
       if (t - lastSingingChangeRef.current > 2.2) {
         lastSingingChangeRef.current = t;
+
         const eyeRandom = Math.random();
-        let nextEye: string;
+        let nextEye = 'happy';
+
         if (eyeRandom < 0.33) {
-          nextEye = 'sleepy';
+          nextEye = 'sleepy'; // Both closed (effort / holding note)
         } else if (eyeRandom < 0.66) {
-          nextEye = 'curious';
+          nextEye = 'curious'; // Both wide open curious rings
         } else {
-          nextEye = 'happy';
+          nextEye = 'happy'; // Both open happy arches
         }
+
+        // Switch mouth between happy (wide open) and curious (vowel circle)
         const nextMouth = Math.random() < 0.5 ? 'happy' : 'curious';
+
         setSingingState({
           leftEye: nextEye,
           rightEye: nextEye,
@@ -267,43 +274,50 @@ export function EngineAssembly({
       }
     }
 
-    // Idle Random Blinking
+    // Idle Random Blinking (Blink closed together for 120ms every 2 to 6 seconds)
     if (!isSinging && explodedProgress === 0) {
       if (t > nextBlinkTimeRef.current) {
         setIsBlinking(true);
-        blinkEndRef.current = t + 0.12;
-        nextBlinkTimeRef.current = t + 2.0 + Math.random() * 4.0;
+        blinkEndRef.current = t + 0.12; // blink duration
+        nextBlinkTimeRef.current = t + 2.0 + Math.random() * 4.0; // delay until next blink
       }
       if (isBlinking && t > blinkEndRef.current) {
         setIsBlinking(false);
       }
     }
 
-    // Smooth speaking/singing mouth mimic
+    // Smooth speaking/singing mimic animation
     if (mouthRef.current) {
       if (isSinging) {
+        // Singing mouth wiggle: medium-tempo vowels (7.5 rad/s)
         const talkY = 0.6 + Math.sin(t * 7.5) * 0.4;
         const talkX = 1.0 + Math.cos(t * 5.5) * 0.12;
         const mouthTilt = Math.sin(t * 2.8) * 0.06;
         mouthRef.current.scale.set(talkX, talkY, 1);
         mouthRef.current.rotation.z = mouthTilt;
       } else if (isSpeaking) {
+        // Talking mouth wiggle: slowed down to a friendly human talking cadence (8.5 rad/s)
         const talkY = 0.5 + Math.abs(Math.sin(t * 8.5)) * 0.6;
         const talkX = 1.0 + Math.sin(t * 6.5) * 0.1;
         mouthRef.current.scale.set(talkX, talkY, 1);
         mouthRef.current.rotation.z = 0;
       } else if (expression === 'sleepy') {
-        const cycleTime = t % 3.0;
-        let scaleY: number;
-        let scaleX: number;
+        // Sleepy yawning mouth animation (previous yawn)
+        const cycleTime = t % 3.0; // 3-second cycle
+        let scaleY = 1.0;
+        let scaleX = 1.0;
+
         if (cycleTime < 0.8) {
+          // Phase 1: Opening (0s to 0.8s) - scale from 0.5 to 2.5 on Y, 0.5 to 1.8 on X
           const progress = cycleTime / 0.8;
           scaleY = 0.5 + progress * 2.0;
           scaleX = 0.5 + progress * 1.3;
         } else if (cycleTime < 2.0) {
+          // Phase 2: Open / Yawn shake (0.8s to 2.0s) - big size with a tiny wiggle
           scaleY = 2.5 + Math.sin(t * 30) * 0.08;
           scaleX = 1.8 + Math.cos(t * 25) * 0.05;
         } else {
+          // Phase 3: Closing (2.0s to 3.0s) - scale back down to 0.5
           const progress = (cycleTime - 2.0) / 1.0;
           scaleY = 2.5 - progress * 2.0;
           scaleX = 1.8 - progress * 1.3;
@@ -318,30 +332,35 @@ export function EngineAssembly({
 
     // Smooth yawning mouth animation
     if (expression === 'yawning' && yawnMouthRef.current) {
-      const cycleTime = t % 5.0;
-      let scaleY: number;
-      let scaleX: number;
-      let showClosed: boolean;
+      const cycleTime = t % 5.0; // 5-second cycle
+      let scaleY = 1.0;
+      let scaleX = 1.0;
+      let showClosed = true;
 
       if (cycleTime < 0.4) {
+        // Phase 1: Normal closed/resting mouth
         scaleY = 1.0;
         scaleX = 1.0;
         showClosed = true;
       } else if (cycleTime < 1.0) {
+        // Phase 2: Opening wide
         const progress = (cycleTime - 0.4) / 0.6;
-        scaleY = 0.3 + progress * 2.7;
-        scaleX = 0.3 + progress * 1.7;
+        scaleY = 0.3 + progress * 2.7; // opens to 3.0
+        scaleX = 0.3 + progress * 1.7; // opens to 2.0
         showClosed = false;
       } else if (cycleTime < 2.1) {
+        // Phase 3: Peak open with tension wiggle
         scaleY = 3.0 + Math.sin(t * 30) * 0.08;
         scaleX = 2.0 + Math.cos(t * 25) * 0.05;
         showClosed = false;
       } else if (cycleTime < 2.8) {
+        // Phase 4: Closing
         const progress = (cycleTime - 2.1) / 0.7;
-        scaleY = 3.0 - progress * 2.7;
-        scaleX = 2.0 - progress * 1.7;
-        showClosed = progress > 0.8;
+        scaleY = 3.0 - progress * 2.7; // down to 0.3
+        scaleX = 2.0 - progress * 1.7; // down to 0.3
+        showClosed = progress > 0.8; // show closed once mostly closed
       } else {
+        // Phase 5: Deep sleep breathing mouth
         const progress = (cycleTime - 2.8) / 2.2;
         const breathe = Math.sin(progress * Math.PI * 2);
         scaleY = 0.5 + breathe * 0.1;
@@ -358,6 +377,7 @@ export function EngineAssembly({
     const isDizzy = explodedProgress > 0 || showDizzyCooldown;
 
     if (isDizzy) {
+      // Dizzy state: center the eyes (no floating or horizontal flat-plane sliding) and spin the crosses
       if (leftEyeGroupRef.current) {
         leftEyeGroupRef.current.position.set(0, 0, 0);
         leftEyeGroupRef.current.rotation.z = t * 6.0;
@@ -370,6 +390,7 @@ export function EngineAssembly({
         eyesGroupRef.current.rotation.set(0, 0, 0);
       }
 
+      // Dizzy head shake/wobble recovery animation (only when fully reassembled)
       if (showDizzyCooldown && explodedProgress === 0 && robotGroupRef.current) {
         robotGroupRef.current.rotation.z = Math.sin(t * 16.0) * 0.08;
         robotGroupRef.current.rotation.x = Math.cos(t * 13.0) * 0.05;
@@ -378,6 +399,7 @@ export function EngineAssembly({
         robotGroupRef.current.rotation.set(0, 0, 0);
       }
     } else {
+      // Normal cursor tracking (clamped pupil shift inside sockets)
       const targetLookX = state.pointer.x * 0.07;
       const targetLookY = state.pointer.y * 0.06;
       lookXRef.current = THREE.MathUtils.lerp(lookXRef.current, targetLookX, 0.1);
@@ -400,81 +422,15 @@ export function EngineAssembly({
         robotGroupRef.current.rotation.set(0, 0, 0);
       }
     }
-
-    // Animate holographic privacy shield rotation
-    if (privacyShieldRef.current) {
-      privacyShieldRef.current.rotation.y = t * 0.8;
-      privacyShieldRef.current.rotation.x = t * 0.3;
-    }
-
-    // Camera shot blend (moves to top-down view looking into split-open hinge as it splits)
-    const LENS_DIR = new THREE.Vector3(0, 0.15, 1.0).normalize();
-    const TOP_DIR = new THREE.Vector3(0.5, 0.8, 0.7).normalize();
-    const CAM_DISTANCE = 7.2;
-    const LENS_LOOK_Y = 0.3;
-    const TOP_LOOK_Y = -0.2;
-
-    const shotT = THREE.MathUtils.clamp(explodedProgress, 0, 1);
-    const easedT = shotT * shotT * (3 - 2 * shotT);
-
-    const camDir = new THREE.Vector3().lerpVectors(LENS_DIR, TOP_DIR, easedT).normalize();
-    const lookY = THREE.MathUtils.lerp(LENS_LOOK_Y, TOP_LOOK_Y, easedT);
-    const desiredTarget = new THREE.Vector3(0, lookY, 0);
-    const desiredPos = desiredTarget.clone().addScaledVector(camDir, CAM_DISTANCE);
-
-    state.camera.position.x = THREE.MathUtils.lerp(state.camera.position.x, desiredPos.x, 0.08);
-    state.camera.position.y = THREE.MathUtils.lerp(state.camera.position.y, desiredPos.y, 0.08);
-    state.camera.position.z = THREE.MathUtils.lerp(state.camera.position.z, desiredPos.z, 0.08);
-    state.camera.lookAt(desiredTarget);
-    state.camera.updateProjectionMatrix();
-
-    // Animate leader line screen projections
-    const lineLayers = [
-      { id: 'head', ref: headRef },
-      { id: 'lens', ref: lensRef },
-      { id: 'gearLarge', ref: gearLargeRef },
-      { id: 'gearSmall', ref: gearSmallRef },
-      { id: 'base', ref: baseRef },
-    ];
-
-    lineLayers.forEach((layer) => {
-      const ref = layer.ref.current;
-      if (!ref) return;
-
-      const vec = new THREE.Vector3();
-      ref.getWorldPosition(vec);
-      vec.project(state.camera);
-
-      const screenX = (vec.x * 0.5 + 0.5) * window.innerWidth;
-      const screenY = (-vec.y * 0.5 + 0.5) * window.innerHeight;
-
-      const line = document.getElementById(`leader-line-${layer.id}`);
-      const anchor = document.getElementById(`leader-anchor-${layer.id}`);
-      if (!line || !anchor) return;
-
-      const rect = anchor.getBoundingClientRect();
-      const targetX = rect.left + rect.width / 2;
-      const targetY = rect.top + rect.height / 2;
-
-      const fadeIn = THREE.MathUtils.clamp((explodedProgress - 0.1) / 0.2, 0, 1);
-      const fadeOut = 1.0 - THREE.MathUtils.clamp((explodedProgress - 0.9) / 0.1, 0, 1);
-      const drawProgress = fadeIn * fadeOut;
-
-      line.setAttribute('x1', `${screenX}`);
-      line.setAttribute('y1', `${screenY}`);
-      line.setAttribute('x2', `${THREE.MathUtils.lerp(screenX, targetX, drawProgress)}`);
-      line.setAttribute('y2', `${THREE.MathUtils.lerp(screenY, targetY, drawProgress)}`);
-      line.setAttribute('opacity', `${drawProgress * 0.6}`);
-    });
   });
 
-  // Resolve active expressions
+  // Resolve active expressions, overriding defaults if blinking or singing is active
   const [leftEyeToShow, rightEyeToShow] = useMemo(() => {
     if (explodedProgress > 0 || showDizzyCooldown) {
       return ['dizzy', 'dizzy'];
     }
     if (isBlinking) {
-      return ['sleepy', 'sleepy'];
+      return ['sleepy', 'sleepy']; // Blink closed together
     }
     if (isSinging) {
       return [singingState.leftEye, singingState.rightEye];
@@ -492,6 +448,9 @@ export function EngineAssembly({
   }, [expression, isSinging, singingState.leftEye, singingState.rightEye, isBlinking, explodedProgress, showDizzyCooldown]);
 
   const mouthToShow = useMemo(() => {
+    if (dismantleMode) {
+      return 'excited';
+    }
     if (explodedProgress > 0 || showDizzyCooldown) {
       return 'dizzy';
     }
@@ -504,34 +463,174 @@ export function EngineAssembly({
     return expression;
   }, [expression, isSinging, singingState.mouth, explodedProgress, showDizzyCooldown]);
 
-  // Toon materials
-  const toonMaterial = useMemo(() => new THREE.MeshBasicMaterial({ color: mainColor }), [mainColor]);
-  const outlineMaterial = useMemo(() => new THREE.MeshBasicMaterial({ color: outlineColor, side: THREE.BackSide }), [outlineColor]);
-  const screenMaterial = useMemo(() => new THREE.MeshBasicMaterial({ color: '#08080a' }), []);
-  const faceGlowMaterial = useMemo(() => new THREE.MeshBasicMaterial({ color: '#ffffff', toneMapped: false }), []);
-  const buttonBaseMaterial = useMemo(() => new THREE.MeshBasicMaterial({ color: '#e6dfd5' }), []);
-  const chipGlowMaterial = useMemo(() => new THREE.MeshBasicMaterial({ color: '#f1c40f', toneMapped: false }), []);
+  // ── Dismantle Sequence color & opacity timeline calculations ─────────────
+  const s = cpuScrollProgress;
+  let alexaOpacity = 1.0;
+  let currentBodyColor = bodyColor;
+  let currentBottomColor = bodyColor;
+  let currentLedColor = ledColor;
 
-  // Web color theme matching materials for microchips (instead of liquid glass cogs)
-  const sensoryMaterial = useMemo(() => new THREE.MeshBasicMaterial({ color: '#244d47' }), []);     // Ghibli Green
-  const masterCoreMaterial = useMemo(() => new THREE.MeshBasicMaterial({ color: '#e9b44c' }), []);   // Pippo Yellow
-  const synapseMaterial = useMemo(() => new THREE.MeshBasicMaterial({ color: '#2e323b' }), []);      // Charcoal base
-  const appCartridgeMaterial = useMemo(() => new THREE.MeshBasicMaterial({ color: '#3a7ca5' }), []); // Doraemon Blue
+  if (dismantleMode) {
+    // 1. Opacity calculation (Alexa remains solid cream, then vanishes completely at s = 0.20)
+    if (s < 0.20) {
+      alexaOpacity = 1.0; // Opaque shell
+    } else if (s < 0.25) {
+      // Rapid Thanos fade-away
+      const tFade = (s - 0.20) / 0.05;
+      alexaOpacity = THREE.MathUtils.lerp(1.0, 0.0, tFade);
+    } else {
+      alexaOpacity = 0.0; // Stay invisible for the rest of the scroll timeline
+    }
 
-  const scaleFactor = 1.0 + outlineThickness * 0.025;
-  const outlineScale = [scaleFactor, scaleFactor, scaleFactor] as [number, number, number];
+    // Apply manual opacity override if provided
+    if (alexaOpacityOverride !== undefined) {
+      alexaOpacity = alexaOpacityOverride;
+    }
 
-  // Symmetrical split slide positions
-  const yHead = explodedProgress * 2.2;
-  const yBase = -explodedProgress * 2.2;
+    // 2. Color calculation
+    const baseColor = new THREE.Color(bodyColor);
+    const blackColor = new THREE.Color('#161514');
+    const baseLedColor = new THREE.Color(ledColor);
+    const targetLedColor = new THREE.Color('#ff3333'); // Red LED
+
+    if (debugMode) {
+      currentBodyColor = bodyColor;
+      currentBottomColor = bodyColor;
+      currentLedColor = baseLedColor.getStyle();
+    } else {
+      if (s < 0.20) {
+        const t = s / 0.20;
+        const lerpedBody = new THREE.Color().lerpColors(baseColor, blackColor, t);
+        currentBodyColor = lerpedBody.getStyle();
+        currentBottomColor = lerpedBody.getStyle();
+        currentLedColor = new THREE.Color().lerpColors(baseLedColor, targetLedColor, t).getStyle();
+      } else if (s < 0.80) {
+        currentBodyColor = blackColor.getStyle();
+        currentBottomColor = blackColor.getStyle();
+        currentLedColor = targetLedColor.getStyle();
+      } else {
+        const t = Math.min(1, (s - 0.80) / 0.20);
+        const lerpedBody = new THREE.Color().lerpColors(blackColor, baseColor, t);
+        currentBodyColor = lerpedBody.getStyle();
+        currentBottomColor = lerpedBody.getStyle();
+        currentLedColor = new THREE.Color().lerpColors(targetLedColor, baseLedColor, t).getStyle();
+      }
+    }
+  }
+
+  // Colors parsed to THREE formats
+  const mainColor = useMemo(() => new THREE.Color(currentBodyColor), [currentBodyColor]);
+  const bottomColor = useMemo(() => new THREE.Color(currentBottomColor), [currentBottomColor]);
+  const outlineColor = useMemo(() => new THREE.Color('#141312'), []);
+  const ledThreeColor = useMemo(() => new THREE.Color(currentLedColor), [currentLedColor]);
+
+  // Share materials to optimize rendering
+  const toonMaterial = useMemo(() => {
+    const isTranslucent = dismantleMode && alexaOpacity < 1.0;
+    return new THREE.MeshBasicMaterial({
+      color: mainColor,
+      transparent: isTranslucent,
+      opacity: alexaOpacity,
+      depthWrite: !isTranslucent,
+    });
+  }, [mainColor, alexaOpacity, dismantleMode]);
+
+  const doubleSidedToonMaterial = useMemo(() => {
+    const isTranslucent = dismantleMode && alexaOpacity < 1.0;
+    return new THREE.MeshBasicMaterial({
+      color: mainColor,
+      side: THREE.DoubleSide,
+      transparent: isTranslucent,
+      opacity: alexaOpacity,
+      depthWrite: !isTranslucent,
+    });
+  }, [mainColor, alexaOpacity, dismantleMode]);
+
+  const bottomToonMaterial = useMemo(() => {
+    const isTranslucent = dismantleMode && alexaOpacity < 1.0;
+    return new THREE.MeshBasicMaterial({
+      color: bottomColor,
+      transparent: isTranslucent,
+      opacity: alexaOpacity,
+      depthWrite: !isTranslucent,
+    });
+  }, [bottomColor, alexaOpacity, dismantleMode]);
+
+  const outlineMaterial = useMemo(() => {
+    const isTranslucent = dismantleMode && alexaOpacity < 1.0;
+    return new THREE.MeshBasicMaterial({
+      color: outlineColor,
+      side: THREE.BackSide,
+      transparent: isTranslucent,
+      opacity: alexaOpacity,
+      depthWrite: !isTranslucent,
+    });
+  }, [outlineColor, alexaOpacity, dismantleMode]);
+
+  // Adjust outline thickness scale factor
+  const outlineScale = useMemo(() => {
+    const scaleFactor = 1.0 + outlineThickness * 0.025;
+    return [scaleFactor, scaleFactor, scaleFactor] as [number, number, number];
+  }, [outlineThickness]);
+
+  // Dark screen backing material
+  const screenMaterial = useMemo(() => {
+    const isTranslucent = dismantleMode && alexaOpacity < 1.0;
+    return new THREE.MeshBasicMaterial({
+      color: '#08080a',
+      transparent: isTranslucent,
+      opacity: alexaOpacity,
+      depthWrite: !isTranslucent,
+    });
+  }, [alexaOpacity, dismantleMode]);
+
+  // Bright glowing face material (Always white)
+  const faceGlowMaterial = useMemo(() => {
+    const isTranslucent = dismantleMode && alexaOpacity < 1.0;
+    return new THREE.MeshBasicMaterial({
+      color: '#ffffff',
+      toneMapped: false,
+      transparent: isTranslucent,
+      opacity: alexaOpacity,
+      depthWrite: !isTranslucent,
+    });
+  }, [alexaOpacity, dismantleMode]);
+
+  const buttonBaseMaterial = useMemo(() => {
+    const isTranslucent = dismantleMode && alexaOpacity < 1.0;
+    return new THREE.MeshBasicMaterial({
+      color: '#e6dfd5',
+      transparent: isTranslucent,
+      opacity: alexaOpacity,
+      depthWrite: !isTranslucent,
+    });
+  }, [alexaOpacity, dismantleMode]);
+
+  // Golden processor chip color
+  const chipGlowMaterial = useMemo(() => {
+    const isTranslucent = dismantleMode && alexaOpacity < 1.0;
+    return new THREE.MeshBasicMaterial({
+      color: '#f1c40f',
+      toneMapped: false,
+      transparent: isTranslucent,
+      opacity: alexaOpacity,
+      depthWrite: !isTranslucent,
+    });
+  }, [alexaOpacity, dismantleMode]);
+
+
+  // Compute positions dynamically based on explodedProgress
+  const yHeadGroup = 0; // relative to parent
+  const yAntenna = 0; // Fixed to top half
+  const yLed = -explodedProgress * 0.8;
 
   return (
     <group ref={robotGroupRef}>
-      {/* 1. TOP SPHERICAL HEAD (slides up & hinges back) */}
-      <group ref={headRef} position={[0, yHead, 0]}>
-        {/* Uncut Dome in Assembled state */}
+      {/* 1. MAIN SPHERICAL BODY ASSEMBLY */}
+      <group position={[0, yHeadGroup, 0]}>
+        {/* Seamless Sliced Sphere Head (rendered only in assembled state) */}
         {explodedProgress === 0 && (
-          <group position={[0, 0, 0]}>
+          <>
             <mesh>
               <sphereGeometry args={[1.2, 32, 32, 0, Math.PI * 2, 0, 2.50]} />
               <primitive object={toonMaterial} attach="material" />
@@ -540,38 +639,29 @@ export function EngineAssembly({
               <sphereGeometry args={[1.2, 32, 32, 0, Math.PI * 2, 0, 2.50]} />
               <primitive object={outlineMaterial} attach="material" />
             </mesh>
-          </group>
+          </>
         )}
 
-        {/* Top Dome (opens like a lid when exploded) */}
-        <group position={[0, 0.26, -1.11]}>
+        {/* Sliced Sphere Head (Top Half - opens like a lid) */}
+        <group position={[0, 0.26 - explodedProgress * 1.0, -1.11 - explodedProgress * 0.35]}> {/* Hinge point pushed further down and back away from the screen */}
           <group rotation={[-explodedProgress * Math.PI * 0.45, 0, 0]}>
-            <group position={[0, -0.26, 1.11]}>
+            <group position={[0, -0.26, 1.11]}> {/* Offset back to center */}
               {explodedProgress > 0 && (
                 <>
                   <mesh>
                     <sphereGeometry args={[1.2, 32, 32, 0, Math.PI * 2, 0, Math.PI / 2]} />
-                    <primitive object={toonMaterial} attach="material" />
+                    <primitive object={doubleSidedToonMaterial} attach="material" />
                   </mesh>
                   <mesh scale={outlineScale}>
                     <sphereGeometry args={[1.2, 32, 32, 0, Math.PI * 2, 0, Math.PI / 2]} />
                     <primitive object={outlineMaterial} attach="material" />
                   </mesh>
-                  
-                  {/* Flat base cap under top hemisphere */}
-                  <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
-                    <circleGeometry args={[1.2, 32]} />
-                    <primitive object={toonMaterial} attach="material" />
-                  </mesh>
-                  <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, 0, 0]} scale={[outlineScale[0], outlineScale[1], 1]}>
-                    <circleGeometry args={[1.2, 32]} />
-                    <primitive object={outlineMaterial} attach="material" />
-                  </mesh>
                 </>
               )}
 
-              {/* Antenna */}
-              <group ref={antennaRef} position={[0, 1.2, 0]}>
+              {/* 3. CUTE RETRO MECHA ANTENNA (Doraemon style) - attached to the lid */}
+              <group ref={antennaRef} position={[0, 1.20 + yAntenna, 0]} rotation={[0, 0, 0]}>
+                {/* Flat bracket base */}
                 <mesh>
                   <cylinderGeometry args={[0.13, 0.13, 0.04, 12]} />
                   <primitive object={toonMaterial} attach="material" />
@@ -581,6 +671,7 @@ export function EngineAssembly({
                   <primitive object={outlineMaterial} attach="material" />
                 </mesh>
 
+                {/* Stem rod */}
                 <mesh position={[0, 0.2, 0]}>
                   <cylinderGeometry args={[0.02, 0.02, 0.4, 8]} />
                   <primitive object={buttonBaseMaterial} attach="material" />
@@ -590,9 +681,15 @@ export function EngineAssembly({
                   <primitive object={outlineMaterial} attach="material" />
                 </mesh>
 
+                {/* Spherical bulb on top */}
                 <mesh position={[0, 0.42, 0]}>
                   <sphereGeometry args={[0.075, 16, 16]} />
-                  <meshBasicMaterial color="#3da5e0" />
+                  <meshBasicMaterial
+                    color="#3da5e0"
+                    transparent={dismantleMode && alexaOpacity < 1.0}
+                    opacity={alexaOpacity}
+                    depthWrite={!(dismantleMode && alexaOpacity < 1.0)}
+                  />
                 </mesh>
                 <mesh position={[0, 0.42, 0]} scale={outlineScale}>
                   <sphereGeometry args={[0.075, 16, 16]} />
@@ -600,9 +697,9 @@ export function EngineAssembly({
                 </mesh>
               </group>
 
-              {/* Glowing Eyes */}
+              {/* 2. GLOWING FACIAL EXPRESSIONS - EYES (attached to the lid) */}
               <group ref={eyesGroupRef}>
-                {/* Left Eye */}
+                {/* LEFT EYE */}
                 <group ref={leftEyeGroupRef}>
                   {leftEyeToShow === 'happy' && (
                     <group position={[-0.24, 0.12, 1.22]} rotation={[0, -0.2, 0]}>
@@ -674,12 +771,14 @@ export function EngineAssembly({
                   )}
                   {leftEyeToShow === 'yawning' && (
                     <group>
+                      {/* Awake phase shape */}
                       <group ref={leftYawnAwakeRef} position={[-0.24, 0.12, 1.22]} rotation={[0, -0.2, 0]}>
                         <mesh>
                           <ringGeometry args={[0.05, 0.09, 24]} />
                           <primitive object={faceGlowMaterial} attach="material" />
                         </mesh>
                       </group>
+                      {/* Slit/Closed phase shape */}
                       <group ref={leftYawnClosedRef} position={[-0.24, 0.10, 1.22]} rotation={[0, -0.2, 0]}>
                         <mesh>
                           <boxGeometry args={[0.20, 0.022, 0.01]} />
@@ -690,7 +789,7 @@ export function EngineAssembly({
                   )}
                 </group>
 
-                {/* Right Eye */}
+                {/* RIGHT EYE */}
                 <group ref={rightEyeGroupRef}>
                   {rightEyeToShow === 'happy' && (
                     <group position={[0.24, 0.12, 1.22]} rotation={[0, 0.2, 0]}>
@@ -762,12 +861,14 @@ export function EngineAssembly({
                   )}
                   {rightEyeToShow === 'yawning' && (
                     <group>
+                      {/* Awake phase shape */}
                       <group ref={rightYawnAwakeRef} position={[0.24, 0.12, 1.22]} rotation={[0, 0.2, 0]}>
                         <mesh>
                           <ringGeometry args={[0.05, 0.09, 24]} />
                           <primitive object={faceGlowMaterial} attach="material" />
                         </mesh>
                       </group>
+                      {/* Slit/Closed phase shape */}
                       <group ref={rightYawnClosedRef} position={[0.24, 0.10, 1.22]} rotation={[0, 0.2, 0]}>
                         <mesh>
                           <boxGeometry args={[0.20, 0.022, 0.01]} />
@@ -781,377 +882,284 @@ export function EngineAssembly({
             </group>
           </group>
         </group>
-      </group>
 
-      {/* 2. BOTTOM SPHERICAL BODY (slides down, revealing nested Cascade Chipset inside Y-cavity) */}
-      <group position={[0, yBase, 0]}>
-        {/* Uncut bottom dome in Assembled state */}
-        {explodedProgress === 0 && (
-          <group position={[0, 0, 0]}>
-            <mesh>
-              <sphereGeometry args={[1.2, 32, 32, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2]} />
-              <primitive object={toonMaterial} attach="material" />
-            </mesh>
-            <mesh scale={outlineScale}>
-              <sphereGeometry args={[1.2, 32, 32, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2]} />
-              <primitive object={outlineMaterial} attach="material" />
-            </mesh>
-          </group>
-        )}
+        {/* Sliced Sphere Head (Bottom Half - slides down) */}
+        <group position={[0, -explodedProgress * 0.8, 0]}>
+          {explodedProgress > 0 && (
+            <>
+              <mesh>
+                <sphereGeometry args={[1.2, 32, 32, 0, Math.PI * 2, Math.PI / 2, 2.50 - Math.PI / 2]} />
+                <primitive object={bottomToonMaterial} attach="material" />
+              </mesh>
+              <mesh scale={outlineScale}>
+                <sphereGeometry args={[1.2, 32, 32, 0, Math.PI * 2, Math.PI / 2, 2.50 - Math.PI / 2]} />
+                <primitive object={outlineMaterial} attach="material" />
+              </mesh>
+              {/* Flat Cap at the top of bottom hemisphere (visible when split) */}
+              <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
+                <circleGeometry args={[1.2, 32]} />
+                <primitive object={bottomToonMaterial} attach="material" />
+              </mesh>
+              <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} scale={[outlineScale[0], outlineScale[1], 1]}>
+                <circleGeometry args={[1.2, 32]} />
+                <primitive object={outlineMaterial} attach="material" />
+              </mesh>
+            </>
+          )}
 
-        {/* Bottom Dome shell when split */}
-        {explodedProgress > 0 && (
-          <group ref={baseRef}>
-            <mesh>
-              <sphereGeometry args={[1.2, 32, 32, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2]} />
-              <primitive object={toonMaterial} attach="material" />
-            </mesh>
-            <mesh scale={outlineScale}>
-              <sphereGeometry args={[1.2, 32, 32, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2]} />
-              <primitive object={outlineMaterial} attach="material" />
-            </mesh>
-
-            {/* Flat top circle cap of bottom cup */}
-            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
-              <circleGeometry args={[1.2, 32]} />
-              <primitive object={toonMaterial} attach="material" />
-            </mesh>
-            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} scale={[outlineScale[0], outlineScale[1], 1]}>
-              <circleGeometry args={[1.2, 32]} />
-              <primitive object={outlineMaterial} attach="material" />
-            </mesh>
-          </group>
-        )}
-
-        {/* Mouth (attached to bottom half) */}
-        <group ref={mouthRef}>
-          {mouthToShow === 'happy' && (
-            <group position={[0, -0.16, 1.225]} rotation={[0.13, 0, 0]}>
-              <mesh>
-                <circleGeometry args={[0.16, 32, Math.PI, Math.PI]} />
-                <primitive object={faceGlowMaterial} attach="material" />
-              </mesh>
-            </group>
-          )}
-          {mouthToShow === 'curious' && (
-            <group position={[0, -0.18, 1.225]} rotation={[0.15, 0, 0]}>
-              <mesh>
-                <ringGeometry args={[0.03, 0.07, 24]} />
-                <primitive object={faceGlowMaterial} attach="material" />
-              </mesh>
-            </group>
-          )}
-          {mouthToShow === 'wink' && (
-            <group position={[0, -0.16, 1.225]} rotation={[0.13, 0, 0]}>
-              <mesh>
-                <circleGeometry args={[0.16, 32, Math.PI, Math.PI]} />
-                <primitive object={faceGlowMaterial} attach="material" />
-              </mesh>
-            </group>
-          )}
-          {mouthToShow === 'sleepy' && (
-            <group position={[0, -0.18, 1.225]} rotation={[0.15, 0, 0]}>
-              <mesh>
-                <ringGeometry args={[0.02, 0.07, 32]} />
-                <primitive object={faceGlowMaterial} attach="material" />
-              </mesh>
-            </group>
-          )}
-          {mouthToShow === 'dizzy' && (
-            <group position={[0, -0.18, 1.225]} rotation={[0.15, 0, 0]}>
-              <mesh rotation={[0, 0, Math.PI / 4]}>
-                <ringGeometry args={[0.03, 0.07, 4]} />
-                <primitive object={faceGlowMaterial} attach="material" />
-              </mesh>
-            </group>
-          )}
-          {mouthToShow === 'excited' && (
-            <group position={[0, -0.12, 1.225]} rotation={[0.1, 0, 0]}>
-              <mesh>
-                <circleGeometry args={[0.22, 32, Math.PI, Math.PI]} />
-                <primitive object={faceGlowMaterial} attach="material" />
-              </mesh>
-            </group>
-          )}
-          {mouthToShow === 'sad' && (
-            <group position={[0, -0.15, 1.225]} rotation={[0.12, 0, 0]}>
-              <mesh>
-                <torusGeometry args={[0.1, 0.022, 8, 24, Math.PI]} />
-                <primitive object={faceGlowMaterial} attach="material" />
-              </mesh>
-            </group>
-          )}
-          {mouthToShow === 'yawning' && (
-            <group ref={yawnMouthRef} position={[0, -0.18, 1.225]} rotation={[0.15, 0, 0]}>
-              <group ref={yawnMouthOpenRef}>
-                <mesh>
-                  <ringGeometry args={[0.01, 0.07, 32]} />
+          {/* MOUTH (slides down with the bottom hemisphere) */}
+          <group ref={mouthRef}>
+            {mouthToShow === 'happy' && (
+              <group position={[0, -0.16, 1.225]} rotation={[0.13, 0, 0]}>
+                <mesh castShadow={false} receiveShadow={false}>
+                  <circleGeometry args={[0.16, 32, Math.PI, Math.PI]} />
                   <primitive object={faceGlowMaterial} attach="material" />
                 </mesh>
               </group>
-              <group ref={yawnMouthClosedRef}>
-                <mesh>
-                  <ringGeometry args={[0.02, 0.045, 16]} />
+            )}
+
+            {mouthToShow === 'curious' && (
+              <group position={[0, -0.18, 1.225]} rotation={[0.15, 0, 0]}>
+                <mesh castShadow={false} receiveShadow={false}>
+                  <ringGeometry args={[0.03, 0.07, 24]} />
                   <primitive object={faceGlowMaterial} attach="material" />
                 </mesh>
               </group>
-            </group>
-          )}
-        </group>
+            )}
 
-        {/* Back Panel Cavity Motherboard */}
-        <group rotation={[0, Math.PI, 0]}>
-          <group position={[0, 0, 1.05]}>
-            <mesh rotation={[Math.PI / 2, 0, 0]}>
-              <cylinderGeometry args={[0.46, 0.46, 0.32, 32]} />
-              <primitive object={screenMaterial} attach="material" />
-            </mesh>
-            <mesh scale={outlineScale} rotation={[Math.PI / 2, 0, 0]}>
-              <cylinderGeometry args={[0.46, 0.46, 0.32, 32]} />
-              <primitive object={outlineMaterial} attach="material" />
-            </mesh>
+            {mouthToShow === 'wink' && (
+              <group position={[0, -0.16, 1.225]} rotation={[0.13, 0, 0]}>
+                <mesh castShadow={false} receiveShadow={false}>
+                  <circleGeometry args={[0.16, 32, Math.PI, Math.PI]} />
+                  <primitive object={faceGlowMaterial} attach="material" />
+                </mesh>
+              </group>
+            )}
 
-            <mesh position={[0, 0, -0.1]} rotation={[Math.PI / 2, 0, 0]}>
-              <cylinderGeometry args={[0.43, 0.43, 0.02, 32]} />
-              <primitive object={buttonBaseMaterial} attach="material" />
-            </mesh>
+            {mouthToShow === 'sleepy' && (
+              <group ref={mouthRef} position={[0, -0.18, 1.225]} rotation={[0.15, 0, 0]}>
+                <mesh castShadow={false} receiveShadow={false}>
+                  <ringGeometry args={[0.02, 0.07, 32]} />
+                  <primitive object={faceGlowMaterial} attach="material" />
+                </mesh>
+              </group>
+            )}
 
-            <mesh position={[0.15, -0.12, -0.09]} rotation={[0, 0, Math.PI / 2]}>
-              <torusGeometry args={[0.08, 0.015, 6, 12, Math.PI]} />
-              <meshBasicMaterial color="#e05353" />
-            </mesh>
-            <mesh position={[0.08, -0.05, -0.09]} rotation={[0, 0, -Math.PI / 4]}>
-              <torusGeometry args={[0.1, 0.015, 6, 12, Math.PI]} />
-              <meshBasicMaterial color="#3da5e0" />
-            </mesh>
+            {mouthToShow === 'dizzy' && (
+              <group position={[0, -0.18, 1.225]} rotation={[0.15, 0, 0]}>
+                <mesh castShadow={false} receiveShadow={false} rotation={[0, 0, Math.PI / 4]}>
+                  <ringGeometry args={[0.03, 0.07, 4]} />
+                  <primitive object={faceGlowMaterial} attach="material" />
+                </mesh>
+              </group>
+            )}
 
-            <group ref={chipRef} position={[0, 0, -0.06]}>
-              <mesh>
-                <boxGeometry args={[0.26, 0.26, 0.06]} />
-                <primitive object={screenMaterial} attach="material" />
-              </mesh>
-              <mesh scale={outlineScale}>
-                <boxGeometry args={[0.26, 0.26, 0.06]} />
-                <primitive object={outlineMaterial} attach="material" />
-              </mesh>
-              <mesh position={[0, 0, 0.02]}>
-                <boxGeometry args={[0.13, 0.13, 0.04]} />
-                <primitive object={chipGlowMaterial} attach="material" />
-              </mesh>
-            </group>
-          </group>
+            {mouthToShow === 'excited' && (
+              <group position={[0, -0.12, 1.225]} rotation={[0.1, 0, 0]}>
+                <mesh castShadow={false} receiveShadow={false}>
+                  <circleGeometry args={[0.22, 32, Math.PI, Math.PI]} />
+                  <primitive object={faceGlowMaterial} attach="material" />
+                </mesh>
+              </group>
+            )}
 
-          {/* Panel Hinge Door */}
-          <group ref={hingeRef} position={[-0.45, 0, 1.205]}>
-            <group
-              position={[0.45, 0, 0]}
-              onPointerDown={(e) => {
-                e.stopPropagation();
-                setIsPanelOpen(!isPanelOpen);
-              }}
-            >
-              <mesh rotation={[Math.PI / 2, 0, 0]}>
-                <cylinderGeometry args={[0.45, 0.45, 0.03, 32]} />
-                <primitive object={toonMaterial} attach="material" />
-              </mesh>
-              <mesh scale={[outlineScale[0], 1.0, outlineScale[2]]} rotation={[Math.PI / 2, 0, 0]}>
-                <cylinderGeometry args={[0.45, 0.45, 0.03, 32]} />
-                <primitive object={outlineMaterial} attach="material" />
-              </mesh>
-              <mesh position={[0.28, 0, 0.02]} rotation={[0, Math.PI / 2, 0]}>
-                <torusGeometry args={[0.045, 0.012, 8, 12]} />
-                <primitive object={buttonBaseMaterial} attach="material" />
-              </mesh>
-            </group>
-          </group>
-        </group>
+            {mouthToShow === 'sad' && (
+              <group position={[0, -0.15, 1.225]} rotation={[0.12, 0, 0]}>
+                <mesh castShadow={false} receiveShadow={false} rotation={[0, 0, 0]}>
+                  <torusGeometry args={[0.1, 0.022, 8, 24, Math.PI]} />
+                  <primitive object={faceGlowMaterial} attach="material" />
+                </mesh>
+              </group>
+            )}
 
-        {/* LED Base Ring */}
-        <group ref={ledGroupRef} position={[0, -0.96, 0]}>
-          {ledMode === 'wave' ? (
-            <group ref={ledRingRef}>
-              {Array.from({ length: 4 }).map((_, i) => {
-                const angle = (i * Math.PI) / 2;
-                const opacityFactor = 0.15 + (i / 3) * 0.85;
-                return (
-                  <mesh key={i} rotation={[Math.PI / 2, 0, angle]}>
-                    <torusGeometry args={[0.70, 0.042, 8, 16, Math.PI / 2]} />
-                    <meshBasicMaterial color={ledThreeColor} transparent opacity={opacityFactor} toneMapped={false} />
+            {mouthToShow === 'yawning' && (
+              <group ref={yawnMouthRef} position={[0, -0.18, 1.225]} rotation={[0.15, 0, 0]}>
+                {/* Yawn open geometry */}
+                <group ref={yawnMouthOpenRef}>
+                  <mesh castShadow={false} receiveShadow={false}>
+                    <ringGeometry args={[0.01, 0.07, 32]} />
+                    <primitive object={faceGlowMaterial} attach="material" />
                   </mesh>
-                );
-              })}
-            </group>
-          ) : (
-            <mesh ref={ledRingRef} rotation={[Math.PI / 2, 0, 0]}>
-              <torusGeometry args={[0.70, 0.042, 8, 48]} />
-              <meshBasicMaterial color={ledThreeColor} transparent opacity={ledMode === 'off' ? 0.05 : 1.0} toneMapped={false} />
-            </mesh>
-          )}
-          
-          <mesh rotation={[Math.PI / 2, 0, 0]}>
-            <circleGeometry args={[0.69, 32]} />
-            <primitive object={screenMaterial} attach="material" />
-          </mesh>
-          <mesh scale={[outlineScale[0], outlineScale[2], 1]} rotation={[Math.PI / 2, 0, 0]} position={[0, 0, -0.005]}>
-            <circleGeometry args={[0.69, 32]} />
-            <primitive object={outlineMaterial} attach="material" />
-          </mesh>
-
-          {ledMode !== 'off' && (
-            <pointLight ref={ledLightRef} position={[0, -0.05, 0]} intensity={1.8} distance={2.5} color={ledThreeColor} decay={1.2} />
-          )}
-        </group>
-
-        {/* -------------------------------------------------------------
-            REDESIGNED HERO COMPONENT: T0-T3 CASCADE CENTRAL BRAIN CHIPSET
-            Instead of cogs, we reveal layered square silicon computer chips
-            representing the local/cloud routing tiers, app cartridge plugins,
-            and the holographic privacy shield.
-        ------------------------------------------------------------- */}
-        {explodedProgress > 0.05 && (
-          <group>
-            {/* A. T0/T1 SENSORY REFLEX (Concave Sensor Ring, rises highest) */}
-            <group ref={lensRef} position={[0, explodedProgress * 2.3, 0]}>
-              {/* Outer circular bracket */}
-              <mesh>
-                <cylinderGeometry args={[0.8, 0.8, 0.04, 24]} />
-                <primitive object={sensoryMaterial} attach="material" />
-              </mesh>
-              <mesh scale={outlineScale}>
-                <cylinderGeometry args={[0.8, 0.8, 0.04, 24]} />
-                <primitive object={outlineMaterial} attach="material" />
-              </mesh>
-
-              {/* Glowing Green Sensory Path lines */}
-              <mesh position={[0, 0.02, 0]} rotation={[Math.PI / 2, 0, 0]}>
-                <torusGeometry args={[0.68, 0.015, 8, 32]} />
-                <meshBasicMaterial color="#3bf574" toneMapped={false} />
-              </mesh>
-              <mesh position={[0, 0.02, 0]} rotation={[Math.PI / 2, 0, Math.PI / 4]}>
-                <torusGeometry args={[0.45, 0.012, 8, 32]} />
-                <meshBasicMaterial color="#3bf574" toneMapped={false} />
-              </mesh>
-
-              {/* Central capture core - clear physical-like lens representing acoustic captures */}
-              <mesh position={[0, -0.01, 0]}>
-                <cylinderGeometry args={[0.26, 0.26, 0.05, 16]} />
-                <meshPhysicalMaterial
-                  color="#3bf574"
-                  transmission={0.9}
-                  roughness={0.1}
-                  thickness={0.1}
-                  transparent
-                  opacity={0.7}
-                />
-              </mesh>
-            </group>
-
-            {/* B. T2 EDGE MASTER CORE - SLM / AZ3 PROCESSOR (Square mecha chip block, sits center) */}
-            <group ref={gearLargeRef} position={[0, explodedProgress * 1.5, 0]}>
-              {/* Square Silicon Board */}
-              <mesh>
-                <boxGeometry args={[0.85, 0.06, 0.85]} />
-                <primitive object={masterCoreMaterial} attach="material" />
-              </mesh>
-              <mesh scale={outlineScale}>
-                <boxGeometry args={[0.85, 0.06, 0.85]} />
-                <primitive object={outlineMaterial} attach="material" />
-              </mesh>
-
-              {/* Central pulsing amber core - "Hearth Butler Core" (Home-Sense) */}
-              <mesh position={[0, 0.04, 0]}>
-                <boxGeometry args={[0.32, 0.04, 0.32]} />
-                <primitive object={chipGlowMaterial} attach="material" />
-              </mesh>
-              <mesh position={[0, 0.04, 0]} scale={outlineScale}>
-                <boxGeometry args={[0.32, 0.04, 0.32]} />
-                <primitive object={outlineMaterial} attach="material" />
-              </mesh>
-
-              {/* Surrounding gold pins/circuits */}
-              {Array.from({ length: 4 }).map((_, i) => {
-                const x = ((i % 2) - 0.5) * 0.55;
-                const z = (Math.floor(i / 2) - 0.5) * 0.55;
-                return (
-                  <mesh key={i} position={[x, 0.035, z]}>
-                    <boxGeometry args={[0.12, 0.02, 0.12]} />
-                    <meshBasicMaterial color="#ffffff" />
-                  </mesh>
-                );
-              })}
-
-              {/* Modular App Cartridge Slot - holds the "App Vault" plugin card */}
-              <group position={[0, 0.01, 0]}>
-                {/* C. APP VAULT PLUGINS - Khata/Swiggy Cartridge slides out to the right */}
-                <group ref={gearSmallRef} position={[0.4 + explodedProgress * 0.9, 0.02, 0]}>
-                  {/* Cartridge board */}
-                  <mesh>
-                    <boxGeometry args={[0.42, 0.04, 0.52]} />
-                    <primitive object={appCartridgeMaterial} attach="material" />
-                  </mesh>
-                  <mesh scale={outlineScale}>
-                    <boxGeometry args={[0.42, 0.04, 0.52]} />
-                    <primitive object={outlineMaterial} attach="material" />
-                  </mesh>
-                  
-                  {/* Golden connection teeth */}
-                  <mesh position={[-0.22, 0, 0]}>
-                    <boxGeometry args={[0.04, 0.03, 0.35]} />
-                    <meshBasicMaterial color="#f1c40f" />
-                  </mesh>
-
-                  {/* Tiny text label indicator (blue block node) */}
-                  <mesh position={[0.05, 0.025, 0]}>
-                    <boxGeometry args={[0.2, 0.02, 0.2]} />
-                    <meshBasicMaterial color="#00f3ff" toneMapped={false} />
+                </group>
+                {/* Yawn closed / sleeping geometry */}
+                <group ref={yawnMouthClosedRef}>
+                  <mesh castShadow={false} receiveShadow={false}>
+                    <ringGeometry args={[0.02, 0.045, 16]} />
+                    <primitive object={faceGlowMaterial} attach="material" />
                   </mesh>
                 </group>
               </group>
-            </group>
+            )}
+          </group>
 
-            {/* D. T3 CLOUD SYNAPSE - BEDROCK (Dark charcoal database plate, sits lower) */}
-            <group ref={baseRef} position={[0, explodedProgress * 0.8, 0]}>
-              {/* Large Dark Silicon Base Plate */}
-              <mesh>
-                <boxGeometry args={[1.0, 0.06, 1.0]} />
-                <primitive object={synapseMaterial} attach="material" />
+          {/* 4. SIDE/BACK ELECTRICAL HATCH (180 degrees behind face) */}
+          <group rotation={[0, Math.PI, 0]}>
+            {/* Circular Cavity Housing */}
+            <group position={[0, 0, 1.05]}>
+              <mesh rotation={[Math.PI / 2, 0, 0]}>
+                <cylinderGeometry args={[0.46, 0.46, 0.32, 32]} />
+                <primitive object={screenMaterial} attach="material" />
               </mesh>
-              <mesh scale={outlineScale}>
-                <boxGeometry args={[1.0, 0.06, 1.0]} />
+              <mesh scale={outlineScale} rotation={[Math.PI / 2, 0, 0]}>
+                <cylinderGeometry args={[0.46, 0.46, 0.32, 32]} />
                 <primitive object={outlineMaterial} attach="material" />
               </mesh>
 
-              {/* Synaptic Purple Paths */}
-              <mesh position={[0, 0.032, 0]} rotation={[Math.PI / 2, 0, 0]}>
-                <planeGeometry args={[0.9, 0.9]} />
-                <meshBasicMaterial color="#08080a" />
+              {/* Circular green Motherboard PCB */}
+              <mesh position={[0, 0, -0.1]} rotation={[Math.PI / 2, 0, 0]}>
+                <cylinderGeometry args={[0.43, 0.43, 0.02, 32]} />
+                <primitive object={buttonBaseMaterial} attach="material" />
               </mesh>
-              
-              {/* Glowing Purple node centers */}
-              {[-0.3, 0.3].map((x, xi) => (
-                [-0.3, 0.3].map((z, zi) => (
-                  <mesh key={`${xi}-${zi}`} position={[x, 0.038, z]}>
-                    <cylinderGeometry args={[0.08, 0.08, 0.01, 8]} />
-                    <meshBasicMaterial color="#d254ff" toneMapped={false} />
+
+              {/* Wires */}
+              <mesh position={[0.15, -0.12, -0.09]} rotation={[0, 0, Math.PI / 2]}>
+                <torusGeometry args={[0.08, 0.015, 6, 12, Math.PI]} />
+                <meshBasicMaterial 
+                  color="#e05353" 
+                  transparent={dismantleMode && alexaOpacity < 1.0}
+                  opacity={alexaOpacity}
+                  depthWrite={!(dismantleMode && alexaOpacity < 1.0)}
+                />
+              </mesh>
+              <mesh position={[0.08, -0.05, -0.09]} rotation={[0, 0, -Math.PI / 4]}>
+                <torusGeometry args={[0.1, 0.015, 6, 12, Math.PI]} />
+                <meshBasicMaterial 
+                  color="#3da5e0" 
+                  transparent={dismantleMode && alexaOpacity < 1.0}
+                  opacity={alexaOpacity}
+                  depthWrite={!(dismantleMode && alexaOpacity < 1.0)}
+                />
+              </mesh>
+
+              {/* 3D POP-UP PROCESSOR CHIP */}
+              <group ref={chipRef} position={[0, 0, -0.06]}>
+                <mesh>
+                  <boxGeometry args={[0.26, 0.26, 0.06]} />
+                  <primitive object={screenMaterial} attach="material" />
+                </mesh>
+                <mesh scale={outlineScale}>
+                  <boxGeometry args={[0.26, 0.26, 0.06]} />
+                  <primitive object={outlineMaterial} attach="material" />
+                </mesh>
+
+                <mesh position={[0, 0, 0.02]}>
+                  <boxGeometry args={[0.13, 0.13, 0.04]} />
+                  <primitive object={chipGlowMaterial} attach="material" />
+                </mesh>
+
+                {[
+                  [-0.08, -0.08],
+                  [-0.08, 0.08],
+                  [0.08, -0.08],
+                  [0.08, 0.08],
+                ].map(([x, y], i) => (
+                  <mesh key={i} position={[x, y, 0.01]}>
+                    <boxGeometry args={[0.03, 0.03, 0.045]} />
+                    <primitive object={chipGlowMaterial} attach="material" />
                   </mesh>
-                ))
-              ))}
+                ))}
+              </group>
             </group>
 
-            {/* E. HOLOGRAPHIC PRIVACY SHIELD (Glowing cyan ring rotating around the local T2 core) */}
-            <group ref={privacyShieldRef} position={[0, explodedProgress * 1.5, 0]}>
-              <mesh>
-                <torusGeometry args={[1.05, 0.025, 8, 48]} />
-                <meshBasicMaterial color="#00f3ff" transparent opacity={0.6} toneMapped={false} />
-              </mesh>
-              <mesh rotation={[Math.PI / 2, 0, 0]}>
-                <torusGeometry args={[1.05, 0.015, 8, 48]} />
-                <meshBasicMaterial color="#00f3ff" transparent opacity={0.3} toneMapped={false} />
-              </mesh>
+            {/* Door Hinge */}
+            <group ref={hingeRef} position={[-0.45, 0, 1.205]}>
+              <group
+                position={[0.45, 0, 0]}
+                onPointerOver={(e) => {
+                  e.stopPropagation();
+                  document.body.style.cursor = 'pointer';
+                }}
+                onPointerOut={(e) => {
+                  e.stopPropagation();
+                  document.body.style.cursor = 'default';
+                }}
+                onPointerDown={(e) => {
+                  e.stopPropagation();
+                  setIsPanelOpen(!isPanelOpen);
+                }}
+              >
+                <mesh rotation={[Math.PI / 2, 0, 0]}>
+                  <cylinderGeometry args={[0.45, 0.45, 0.03, 32]} />
+                  <primitive object={toonMaterial} attach="material" />
+                </mesh>
+                <mesh scale={[outlineScale[0], 1.0, outlineScale[2]]} rotation={[Math.PI / 2, 0, 0]}>
+                  <cylinderGeometry args={[0.45, 0.45, 0.03, 32]} />
+                  <primitive object={outlineMaterial} attach="material" />
+                </mesh>
+
+                <mesh position={[0.28, 0, 0.02]} rotation={[0, Math.PI / 2, 0]}>
+                  <torusGeometry args={[0.045, 0.012, 8, 12]} />
+                  <primitive object={buttonBaseMaterial} attach="material" />
+                </mesh>
+                <mesh position={[0.28, 0, 0.02]} scale={outlineScale} rotation={[0, Math.PI / 2, 0]}>
+                  <torusGeometry args={[0.045, 0.012, 8, 12]} />
+                  <primitive object={outlineMaterial} attach="material" />
+                </mesh>
+              </group>
             </group>
           </group>
+        </group>
+      </group>
+
+      {/* 5. GLOWING BASE LIGHT RING (At the flat sliced bottom, Y = -0.96) */}
+      <group ref={ledGroupRef} position={[0, -0.96 + yLed, 0]} visible={alexaOpacity > 0}>
+        {/* Glow Ring Torus segments for Wave Mode vs Normal */}
+        {ledMode === 'wave' ? (
+          <group rotation={[-Math.PI, 0, 0]}>
+            <group ref={ledRingRef}>
+              {Array.from({ length: 4 }).map((_, i) => {
+                const angle = (i * Math.PI) / 2;
+                const opacityFactor = 0.15 + (i / 3) * 0.85; // smooth trailing gradient: 0.15, 0.43, 0.71, 1.0
+                return (
+                  <mesh key={i} rotation={[Math.PI / 2, 0, angle]}>
+                    <torusGeometry args={[0.70, 0.042, 8, 16, Math.PI / 2]} />
+                    <meshBasicMaterial
+                      color={ledThreeColor}
+                      transparent
+                      opacity={opacityFactor * alexaOpacity}
+                      toneMapped={false}
+                    />
+                  </mesh>
+                );
+              })}
+            </group>
+          </group>
+        ) : (
+          <mesh ref={ledRingRef} rotation={[Math.PI / 2, 0, 0]}>
+            <torusGeometry args={[0.70, 0.042, 8, 48]} />
+            <meshBasicMaterial
+              color={ledThreeColor}
+              transparent
+              opacity={(ledMode === 'off' ? 0.05 : 1.0) * alexaOpacity}
+              toneMapped={false}
+            />
+          </mesh>
+        )}
+
+        {/* Flat Bottom Bezel Cover */}
+        <mesh rotation={[Math.PI / 2, 0, 0]} visible={alexaOpacity > 0.1}>
+          <circleGeometry args={[0.69, 32]} />
+          <primitive object={screenMaterial} attach="material" />
+        </mesh>
+        {/* Outline for the base foot */}
+        <mesh scale={[outlineScale[0], outlineScale[2], 1]} rotation={[Math.PI / 2, 0, 0]} position={[0, 0, -0.005]}>
+          <circleGeometry args={[0.69, 32]} />
+          <primitive object={outlineMaterial} attach="material" />
+        </mesh>
+
+        {/* Real Light projection onto the pedestal floor (pulses with mode) */}
+        {ledMode !== 'off' && (
+          <pointLight
+            ref={ledLightRef}
+            position={[0, -0.05, 0]}
+            intensity={1.8 * alexaOpacity}
+            distance={2.5}
+            color={ledThreeColor}
+            decay={1.2}
+          />
         )}
       </group>
     </group>
   );
 }
+

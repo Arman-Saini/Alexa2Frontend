@@ -46,7 +46,7 @@ export function SmartLights() {
     () =>
       placedObjects.filter(
         (o) =>
-          (o.type === 'smart-bulb' || o.type === 'ceiling-fan') &&
+          (o.type === 'smart-bulb' || o.type === 'ceiling-fan' || o.type === 'floor-lamp') &&
           o.alexaDeviceState.isOn
       ),
     [placedObjects]
@@ -61,9 +61,19 @@ export function SmartLights() {
         const color = kelvinToHex(colorTemp);
         // Intensity scales with brightness; ceiling bulbs cast down
         const intensity = brightness * 2.8;
+
+        let lightY = BULB_LIGHT_Y;
+        if (obj.type === 'smart-bulb') {
+          lightY = (obj.position.y ?? 0) + 2.7 - 0.59;
+        } else if (obj.type === 'ceiling-fan') {
+          lightY = (obj.position.y ?? 0) + 2.7 - 0.1;
+        } else if (obj.type === 'floor-lamp') {
+          lightY = (obj.position.y ?? 0) + 1.5;
+        }
+
         const pos: [number, number, number] = [
           obj.position.x,
-          BULB_LIGHT_Y,
+          lightY,
           obj.position.z,
         ];
 

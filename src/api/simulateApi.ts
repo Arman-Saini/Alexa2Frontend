@@ -27,6 +27,9 @@ export const simulateApi = {
 
   voiceCommand: (utterance: string, homeId = env.HOME_ID) =>
     apiClient.post<any>(endpoints.simulateVoiceCommand, { home_id: homeId, utterance }),
+
+  simulateInventoryDrop: (homeId = env.HOME_ID) =>
+    apiClient.post<any>(endpoints.simulateInventoryDrop, { home_id: homeId }),
 };
 
 export type SimulateEndpoint = 'studyMode' | 'nightSafetyCheck' | 'powerCut';

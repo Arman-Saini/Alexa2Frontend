@@ -81,6 +81,9 @@ export function PixelDog() {
 // ── Robot vacuum , slowly patrols the living-room floor ───────────────────────
 function RobotVacuum() {
   const ref = useRef<THREE.Group>(null);
+  const timeRef = useRef(0);
+  const vacuumOn = useAppStore((s) => s.vacuumOn);
+
   // Boustrophedon (lawn-mower) sweep across living room x[-3,13] z[-10,2]
   const path = [
     new THREE.Vector3(-1.5, 0, -9),
@@ -96,9 +99,12 @@ function RobotVacuum() {
     new THREE.Vector3(11.5, 0, -9), // loop back
   ];
 
-  useFrame(({ clock }) => {
+  useFrame((_, delta) => {
     if (!ref.current) return;
-    const t = (clock.getElapsedTime() * 0.025) % 1;
+    if (vacuumOn) {
+      timeRef.current += delta;
+    }
+    const t = (timeRef.current * 0.025) % 1;
     const seg = t * path.length;
     const i = Math.floor(seg);
     const f = seg - i;
@@ -117,7 +123,12 @@ function RobotVacuum() {
       {/* status light */}
       <mesh position={[0, 0.1, 0]}>
         <cylinderGeometry args={[0.05, 0.05, 0.02, 16]} />
-        <meshStandardMaterial color="#00C8FF" emissive="#00C8FF" emissiveIntensity={2} toneMapped={false} />
+        <meshStandardMaterial
+          color={vacuumOn ? "#00C8FF" : "#FF3B30"}
+          emissive={vacuumOn ? "#00C8FF" : "#FF3B30"}
+          emissiveIntensity={vacuumOn ? 2 : 0.5}
+          toneMapped={false}
+        />
       </mesh>
     </group>
   );

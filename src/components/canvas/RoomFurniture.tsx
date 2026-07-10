@@ -103,6 +103,25 @@ function Whiteboard({ pos, rot, size }: { pos: [number, number, number]; rot: nu
   );
 }
 
+function DogBowl({ fed }: { fed: boolean }) {
+  return (
+    <group position={[0.32, 0, 0.32]}>
+      {/* Bowl outer */}
+      <mesh position={[0, 0.04, 0]} castShadow receiveShadow>
+        <cylinderGeometry args={[0.12, 0.1, 0.08, 16]} />
+        <meshStandardMaterial color="#FF5A50" roughness={0.3} metalness={0.2} />
+      </mesh>
+      {/* Food inside */}
+      {fed && (
+        <mesh position={[0, 0.065, 0]}>
+          <cylinderGeometry args={[0.09, 0.09, 0.03, 12]} />
+          <meshStandardMaterial color="#8B5A2B" roughness={0.9} />
+        </mesh>
+      )}
+    </group>
+  );
+}
+
 function Piece({ model, pos, rot, size, yOffset, selected, onClick }: {
   id?: string;
   model: string;
@@ -115,12 +134,16 @@ function Piece({ model, pos, rot, size, yOffset, selected, onClick }: {
 }) {
   const finalPos: [number, number, number] = [pos[0], pos[1] + (yOffset ?? 0), pos[2]];
   if (model === 'whiteboard') return <Whiteboard pos={finalPos} rot={rot} size={size} />;
-  if (model === 'easter:dog') return (
-    <group position={finalPos} rotation={[0, rot, 0]} onClick={onClick}>
-      <PixelDog />
-      {selected && <mesh position={[0, 0.01, 0]} rotation={[-Math.PI/2,0,0]}><ringGeometry args={[0.35,0.42,32]} /><meshBasicMaterial color="#00BFFF" transparent opacity={0.8} depthWrite={false} /></mesh>}
-    </group>
-  );
+  if (model === 'easter:dog') {
+    const dogFed = useAppStore((s) => s.dogFed);
+    return (
+      <group position={finalPos} rotation={[0, rot, 0]} onClick={onClick}>
+        <PixelDog />
+        <DogBowl fed={dogFed} />
+        {selected && <mesh position={[0, 0.01, 0]} rotation={[-Math.PI/2,0,0]}><ringGeometry args={[0.35,0.42,32]} /><meshBasicMaterial color="#00BFFF" transparent opacity={0.8} depthWrite={false} /></mesh>}
+      </group>
+    );
+  }
   if (model === 'easter:cat') return (
     <group position={finalPos} rotation={[0, rot, 0]} onClick={onClick}>
       <SleepingCat />

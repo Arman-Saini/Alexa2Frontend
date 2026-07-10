@@ -3,7 +3,7 @@ import { processCommand } from '../store/commandProcessor';
 import {
   ALL_DEVICES, LIVING_ROOM_BULB, BEDROOM_BULB, KITCHEN_BULB,
   LIVING_ROOM_FAN, BEDROOM_FAN, LIVING_ROOM_TV,
-  THERMOSTAT, SMART_LOCK, KITCHEN_PLUG, AIR_PURIFIER, LIVING_ROOM_ECHO,
+  THERMOSTAT, SMART_LOCK, KITCHEN_PLUG, AIR_PURIFIER,
 } from './fixtures';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────

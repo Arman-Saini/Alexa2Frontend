@@ -41,7 +41,11 @@ export function ActShell() {
           animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
           exit={{ opacity: 0, scale: 0.96, filter: 'blur(8px)' }}
           transition={ACT_TRANSITION}
-          style={{ position: 'absolute', inset: 0, pointerEvents: 'auto' }}
+          style={{
+            position: 'absolute',
+            inset: 0,
+            pointerEvents: typeof currentAct === 'number' ? 'auto' : 'none',
+          }}
         >
           {currentAct === 0 && <Act0_Resting />}
           {currentAct === 1 && <Act1_Sensing />}

@@ -1,150 +1,103 @@
-// useMic , Chrome/Edge Web Speech API with continuous listening mode.
-// Fixes: (1) restart chain bug where fresh.onend captured stale rec ref,
-//        (2) immediate onend by pre-requesting getUserMedia permission.
-
 import { useState, useCallback, useRef } from 'react';
+import { voiceApi } from '../api/voiceApi';
+import { env } from '../config/env';
 
-interface SpeechRecognition extends EventTarget {
-  lang: string;
-  continuous: boolean;
-  interimResults: boolean;
-  maxAlternatives: number;
-  onstart: ((this: SpeechRecognition, ev: Event) => void) | null;
-  onend: ((this: SpeechRecognition, ev: Event) => void) | null;
-  onresult: ((this: SpeechRecognition, ev: SpeechRecognitionEvent) => void) | null;
-  onerror: ((this: SpeechRecognition, ev: SpeechRecognitionErrorEvent) => void) | null;
-  start(): void;
-  stop(): void;
-}
-
-type MicMode = 'idle' | 'listening';
-
-function getSpeechRecCtor() {
-  const w = window as typeof window & {
-    webkitSpeechRecognition?: new () => SpeechRecognition;
-    SpeechRecognition?: new () => SpeechRecognition;
-  };
-  return w.webkitSpeechRecognition ?? w.SpeechRecognition ?? null;
-}
+type MicMode = 'idle' | 'listening' | 'processing';
 
 export function useMic(onFinalTranscript: (text: string) => void) {
-  const [mode,     setMode]     = useState<MicMode>('idle');
+  const [mode, setMode] = useState<MicMode>('idle');
   const [liveText, setLiveText] = useState('');
-  const [error,    setError]    = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
-  const activeRef      = useRef(false);   // true while we want to keep listening
-  const finalBufferRef = useRef('');
-  const onFinalRef     = useRef(onFinalTranscript);
-  onFinalRef.current   = onFinalTranscript;
-
-  // Attach handlers to any SpeechRecognition instance.
-  // Uses activeRef (not a captured rec) so the restart chain never breaks.
-  const attachHandlers = useCallback((rec: SpeechRecognition) => {
-    rec.onstart = () => setMode('listening');
-
-    rec.onresult = (e: SpeechRecognitionEvent) => {
-      let interim = '';
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        const seg = e.results[i][0].transcript;
-        if (e.results[i].isFinal) finalBufferRef.current += seg + ' ';
-        else interim += seg;
-      }
-      setLiveText(finalBufferRef.current + interim);
-    };
-
-    rec.onerror = (e: SpeechRecognitionErrorEvent) => {
-      if (e.error === 'no-speech') return;
-      if (e.error === 'aborted')   return;
-      if (e.error === 'not-allowed') {
-        setError('Microphone access denied. Click the lock icon in the address bar to allow it.');
-        activeRef.current = false;
-        setMode('idle');
-      } else if (e.error === 'network') {
-        setError('Speech recognition needs internet.');
-      } else {
-        setError(`Recognition error: ${e.error}. Try refreshing.`);
-      }
-    };
-
-    // onend fires when Chrome's session times out (~60s) or on any stop.
-    // If we still want to listen (activeRef = true), spin up a fresh instance.
-    rec.onend = () => {
-      if (!activeRef.current) return;   // intentional stop — do nothing
-      recognitionRef.current = null;
-      const SpeechRec = getSpeechRecCtor();
-      if (!SpeechRec) return;
-      const fresh = new SpeechRec();
-      fresh.lang           = 'en-US';
-      fresh.continuous     = true;
-      fresh.interimResults = true;
-      fresh.maxAlternatives = 1;
-      attachHandlers(fresh);            // same function, no stale rec captured
-      recognitionRef.current = fresh;
-      try { fresh.start(); } catch { /* retry next onend */ }
-    };
-  }, []);
-
-  const stop = useCallback((shouldProcess = true) => {
-    activeRef.current = false;
-    const rec = recognitionRef.current;
-    if (rec) {
-      rec.onend = null;  // prevent restart handler from firing
-      try { rec.stop(); } catch { /* already stopped */ }
-      recognitionRef.current = null;
-    }
-    setMode('idle');
-    setLiveText('');
-
-    const text = finalBufferRef.current.trim();
-    finalBufferRef.current = '';
-    if (shouldProcess && text) onFinalRef.current(text);
-  }, []);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const onFinalRef = useRef(onFinalTranscript);
+  onFinalRef.current = onFinalTranscript;
 
   const start = useCallback(async () => {
-    if (activeRef.current) return;
-
-    const SpeechRec = getSpeechRecCtor();
-    if (!SpeechRec) {
-      setError('Speech recognition requires Chrome or Edge.');
-      return;
-    }
-
-    // Pre-request mic permission so Chrome doesn't fire onend immediately.
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      stream.getTracks().forEach(t => t.stop());  // release immediately, just needed for permission
-    } catch {
-      setError('Microphone access denied. Allow microphone access in your browser.');
-      return;
-    }
-
+    if (mode !== 'idle') return;
     setError(null);
-    setLiveText('');
-    finalBufferRef.current = '';
-    activeRef.current = true;
-
-    const rec = new SpeechRec();
-    rec.lang            = 'en-US';
-    rec.continuous      = true;
-    rec.interimResults  = true;
-    rec.maxAlternatives = 1;
-    attachHandlers(rec);
-    recognitionRef.current = rec;
+    setLiveText('Recording...');
+    audioChunksRef.current = [];
 
     try {
-      rec.start();
-    } catch {
-      setError('Could not start microphone. Please try again.');
-      activeRef.current = false;
-      recognitionRef.current = null;
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Microphone media devices not supported in this browser context.');
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      
+      const options = { mimeType: 'audio/webm' };
+      let mediaRecorder: MediaRecorder;
+      try {
+        mediaRecorder = new MediaRecorder(stream, options);
+      } catch (e) {
+        // Fallback to default if webm is not supported (e.g. Safari / mobile browser)
+        mediaRecorder = new MediaRecorder(stream);
+      }
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        // Stop all tracks on the stream to release the mic
+        stream.getTracks().forEach(t => t.stop());
+
+        setMode('processing');
+        setLiveText('Transcribing...');
+
+        try {
+          const audioBlob = new Blob(audioChunksRef.current, { type: mediaRecorder.mimeType });
+          const res = await voiceApi.transcribeAudio(audioBlob, false, env.HOME_ID);
+          setMode('idle');
+          setLiveText('');
+          
+          if (res && res.transcript) {
+            onFinalRef.current(res.transcript);
+          } else {
+            setError('No speech detected.');
+          }
+        } catch (err: any) {
+          console.error('[useMic] Transcription failed:', err);
+          setError(`Transcription failed: ${err.message || err}`);
+          alert(`Backend STT error: ${err.message || err}`);
+          setMode('idle');
+          setLiveText('');
+        }
+      };
+
+      mediaRecorderRef.current = mediaRecorder;
+      mediaRecorder.start();
+      setMode('listening');
+    } catch (e: any) {
+      console.error('[useMic] Start failed:', e);
+      setError(`Microphone access error: ${e.message || e}`);
+      alert(`Microphone access error: ${e.message || e}`);
+      setMode('idle');
+      setLiveText('');
     }
-  }, [attachHandlers]);
+  }, [mode]);
+
+  const stop = useCallback(() => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+  }, []);
 
   const toggle = useCallback(() => {
-    if (mode === 'listening') stop(true);
-    else start();
+    if (mode === 'listening') stop();
+    else if (mode === 'idle') start();
   }, [mode, start, stop]);
 
-  return { listening: mode === 'listening', liveText, error, toggle, stop, start };
+  return { 
+    listening: mode === 'listening', 
+    liveText: mode === 'listening' ? 'Listening...' : liveText, 
+    error, 
+    toggle, 
+    stop, 
+    start,
+    isProcessing: mode === 'processing'
+  };
 }

@@ -51,6 +51,11 @@ export function CuteAlexaModel({
   const lookXRef = useRef(0);
   const lookYRef = useRef(0);
 
+  // Expression-change pop squash-and-stretch
+  const expressionPopRef = useRef(0); // 0 = idle, >0 = pop phase (t since pop)
+  const prevExpressionRef = useRef(expression);
+  const popStartTimeRef = useRef(-1); // three.js clock time when pop began
+
   // Colors parsed to THREE formats
   const mainColor = useMemo(() => new THREE.Color(bodyColor), [bodyColor]);
   const outlineColor = useMemo(() => new THREE.Color('#141312'), []);
@@ -73,6 +78,13 @@ export function CuteAlexaModel({
   const [showDizzyCooldown, setShowDizzyCooldown] = useState(false);
   const showDizzyCooldownRef = useRef(false);
 
+  // Trigger pop when expression changes
+  useEffect(() => {
+    if (prevExpressionRef.current !== expression) {
+      prevExpressionRef.current = expression;
+      expressionPopRef.current = 1; // flag: pop pending, value used as start sentinel
+    }
+  }, [expression]);
   useEffect(() => {
     if (explodedProgress > 0) {
       setShowDizzyCooldown(true);
@@ -184,7 +196,30 @@ export function CuteAlexaModel({
         robotGroupRef.current.position.y = 1.1 + hoverHeight;
         robotGroupRef.current.rotation.x = hoverTiltX + (isHovered ? 0.03 : 0);
         robotGroupRef.current.rotation.z = hoverTiltZ;
-        robotGroupRef.current.scale.set(1, 1, 1);
+
+        // Expression pop squash-and-stretch
+        let popScaleX = 1, popScaleY = 1, popScaleZ = 1;
+        if (expressionPopRef.current === 1) {
+          // Pop just triggered — record start time
+          popStartTimeRef.current = t;
+          expressionPopRef.current = 2; // running
+        }
+        if (expressionPopRef.current === 2) {
+          const POP_DUR = 0.45;
+          const elapsed = t - popStartTimeRef.current;
+          const p = Math.min(elapsed / POP_DUR, 1.0);
+          if (p < 1.0) {
+            // Phase A (0→0.35): squash then stretch
+            const wave = Math.sin(p * Math.PI * 2.2) * (1.0 - p);
+            popScaleY = 1.0 + wave * 0.18; // stretches then squashes back
+            popScaleX = 1.0 - wave * 0.09;
+            popScaleZ = 1.0 - wave * 0.09;
+          } else {
+            expressionPopRef.current = 0; // done
+          }
+        }
+
+        robotGroupRef.current.scale.set(popScaleX, popScaleY, popScaleZ);
       }
     } else if (robotGroupRef.current) {
       // In exploded view, reset transformations for clarity
@@ -207,21 +242,21 @@ export function CuteAlexaModel({
         const ledMaterial = ledRingRef.current.material as THREE.MeshBasicMaterial;
         if (ledMaterial) ledMaterial.opacity = 0.05;
         if (ledLightRef.current) ledLightRef.current.intensity = 0;
-        ledRingRef.current.rotation.z = 0;
+        ledRingRef.current.rotation.y = 0;
       } else if (ledMode === 'solid') {
         const ledMaterial = ledRingRef.current.material as THREE.MeshBasicMaterial;
         if (ledMaterial) ledMaterial.opacity = 1.0;
         if (ledLightRef.current) ledLightRef.current.intensity = 2.0;
-        ledRingRef.current.rotation.z = 0;
+        ledRingRef.current.rotation.y = 0;
       } else if (ledMode === 'pulse') {
         const ledMaterial = ledRingRef.current.material as THREE.MeshBasicMaterial;
         const pulse = 0.5 + Math.sin(t * 3.5) * 0.5;
         if (ledMaterial) ledMaterial.opacity = 0.3 + pulse * 0.7;
         if (ledLightRef.current) ledLightRef.current.intensity = 0.4 + pulse * 1.6;
-        ledRingRef.current.rotation.z = 0;
+        ledRingRef.current.rotation.y = 0;
       } else if (ledMode === 'wave') {
         // Rotating chase pattern (group)
-        ledRingRef.current.rotation.z = -t * 5.0; // spin speed
+        ledRingRef.current.rotation.y = -t * 5.0; // spin speed
         if (ledLightRef.current) {
           // constant bright pulse for the light source
           ledLightRef.current.intensity = 1.8;
@@ -465,6 +500,13 @@ export function CuteAlexaModel({
     });
   }, [mainColor]);
 
+  const doubleSidedToonMaterial = useMemo(() => {
+    return new THREE.MeshBasicMaterial({
+      color: mainColor,
+      side: THREE.DoubleSide,
+    });
+  }, [mainColor]);
+
   const outlineMaterial = useMemo(() => {
     return new THREE.MeshBasicMaterial({
       color: outlineColor,
@@ -538,20 +580,10 @@ export function CuteAlexaModel({
                 <>
                   <mesh>
                     <sphereGeometry args={[1.2, 32, 32, 0, Math.PI * 2, 0, Math.PI / 2]} />
-                    <primitive object={toonMaterial} attach="material" />
+                    <primitive object={doubleSidedToonMaterial} attach="material" />
                   </mesh>
                   <mesh scale={outlineScale}>
                     <sphereGeometry args={[1.2, 32, 32, 0, Math.PI * 2, 0, Math.PI / 2]} />
-                    <primitive object={outlineMaterial} attach="material" />
-                  </mesh>
-                  
-                  {/* Flat Cap at the bottom of top hemisphere (visible when split) */}
-                  <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
-                    <circleGeometry args={[1.2, 32]} />
-                    <primitive object={toonMaterial} attach="material" />
-                  </mesh>
-                  <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, 0, 0]} scale={[outlineScale[0], outlineScale[1], 1]}>
-                    <circleGeometry args={[1.2, 32]} />
                     <primitive object={outlineMaterial} attach="material" />
                   </mesh>
                 </>
@@ -988,22 +1020,24 @@ export function CuteAlexaModel({
       <group ref={ledGroupRef} position={[0, -0.96 + yLed, 0]}>
         {/* Glow Ring Torus segments for Wave Mode vs Normal */}
         {ledMode === 'wave' ? (
-          <group ref={ledRingRef}>
-            {Array.from({ length: 4 }).map((_, i) => {
-              const angle = (i * Math.PI) / 2;
-              const opacityFactor = 0.15 + (i / 3) * 0.85; // smooth trailing gradient: 0.15, 0.43, 0.71, 1.0
-              return (
-                <mesh key={i} rotation={[Math.PI / 2, 0, angle]}>
-                  <torusGeometry args={[0.70, 0.042, 8, 16, Math.PI / 2]} />
-                  <meshBasicMaterial
-                    color={ledThreeColor}
-                    transparent
-                    opacity={opacityFactor}
-                    toneMapped={false}
-                  />
-                </mesh>
-              );
-            })}
+          <group rotation={[-Math.PI, 0, 0]}>
+            <group ref={ledRingRef}>
+              {Array.from({ length: 4 }).map((_, i) => {
+                const angle = (i * Math.PI) / 2;
+                const opacityFactor = 0.15 + (i / 3) * 0.85; // smooth trailing gradient: 0.15, 0.43, 0.71, 1.0
+                return (
+                  <mesh key={i} rotation={[Math.PI / 2, 0, angle]}>
+                    <torusGeometry args={[0.70, 0.042, 8, 16, Math.PI / 2]} />
+                    <meshBasicMaterial
+                      color={ledThreeColor}
+                      transparent
+                      opacity={opacityFactor}
+                      toneMapped={false}
+                    />
+                  </mesh>
+                );
+              })}
+            </group>
           </group>
         ) : (
           <mesh ref={ledRingRef} rotation={[Math.PI / 2, 0, 0]}>
@@ -1016,7 +1050,7 @@ export function CuteAlexaModel({
             />
           </mesh>
         )}
-        
+
         {/* Flat Bottom Bezel Cover */}
         <mesh rotation={[Math.PI / 2, 0, 0]}>
           <circleGeometry args={[0.69, 32]} />

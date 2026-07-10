@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useTourStore } from '../../store/tourStore';
 import { useActStore } from '../../store/actStore';
+import { useLiquidGlass } from '../../hooks/useLiquidGlass';
 
 const PROMPT = 'Turn off the kitchen light';
 
@@ -10,11 +11,18 @@ const PROMPT = 'Turn off the kitchen light';
  * scenario diagram, this beat is the live thing actually happening.
  */
 export function Act3_ScenarioWalkthrough() {
-  const baselineReplyAt = useRef<number | null>(useTourStore.getState().lastReplyAt);
+  // Captured *after* our own prompt bubble below (not at render time): that
+  // setReply call itself advances lastReplyAt, so freezing the baseline
+  // before it would make the very next unrelated tourStore update (e.g. the
+  // mic's isListening toggle) look like "a reply changed" and fire early.
+  const baselineReplyAt = useRef<number | null>(null);
+  const glassRef = useRef<HTMLDivElement>(null);
+  useLiquidGlass(glassRef, { borderRadius: 24, scale: -100, frost: 0.08 });
 
   useEffect(() => {
     useTourStore.getState().setReply(`Try saying: "${PROMPT}"`);
     useTourStore.getState().setDockExpanded(true);
+    baselineReplyAt.current = useTourStore.getState().lastReplyAt;
   }, []);
 
   useEffect(() => {
@@ -37,8 +45,26 @@ export function Act3_ScenarioWalkthrough() {
         justifyContent: 'center',
         padding: 'var(--space-8)',
         gap: 'var(--space-4)',
+        pointerEvents: 'none',
       }}
     >
+      {/* Rest of viewport passes through to OrbitControls; only this
+          content stack captures clicks. */}
+      <div
+        ref={glassRef}
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 'var(--space-4)',
+          pointerEvents: 'auto',
+          padding: 'var(--space-6)',
+          borderRadius: 24,
+          border: '1px solid rgba(255, 255, 255, 0.25)',
+          boxShadow:
+            '0 8px 32px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.3)',
+        }}
+      >
       <h2
         style={{
           fontFamily: 'var(--font-display)',
@@ -63,6 +89,18 @@ export function Act3_ScenarioWalkthrough() {
       >
         Open the phone in the corner and say or type: <strong>"{PROMPT}"</strong>. Watch the house.
       </p>
+      <p
+        style={{
+          fontFamily: 'var(--font-body)',
+          fontSize: '0.85rem',
+          color: 'var(--text-tertiary)',
+          textAlign: 'center',
+          maxWidth: 480,
+        }}
+      >
+        Drag anywhere to orbit the house, scroll to zoom — you can move the camera around freely while you try it.
+      </p>
+      </div>
     </div>
   );
 }

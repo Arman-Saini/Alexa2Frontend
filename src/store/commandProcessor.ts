@@ -745,6 +745,17 @@ export function processCommand(raw: string, objects: PlacedObject[]): CommandRes
     };
   }
 
+  // ─── CHECK DOG FED (T0) ───────────────────────────────────────────────────
+  if (/\b(feed|fed)\b.*\bbruno\b|\bbruno\b.*\b(feed|fed)\b|\bdid\s+(someone|anybody|anyone)\s+feed\s+bruno\b/.test(q)) {
+    return {
+      matched: true,
+      tier: 'T0_LOCAL',
+      response: 'Yes, Bruno was fed by you (Arman) just 2 hours ago according to the smart dog feeder.',
+      updates: [],
+      roomFocus: 'living-room',
+    };
+  }
+
   // ─── FEED DOG (T0) ───────────────────────────────────────────────────────
   if (/\bfeed\b.*\b(dog|pet)\b|\b(dog|pet)\b.*\bfeed\b|\bdispense\s*dog\s*food\b/.test(q)) {
     return {

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { CuteAlexaCanvas } from './CuteAlexaCanvas';
 
@@ -52,6 +52,42 @@ export function CuteAlexaPage() {
 
   // Auto-explode animation state
   const [isExploding, setIsExploding] = useState(false);
+
+  // Auto-cycle expression demo: resting → curious → excited
+  const DEMO_SEQUENCE: ExpressionType[] = ['resting', 'curious', 'excited'];
+  const DEMO_HOLD_MS = 2500; // ms per expression
+  const MANUAL_PAUSE_MS = 8000; // pause auto-cycle after manual pick
+  const [isAutoCycling, setIsAutoCycling] = useState(true);
+  const demoCycleIndexRef = useRef(0);
+  const manualPauseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Resume auto-cycling after manual pause
+  const resumeAutoCycle = useCallback(() => {
+    setIsAutoCycling(true);
+  }, []);
+
+  // Called when user manually picks an expression
+  const handleManualExpression = useCallback((expr: ExpressionType) => {
+    setExpression(expr);
+    setIsAutoCycling(false);
+    if (manualPauseTimerRef.current) clearTimeout(manualPauseTimerRef.current);
+    manualPauseTimerRef.current = setTimeout(resumeAutoCycle, MANUAL_PAUSE_MS);
+  }, [resumeAutoCycle]);
+
+  // Auto-cycle effect
+  useEffect(() => {
+    if (!isAutoCycling) return;
+    const interval = setInterval(() => {
+      demoCycleIndexRef.current = (demoCycleIndexRef.current + 1) % DEMO_SEQUENCE.length;
+      setExpression(DEMO_SEQUENCE[demoCycleIndexRef.current]);
+    }, DEMO_HOLD_MS);
+    return () => clearInterval(interval);
+  }, [isAutoCycling]);
+
+  // Cleanup pause timer on unmount
+  useEffect(() => () => {
+    if (manualPauseTimerRef.current) clearTimeout(manualPauseTimerRef.current);
+  }, []);
 
   useEffect(() => {
     let frameId: number;
@@ -233,7 +269,15 @@ export function CuteAlexaPage() {
           className="absolute top-20 left-6 z-20 px-3 py-1.5 border border-[#3b3a37] bg-black/40 rounded-md pointer-events-none transition-all duration-300"
           style={{ opacity: explodedProgress > 0 ? 0 : 1 }}
         >
-          <div className="text-[9px] font-mono text-[#7A7168] uppercase tracking-wider mb-0.5">CURRENT MOOD</div>
+          <div className="text-[9px] font-mono text-[#7A7168] uppercase tracking-wider mb-0.5 flex items-center gap-1.5">
+            CURRENT MOOD
+            {isAutoCycling && (
+              <span className="inline-flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#3da5e0] animate-pulse" />
+                <span className="text-[#3da5e0]">DEMO</span>
+              </span>
+            )}
+          </div>
           <div className="text-sm font-semibold tracking-wider font-mono text-[#e9b44c]">
             {expression.toUpperCase()} {EXPRESSIONS.find(e => e.type === expression)?.face}
           </div>
@@ -256,14 +300,20 @@ export function CuteAlexaPage() {
         <div className="flex-1 overflow-y-auto px-6 py-6 space-y-8 select-none">
           {/* Section A: Expressions Grid */}
           <section className="space-y-3">
-            <h3 className="text-xs font-mono text-[#C08662] uppercase tracking-[0.15em] font-semibold">
+            <h3 className="text-xs font-mono text-[#C08662] uppercase tracking-[0.15em] font-semibold flex items-center gap-2">
               1. Synthesizer Expression
+              {isAutoCycling && (
+                <span className="inline-flex items-center gap-1 text-[#3da5e0]">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#3da5e0] animate-pulse" />
+                  <span className="text-[8px] tracking-wider">AUTO DEMO</span>
+                </span>
+              )}
             </h3>
             <div className="grid grid-cols-4 gap-2">
               {EXPRESSIONS.map((item) => (
                 <button
                   key={item.type}
-                  onClick={() => setExpression(item.type)}
+                  onClick={() => handleManualExpression(item.type)}
                   className={`flex flex-col items-center justify-between p-2 rounded-md border text-center transition-all duration-200 ${
                     expression === item.type
                       ? 'bg-[#C08662]/15 border-[#C08662] text-[#F2EDE6]'

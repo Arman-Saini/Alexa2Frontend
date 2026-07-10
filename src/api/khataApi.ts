@@ -75,4 +75,7 @@ export const khataApi = {
 
   settle: (homeId = env.HOME_ID) =>
     apiClient.post<KhataSettleResponse>(endpoints.khataSettle(homeId)),
+
+  reset: (homeId = env.HOME_ID) =>
+    apiClient.post<{ success: boolean; message: string }>(endpoints.khataReset(homeId)),
 };

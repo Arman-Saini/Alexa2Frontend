@@ -15,7 +15,8 @@ export type WsMessageType =
   | 'voice_response'
   | 'lookup_request'
   | 'lookup_approved'
-  | 'lookup_result';
+  | 'lookup_result'
+  | 'khata_entry';
 
 export interface WsMessage {
   type: WsMessageType;

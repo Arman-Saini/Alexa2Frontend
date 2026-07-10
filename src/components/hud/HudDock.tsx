@@ -2,32 +2,28 @@ import { CartoonHudAvatar } from '../cartoon/CartoonHudAvatar';
 import { SmartphoneDock } from '../phone/SmartphoneDock';
 
 /**
- * Bottom-right persistent chrome over the digital twin: the cartoon avatar
- * sits just above the collapsible phone, both driven by tourStore. This is
- * the only thing ActShell mounts on top of the twin besides ActNav and the
- * lens panel — PhoneMockup/DemoControls no longer render here (see
- * ActShell.tsx diff), though those files still exist untouched.
+ * Phone docks bottom-left; cartoon avatar is a separate draggable layer
+ * bottom-right (see CartoonHudAvatar's own drag handling) so it can roam
+ * the viewport without fighting the phone's own fixed positioning.
  */
 export function HudDock() {
   return (
-    <div
-      style={{
-        position: 'fixed',
-        bottom: 'var(--space-6)',
-        right: 'var(--space-6)',
-        zIndex: 40,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'flex-end',
-        gap: 'var(--space-3)',
-        pointerEvents: 'none',
-      }}
-    >
-      <div style={{ pointerEvents: 'auto' }}>
-        <CartoonHudAvatar />
+    <>
+      <div
+        style={{
+          position: 'fixed',
+          bottom: 'var(--space-6)',
+          left: 'var(--space-6)',
+          zIndex: 40,
+          pointerEvents: 'none',
+        }}
+      >
+        <div style={{ pointerEvents: 'auto' }}>
+          <SmartphoneDock />
+        </div>
       </div>
-      <SmartphoneDock />
-    </div>
+      <CartoonHudAvatar />
+    </>
   );
 }
 

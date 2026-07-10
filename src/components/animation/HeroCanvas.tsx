@@ -1,8 +1,8 @@
 import { Suspense, useMemo, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls, ContactShadows } from '@react-three/drei';
+import { ContactShadows } from '@react-three/drei';
 import * as THREE from 'three';
-import { EngineAssembly } from './EngineAssembly';
+import { CuteAlexaModel } from './CuteAlexaModel';
 
 interface HeroCanvasProps {
   expression: 'resting' | 'happy' | 'curious' | 'wink' | 'sleepy' | 'dizzy' | 'excited' | 'sad' | 'yawning';
@@ -15,10 +15,21 @@ interface HeroCanvasProps {
   setIsPanelOpen: (open: boolean) => void;
   isSpeaking: boolean;
   isSinging: boolean;
-  isWhiteTheme: boolean;
+  animValuesRef: React.MutableRefObject<{
+    explodedProgress: number;
+    robotRotationY: number;
+    cameraX: number;
+    cameraY: number;
+    cameraZ: number;
+    lookAtX: number;
+    lookAtY: number;
+    lookAtZ: number;
+    panelOpenProgress: number;
+    chipPopProgress: number;
+  }>;
 }
 
-// Platform/Pedestal for the mecha robot
+// Grid Platform/Pedestal for the mecha robot
 function Pedestal({ outlineThickness }: { outlineThickness: number }) {
   const outlineScale = 1.0 + outlineThickness * 0.015;
 
@@ -64,7 +75,7 @@ export function HeroCanvas({
   setIsPanelOpen,
   isSpeaking,
   isSinging,
-  isWhiteTheme,
+  animValuesRef,
 }: HeroCanvasProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [isClicked, setIsClicked] = useState(false);
@@ -78,7 +89,7 @@ export function HeroCanvas({
     >
       <ambientLight intensity={0.7} color="#fffcf5" />
 
-      {/* Warm directional light casting shadows */}
+      {/* Warm Sun Light casting toon shadows */}
       <directionalLight
         position={[4, 8, 3]}
         intensity={1.5}
@@ -91,10 +102,10 @@ export function HeroCanvas({
         color="#fff5e6"
       />
 
-      {/* Rim light from behind */}
+      {/* Rim light from behind for glowing outline effect */}
       <directionalLight position={[-4, 2, -4]} intensity={0.6} color="#cce6ff" />
 
-      {/* Floor bounce fill light */}
+      {/* Soft floor bounce fill light */}
       <directionalLight position={[0, -5, 0]} intensity={0.3} color="#a68e6f" />
 
       <Suspense fallback={null}>
@@ -104,7 +115,7 @@ export function HeroCanvas({
           onPointerDown={() => setIsClicked(true)}
           onPointerUp={() => setIsClicked(false)}
         >
-          <EngineAssembly
+          <CuteAlexaModel
             expression={expression}
             bodyColor={bodyColor}
             ledColor={ledColor}
@@ -117,12 +128,13 @@ export function HeroCanvas({
             setIsPanelOpen={setIsPanelOpen}
             isSpeaking={isSpeaking}
             isSinging={isSinging}
-            isWhiteTheme={isWhiteTheme}
+            animValuesRef={animValuesRef}
           />
         </group>
 
         <Pedestal outlineThickness={outlineThickness} />
 
+        {/* Soft shadow under pedestal */}
         <ContactShadows
           position={[0, -1.24, 0]}
           opacity={0.65}
@@ -132,14 +144,6 @@ export function HeroCanvas({
           frames={1}
         />
       </Suspense>
-
-      <OrbitControls
-        enableZoom={true}
-        minDistance={3.5}
-        maxDistance={9.0}
-        maxPolarAngle={Math.PI / 2 + 0.15}
-        enablePan={false}
-      />
     </Canvas>
   );
 }
