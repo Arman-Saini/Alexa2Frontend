@@ -27,6 +27,7 @@ export const KITCHEN_PLUG       = device('kt-plug',   'smart-plug',   'kitchen')
 export const AIR_PURIFIER       = device('ap-1',      'air-purifier', 'living-room',     { speed: 2 });
 export const CAMERA             = device('cam-1',     'camera',       'living-room',     { isOn: true });
 export const SMOKE_DETECTOR     = device('sd-1',      'smoke-detector','living-room',    { isOn: true });
+export const LIVING_ROOM_ECHO   = device('lr-echo',   'echo-dot',     'living-room');
 
 // Standard test set used by most command tests
 export const ALL_DEVICES: PlacedObject[] = [
@@ -35,4 +36,5 @@ export const ALL_DEVICES: PlacedObject[] = [
   LIVING_ROOM_TV, THERMOSTAT, SMART_LOCK,
   KITCHEN_PLUG, AIR_PURIFIER,
   CAMERA, SMOKE_DETECTOR,
+  LIVING_ROOM_ECHO,
 ];

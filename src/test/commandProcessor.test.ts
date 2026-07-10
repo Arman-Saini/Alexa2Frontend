@@ -3,7 +3,7 @@ import { processCommand } from '../store/commandProcessor';
 import {
   ALL_DEVICES, LIVING_ROOM_BULB, BEDROOM_BULB, KITCHEN_BULB,
   LIVING_ROOM_FAN, BEDROOM_FAN, LIVING_ROOM_TV,
-  THERMOSTAT, SMART_LOCK, KITCHEN_PLUG, AIR_PURIFIER,
+  THERMOSTAT, SMART_LOCK, KITCHEN_PLUG, AIR_PURIFIER, LIVING_ROOM_ECHO,
 } from './fixtures';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -554,6 +554,37 @@ describe('room navigation', () => {
   });
 });
 
+// ── Robot vacuum commands ──────────────────────────────────────────────────────
+
+describe('robot vacuum', () => {
+  it('turns off the robot vacuum', () => {
+    const r = processCommand('turn off the robot vacuum', ALL_DEVICES);
+    expect(r.matched).toBe(true);
+    expect(r.tier).toBe('T0_LOCAL');
+    expect(r.vacuumAction).toBe(false);
+    expect(r.response).toContain('Stopping');
+  });
+
+  it('deploys the robot vacuum', () => {
+    const r = processCommand('deploy the robot vacuum cleaner', ALL_DEVICES);
+    expect(r.matched).toBe(true);
+    expect(r.vacuumAction).toBe(true);
+    expect(r.response).toContain('Starting');
+  });
+});
+
+// ── Feed dog commands ──────────────────────────────────────────────────────────
+
+describe('feed dog', () => {
+  it('feeds the dog', () => {
+    const r = processCommand('feed the dog', ALL_DEVICES);
+    expect(r.matched).toBe(true);
+    expect(r.tier).toBe('T0_LOCAL');
+    expect(r.feedDogAction).toBe(true);
+    expect(r.response).toContain('Feeding the dog');
+  });
+});
+
 // ── Wake word stripping ────────────────────────────────────────────────────────
 
 describe('wake word stripping', () => {
@@ -617,5 +648,26 @@ describe('device name matching', () => {
     const r = processCommand(`turn on ${LIVING_ROOM_TV.deviceName}`, ALL_DEVICES);
     expect(r.matched).toBe(true);
     expect(updatedIsOn(r, LIVING_ROOM_TV.id)).toBe(true);
+  });
+});
+
+// ── Dance party easter egg ────────────────────────────────────────────────────
+
+describe('dance party easter egg', () => {
+  it('sets partyAction on "dance party"', () => {
+    const result = processCommand('dance party', ALL_DEVICES);
+    expect(result.matched).toBe(true);
+    expect(result.partyAction).toBe(true);
+  });
+
+  it('sets partyAction on "party mode"', () => {
+    const result = processCommand('turn on party mode', ALL_DEVICES);
+    expect(result.matched).toBe(true);
+    expect(result.partyAction).toBe(true);
+  });
+
+  it('does not set partyAction for unrelated commands', () => {
+    const result = processCommand('turn on the kitchen light', ALL_DEVICES);
+    expect(result.partyAction).toBeUndefined();
   });
 });

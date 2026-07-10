@@ -8,6 +8,10 @@ export interface CommandResult {
   tier: CommandTier;
   updates: { id: string; changes: Partial<AlexaDeviceState> }[];
   roomFocus?: string | null; // null = show all rooms, undefined = no change
+  vacuumAction?: boolean;
+  feedDogAction?: boolean;
+  musicAction?: boolean;
+  partyAction?: boolean;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -93,7 +97,11 @@ function merge(results: CommandResult[]): CommandResult {
     : results.some(r => r.tier === 'T1_LOCAL') ? 'T1_LOCAL' : 'T0_LOCAL';
   const roomFocuses = results.filter(r => r.matched && r.roomFocus !== undefined).map(r => r.roomFocus);
   const roomFocus = roomFocuses.length > 1 ? null : roomFocuses[0];
-  return { matched, response: responses.join(' '), tier, updates: [...byId.values()], roomFocus };
+  const vacuumAction = results.find(r => r.vacuumAction !== undefined)?.vacuumAction;
+  const feedDogAction = results.find(r => r.feedDogAction !== undefined)?.feedDogAction;
+  const musicAction = results.find(r => r.musicAction !== undefined)?.musicAction;
+  const partyAction = results.find(r => r.partyAction !== undefined)?.partyAction;
+  return { matched, response: responses.join(' '), tier, updates: [...byId.values()], roomFocus, vacuumAction, feedDogAction, musicAction, partyAction };
 }
 
 // ── Main processor ────────────────────────────────────────────────────────────
@@ -268,6 +276,17 @@ export function processCommand(raw: string, objects: PlacedObject[]): CommandRes
     };
   }
 
+  // ─── DANCE PARTY (T0) ────────────────────────────────────────────────────────
+  if (/\bdance\s*party\b/.test(q)) {
+    const speakers = [...byType(objects, 'echo-dot'), ...byType(objects, 'echo-show')];
+    return {
+      matched: true, tier: 'T0_LOCAL',
+      response: "Let's dance!",
+      updates: speakers.map(o => ({ id: o.id, changes: { isOn: true, volume: 80 } as Partial<AlexaDeviceState> })),
+      partyAction: true,
+    };
+  }
+
   if (/\bparty\s*(mode|time|hard)?\b/.test(q)) {
     return {
       matched: true, tier: 'T0_LOCAL',
@@ -277,6 +296,7 @@ export function processCommand(raw: string, objects: PlacedObject[]): CommandRes
         ...applyTo(objects, 'smart-bulb', { isOn: true, brightness: 100, colorTemp: 4000 }),
         ...applyTo(objects, 'ceiling-fan', { isOn: true, speed: 5 }),
       ],
+      partyAction: true,
     };
   }
 
@@ -713,6 +733,29 @@ export function processCommand(raw: string, objects: PlacedObject[]): CommandRes
     }
   }
 
+  // ─── ROBOT VACUUM (T0) ───────────────────────────────────────────────────
+  if (/\b(robot\s*)?vacuums?\b/.test(q) || /\b(vacuum\s*cleaner)\b/.test(q)) {
+    const turnOn = action !== null ? action : /\b(deploy|start)\b/.test(q);
+    return {
+      matched: true,
+      tier: 'T0_LOCAL',
+      response: turnOn ? 'Starting the robot vacuum cleaner.' : 'Stopping the robot vacuum cleaner.',
+      updates: [],
+      vacuumAction: turnOn,
+    };
+  }
+
+  // ─── FEED DOG (T0) ───────────────────────────────────────────────────────
+  if (/\bfeed\b.*\b(dog|pet)\b|\b(dog|pet)\b.*\bfeed\b|\bdispense\s*dog\s*food\b/.test(q)) {
+    return {
+      matched: true,
+      tier: 'T0_LOCAL',
+      response: 'Feeding the dog now. Dispensing food into the bowl.',
+      updates: [],
+      feedDogAction: true,
+    };
+  }
+
   // ─── MUSIC / PLAY (T0) ───────────────────────────────────────────────────────
   if (/\b(play|start|put\s+on)\b/.test(q) && /\b(music|jazz|song|something|tunes?|beats?|audio)\b/.test(q)) {
     const speakers = [...byType(objects, 'echo-dot'), ...byType(objects, 'echo-show')];
@@ -720,6 +763,7 @@ export function processCommand(raw: string, objects: PlacedObject[]): CommandRes
       matched: true, tier: 'T0_LOCAL',
       response: 'Playing soulful jazz for you.',
       updates: speakers.map(o => ({ id: o.id, changes: { isOn: true, volume: 60 } as Partial<AlexaDeviceState> })),
+      musicAction: true,
     };
   }
 
