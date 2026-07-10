@@ -1,4 +1,4 @@
-import { Suspense } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { CuteAlexaModel } from './CuteAlexaModel';
 import { useTourStore } from '../../store/tourStore';
@@ -18,8 +18,40 @@ export function CartoonHudAvatar() {
   const lastReply = useTourStore((s) => s.lastReply);
   const { isConnected } = useWebSocket();
 
-  const expression = isSpeaking ? 'happy' : isListening ? 'curious' : 'resting';
-  const ledMode = isSpeaking ? 'wave' : isListening ? 'pulse' : 'solid';
+  // Occasional idle personality quirk: a brief spontaneous singing burst
+  // every so often while nothing else is going on. Purely cosmetic, local
+  // to this component — not driven by tourStore since nothing else needs
+  // to react to it.
+  const [isSinging, setIsSinging] = useState(false);
+  const isSpeakingRef = useRef(isSpeaking);
+  isSpeakingRef.current = isSpeaking;
+  const isListeningRef = useRef(isListening);
+  isListeningRef.current = isListening;
+
+  useEffect(() => {
+    let scheduleTimer: ReturnType<typeof setTimeout>;
+    let hideTimer: ReturnType<typeof setTimeout>;
+
+    const scheduleNext = () => {
+      const delay = 20000 + Math.random() * 25000; // every 20-45s
+      scheduleTimer = setTimeout(() => {
+        if (!isSpeakingRef.current && !isListeningRef.current) {
+          setIsSinging(true);
+          hideTimer = setTimeout(() => setIsSinging(false), 4000 + Math.random() * 2000);
+        }
+        scheduleNext();
+      }, delay);
+    };
+    scheduleNext();
+
+    return () => {
+      clearTimeout(scheduleTimer);
+      clearTimeout(hideTimer);
+    };
+  }, []);
+
+  const expression = isSpeaking ? 'happy' : isListening ? 'curious' : isSinging ? 'happy' : 'resting';
+  const ledMode = isSpeaking ? 'wave' : isListening ? 'pulse' : isSinging ? 'wave' : 'solid';
   const bubbleText = !isConnected
     ? 'Reconnecting…'
     : isSpeaking && lastReply
@@ -29,7 +61,7 @@ export function CartoonHudAvatar() {
   return (
     <div style={{ position: 'relative', width: 160, height: 160 }}>
       <Canvas
-        camera={{ position: [0, 1.2, 4.2], fov: 40 }}
+        camera={{ position: [0, 0.6, 6.5], fov: 50 }}
         style={{ background: 'transparent' }}
         gl={{ antialias: true, powerPreference: 'low-power' }}
       >
@@ -48,7 +80,7 @@ export function CartoonHudAvatar() {
             isPanelOpen={false}
             setIsPanelOpen={() => {}}
             isSpeaking={isSpeaking}
-            isSinging={false}
+            isSinging={isSinging}
           />
         </Suspense>
       </Canvas>
