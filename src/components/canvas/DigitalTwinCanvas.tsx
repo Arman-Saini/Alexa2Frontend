@@ -21,6 +21,7 @@ import { FurnitureInspector } from './FurnitureInspector';
 import { SensorTooltip } from './SensorTooltip';
 import { DoorInspector } from './DoorInspector';
 import { WindowInspector } from './WindowInspector';
+import { RobotVacuum } from './RobotVacuum';
 import type { AssetType } from '../../types';
 
 // Scenario overrides for SceneLighting , muted when ScenarioReactor takes over
@@ -309,6 +310,7 @@ export function DigitalTwinCanvas() {
           <RoomFurniture />
           <RoomWindows />
           <Doors />
+          <RobotVacuum />
           <SceneWarmLights />
           <EasterEggs />
 
