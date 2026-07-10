@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { onInteraction } from '../store/interactionEvents';
 import { useAppStore } from '../store/store';
 import { useTourStore } from '../store/tourStore';
@@ -28,6 +28,8 @@ const AVATAR_TICKLE_LINES = [
  * next — this hook is the only place that does.
  */
 export function useInteractionEffects(): void {
+  const stopJazzTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
     const unsubscribe = onInteraction((event) => {
       switch (event.type) {
@@ -47,7 +49,8 @@ export function useInteractionEffects(): void {
         case 'easter-egg:dance-party': {
           useAppStore.getState().setPartyMode(true);
           playDisco();
-          setTimeout(() => stopJazz(), 8000);
+          if (stopJazzTimeout.current) clearTimeout(stopJazzTimeout.current);
+          stopJazzTimeout.current = setTimeout(() => stopJazz(), 8000);
           break;
         }
         case 'easter-egg:avatar-tickle': {
@@ -62,6 +65,9 @@ export function useInteractionEffects(): void {
           break;
       }
     });
-    return unsubscribe;
+    return () => {
+      unsubscribe();
+      if (stopJazzTimeout.current) clearTimeout(stopJazzTimeout.current);
+    };
   }, []);
 }
