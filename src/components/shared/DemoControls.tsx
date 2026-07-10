@@ -7,16 +7,7 @@ export function DemoControls() {
   const restartStory = useStoryStore((s) => s.restartStory);
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        top: 'var(--space-4)',
-        right: 'var(--space-4)',
-        zIndex: 50,
-        display: 'flex',
-        gap: 'var(--space-3)',
-      }}
-    >
+    <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
       <GlassCard padding="sm" className="flex items-center gap-3">
         <button
           type="button"

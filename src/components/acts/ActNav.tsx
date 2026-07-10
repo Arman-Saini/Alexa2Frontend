@@ -1,23 +1,28 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useActStore, type ActId } from '../../store/actStore';
+import { DemoControls } from '../shared/DemoControls';
 
-const ACT_LABELS: Record<ActId, string> = {
-  0: 'Rest',
+const ACT_LABELS: Record<Exclude<ActId, 'freeplay'>, string> = {
+  0: 'Hi',
   1: 'Sensing',
   2: 'Brain',
-  3: 'Scenario',
+  3: 'Try it',
 };
 
-const ACT_IDS: ActId[] = [0, 1, 2, 3];
+const ACT_IDS: Exclude<ActId, 'freeplay'>[] = [0, 1, 2, 3];
 
 /**
- * Minimal persistent nav — thin glass strip, corner-anchored.
- * 4 dots/labels for Acts 0-3, plus a link out to the separate Ecosystem page.
- * Does not participate in the Act Z-depth transition; always visible.
+ * Minimal persistent nav — thin glass strip, corner-anchored. Plain-language
+ * tour-beat dots (no jargon), a Replay tour button (reuses actStore's
+ * existing resetToRest), and one de-emphasized dev-only menu for the other
+ * routes/debug tools — nothing here should require reading to operate.
  */
 export function ActNav() {
   const currentAct = useActStore((s) => s.currentAct);
   const goToAct = useActStore((s) => s.goToAct);
+  const resetToRest = useActStore((s) => s.resetToRest);
+  const [devMenuOpen, setDevMenuOpen] = useState(false);
 
   return (
     <nav
@@ -48,7 +53,7 @@ export function ActNav() {
               type="button"
               onClick={() => goToAct(id)}
               aria-current={active ? 'step' : undefined}
-              aria-label={`Go to Act ${id}: ${ACT_LABELS[id]}`}
+              aria-label={`Go to: ${ACT_LABELS[id]}`}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -88,67 +93,110 @@ export function ActNav() {
 
       <div style={{ width: 1, height: 16, backgroundColor: 'var(--void-border)' }} />
 
-      <Link
-        to="/ecosystem"
+      <button
+        type="button"
+        onClick={resetToRest}
         style={{
           fontFamily: 'var(--font-body)',
           fontSize: 11,
           fontWeight: 500,
           color: 'var(--copper-300)',
-          textDecoration: 'none',
+          background: 'none',
+          border: 'none',
+          cursor: 'pointer',
           whiteSpace: 'nowrap',
         }}
       >
-        App Store ↗
-      </Link>
+        Replay tour
+      </button>
+
+      {currentAct !== 'freeplay' && (
+        <>
+          <div style={{ width: 1, height: 16, backgroundColor: 'var(--void-border)' }} />
+          <button
+            type="button"
+            onClick={() => goToAct('freeplay')}
+            style={{
+              fontFamily: 'var(--font-body)',
+              fontSize: 11,
+              fontWeight: 500,
+              color: 'var(--text-tertiary)',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            Skip tour → Explore now
+          </button>
+        </>
+      )}
 
       <div style={{ width: 1, height: 16, backgroundColor: 'var(--void-border)' }} />
 
-      <Link
-        to="/animation"
-        style={{
-          fontFamily: 'var(--font-body)',
-          fontSize: 11,
-          fontWeight: 500,
-          color: 'var(--copper-300)',
-          textDecoration: 'none',
-          whiteSpace: 'nowrap',
-        }}
-      >
-        3D Cascade ↗
-      </Link>
+      <div style={{ position: 'relative' }}>
+        <button
+          type="button"
+          onClick={() => setDevMenuOpen((v) => !v)}
+          aria-label="Developer links"
+          style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: 10,
+            color: 'var(--text-tertiary)',
+            opacity: 0.6,
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+          }}
+        >
+          dev ↗
+        </button>
 
-      <div style={{ width: 1, height: 16, backgroundColor: 'var(--void-border)' }} />
-
-      <Link
-        to="/cartoon"
-        style={{
-          fontFamily: 'var(--font-body)',
-          fontSize: 11,
-          fontWeight: 500,
-          color: 'var(--copper-300)',
-          textDecoration: 'none',
-          whiteSpace: 'nowrap',
-        }}
-      >
-        Cute Alexa ↗
-      </Link>
-
-      <div style={{ width: 1, height: 16, backgroundColor: 'var(--void-border)' }} />
-
-      <Link
-        to="/companion"
-        style={{
-          fontFamily: 'var(--font-body)',
-          fontSize: 11,
-          fontWeight: 500,
-          color: 'var(--copper-300)',
-          textDecoration: 'none',
-          whiteSpace: 'nowrap',
-        }}
-      >
-        Companion App ↗
-      </Link>
+        {devMenuOpen && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '100%',
+              right: 0,
+              marginTop: 8,
+              padding: 'var(--space-3)',
+              borderRadius: 'var(--r-md)',
+              backgroundColor: 'var(--glass-bg)',
+              border: '1px solid var(--glass-border)',
+              backdropFilter: 'var(--glass-blur)',
+              WebkitBackdropFilter: 'var(--glass-blur)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 'var(--space-2)',
+              minWidth: 160,
+            }}
+          >
+            {[
+              ['/ecosystem', 'App Store'],
+              ['/animation', '3D Cascade'],
+              ['/cartoon', 'Cute Alexa'],
+              ['/companion', 'Companion App'],
+              ['/smartphone', 'Smartphone Lab'],
+            ].map(([to, label]) => (
+              <Link
+                key={to}
+                to={to}
+                style={{
+                  fontFamily: 'var(--font-body)',
+                  fontSize: 11,
+                  color: 'var(--copper-300)',
+                  textDecoration: 'none',
+                }}
+              >
+                {label} ↗
+              </Link>
+            ))}
+            <div style={{ borderTop: '1px solid var(--void-border)', paddingTop: 'var(--space-2)' }}>
+              <DemoControls />
+            </div>
+          </div>
+        )}
+      </div>
     </nav>
   );
 }
