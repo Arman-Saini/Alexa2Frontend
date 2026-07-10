@@ -1,30 +1,17 @@
-import { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
-import { VoiceEntry } from '../shared/VoiceEntry';
-import { useDemoScript } from '../../hooks/useDemoScript';
-import { useActSequencer } from '../../hooks/useActSequencer';
+import { useEffect } from 'react';
+import { useTourStore } from '../../store/tourStore';
 
 /**
- * Act 0 — the landing/idle state. Calmest, most spacious act; the 3D house
- * (rendered behind this layer) is the visual anchor. Hero headline + the
- * primary voice entry point, with ambient example prompts cycling from the
- * attract-mode demo script.
+ * Act 0 — "Hi". The avatar wakes and greets, points at the phone dock as the
+ * one way to talk to the house. No mic here — this was voice-entry-point #1
+ * of 3 in the old design; SmartphoneWidget (in HudDock) is now the only one.
  */
 export function Act0_Resting() {
-  const { submitTranscript } = useActSequencer();
-  const { steps } = useDemoScript();
-  const [chipIndex, setChipIndex] = useState(0);
-
   useEffect(() => {
-    if (steps.length === 0) return;
-    const dwell = steps[chipIndex % steps.length]?.dwell_ms ?? 4000;
-    const timer = setTimeout(() => {
-      setChipIndex((i) => (i + 1) % steps.length);
-    }, dwell);
-    return () => clearTimeout(timer);
-  }, [chipIndex, steps]);
-
-  const currentCaption = steps[chipIndex % steps.length]?.caption;
+    useTourStore.getState().setReply(
+      "Hi — I'm Alexa. This is your home, live. Tap me to talk."
+    );
+  }, []);
 
   return (
     <div
@@ -62,30 +49,8 @@ export function Act0_Resting() {
             marginTop: 'var(--space-4)',
           }}
         >
-          Hearth reads every room in real time and reasons about what's happening — so it can act
-          before you have to ask.
+          Say hi to Alexa in the corner — she'll show you around.
         </p>
-      </div>
-
-      <div style={{ pointerEvents: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-3)' }}>
-        <VoiceEntry onSubmit={submitTranscript} />
-
-        {currentCaption && (
-          <motion.div
-            key={chipIndex}
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 0.6, y: 0 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.5 }}
-            style={{
-              fontFamily: 'var(--font-body)',
-              fontSize: 12,
-              color: 'var(--text-tertiary)',
-            }}
-          >
-            Try: “{currentCaption}”
-          </motion.div>
-        )}
       </div>
     </div>
   );
