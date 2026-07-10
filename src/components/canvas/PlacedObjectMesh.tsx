@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import { type ThreeEvent, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useAppStore } from '../../store/store';
+import { emitInteraction } from '../../store/interactionEvents';
 import type { PlacedObject } from '../../types';
 import { TOON_GRADIENT } from './ToonMaterial';
 import { draggingObjectIdRef } from './dragRef';
@@ -37,6 +38,10 @@ const TOP_H: Record<string, number> = {
   doorbell: 0.2, 'air-purifier': 0.65, 'floor-lamp': 0.6,
 };
 
+// Sensor/security types stay click-to-select only — toggling these casually
+// during a demo would misrepresent security state.
+const NON_TOGGLEABLE = new Set(['motion-sensor', 'camera', 'smoke-detector', 'doorbell', 'smart-lock']);
+
 function DeviceGeometry({ obj }: { obj: PlacedObject }) {
   const ds = obj.alexaDeviceState;
   const isOn = ds.isOn;
@@ -70,7 +75,9 @@ function DeviceGeometry({ obj }: { obj: PlacedObject }) {
 export function PlacedObjectMesh({ obj }: { obj: PlacedObject }) {
   const groupRef = useRef<THREE.Group>(null);
   const confirmRingRef = useRef<THREE.Mesh>(null);
-  const { setSelectedObject, setHoveredObject, ui } = useAppStore();
+  const activeRingMatRef = useRef<THREE.MeshBasicMaterial>(null);
+  const { setSelectedObject, setHoveredObject, ui, updateAlexaState, setRecentlyChanged } = useAppStore();
+  const partyMode = useAppStore((s) => s.ui.partyMode);
   const recentlyChanged = useAppStore((s) => s.recentlyChangedIds.includes(obj.id));
   const isSelected = ui.selectedObjectId === obj.id;
   const isOn = obj.alexaDeviceState.isOn;
@@ -91,12 +98,24 @@ export function PlacedObjectMesh({ obj }: { obj: PlacedObject }) {
       const s = 1 + 0.15 * Math.sin(clock.getElapsedTime() * 8);
       confirmRingRef.current.scale.set(s, s, s);
     }
+    // Party mode: strobe every powered-on device's active-pulse ring through
+    // a hue cycle instead of its static color.
+    if (partyMode && activeRingMatRef.current) {
+      const hue = (clock.getElapsedTime() * 2) % 1;
+      activeRingMatRef.current.color.setHSL(hue, 0.9, 0.6);
+    }
   });
 
   const handleClick = (e: ThreeEvent<MouseEvent>) => {
     if (ui.isPlacementMode || isEditMode) return;
     e.stopPropagation();
     setSelectedObject(isSelected ? null : obj.id);
+    if (obj.isAlexaDevice && !NON_TOGGLEABLE.has(obj.type)) {
+      const nextOn = !isOn;
+      updateAlexaState(obj.id, { isOn: nextOn });
+      setRecentlyChanged([obj.id]);
+      emitInteraction({ type: 'object:toggle', objectId: obj.id, objectType: obj.type, isOn: nextOn });
+    }
   };
 
   const handlePointerDown = (e: ThreeEvent<PointerEvent>) => {
@@ -164,7 +183,7 @@ export function PlacedObjectMesh({ obj }: { obj: PlacedObject }) {
       {obj.isAlexaDevice && isOn && obj.type !== 'smart-bulb' && (
         <mesh position={[0, 0.015, 0]} rotation={[-Math.PI / 2, 0, 0]}>
           <ringGeometry args={[0.16, 0.22, 28]} />
-          <meshBasicMaterial color={obj.color ?? '#E8E8E6'} transparent opacity={0.45} depthWrite={false} />
+          <meshBasicMaterial ref={activeRingMatRef} color={obj.color ?? '#E8E8E6'} transparent opacity={0.45} depthWrite={false} />
         </mesh>
       )}
     </group>
