@@ -13,7 +13,7 @@ import type { ScenarioPlan } from '../api/scenarioBuilderApi';
 // timeline that actually drives the X-ray → lens hand-off is a separate,
 // not-yet-built ticket , this file only exposes the actions it will call.
 
-export type ActId = 0 | 1 | 2 | 3;
+export type ActId = 0 | 1 | 2 | 3 | 'freeplay';
 export type LensVariant = 'brain' | 'scenario' | 'module' | 'phone';
 
 export interface TriggerContext {
