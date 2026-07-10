@@ -99,10 +99,16 @@ export function PlacedObjectMesh({ obj }: { obj: PlacedObject }) {
       confirmRingRef.current.scale.set(s, s, s);
     }
     // Party mode: strobe every powered-on device's active-pulse ring through
-    // a hue cycle instead of its static color.
-    if (partyMode && activeRingMatRef.current) {
-      const hue = (clock.getElapsedTime() * 2) % 1;
-      activeRingMatRef.current.color.setHSL(hue, 0.9, 0.6);
+    // a hue cycle instead of its static color; revert to the static color
+    // once party mode ends (this is an imperative per-frame write via a ref,
+    // so nothing else resets it automatically).
+    if (activeRingMatRef.current) {
+      if (partyMode) {
+        const hue = (clock.getElapsedTime() * 2) % 1;
+        activeRingMatRef.current.color.setHSL(hue, 0.9, 0.6);
+      } else {
+        activeRingMatRef.current.color.set(obj.color ?? '#E8E8E6');
+      }
     }
   });
 
