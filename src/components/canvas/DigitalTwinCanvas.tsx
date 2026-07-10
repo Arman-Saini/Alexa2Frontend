@@ -1,5 +1,5 @@
 import { Suspense, useEffect, useState, useCallback, useRef } from 'react';
-import { Canvas } from '@react-three/fiber';
+import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, Environment, ContactShadows } from '@react-three/drei';
 import { EffectComposer, Bloom, Vignette, N8AO } from '@react-three/postprocessing';
 import * as THREE from 'three';
@@ -36,13 +36,13 @@ const SCENARIO_LIGHTING: Record<string, {
   away:  { sunColor: '#40C8FF', sunInt: 0.8,  ambColor: '#081020', ambInt: 0.22, fogColor: '#081422' },
 };
 
-// Room light positions (approximate 3D positions for each room)
+// Room light positions (exact 3D positions for scenario glow)
 const ROOM_LIGHT_POS: Record<string, [number, number, number]> = {
-  kitchen:  [  5,   2,   5],
-  bathroom: [ -5,   2,   5],
-  living:   [  0,   2,  -5],
-  pooja:    [  5,   2,  -5],
-  all:      [  0,   3,   0],
+  kitchen:  [  8.0, 2.85,  6.0],
+  bathroom: [ -8.0, 2.85,  2.0],
+  living:   [  5.0, 2.85, -4.0],
+  pooja:    [-11.0, 1.32,  0.7], // Exactly at the diya flame shelf in Master Bedroom
+  all:      [  0.0, 2.85,  3.0], // Center hallway
 };
 
 // Scenario glow colors
@@ -97,22 +97,71 @@ function SceneLighting() {
   );
 }
 
+const ROOM_LIGHT_SETTINGS: Record<string, { color: string; intensity: number; distance: number }> = {
+  'living-room':    { color: "#FFD27A", intensity: 2.6, distance: 11 },
+  'master-bedroom': { color: "#FFB860", intensity: 2.2, distance: 9 },
+  'bathroom':       { color: "#CFE4FF", intensity: 1.8, distance: 7 },
+  'office':         { color: "#DCEBFF", intensity: 2.0, distance: 8 },
+  'kitchen':        { color: "#FFE6B0", intensity: 2.2, distance: 9 },
+  'hallway':        { color: "#FFE0B0", intensity: 1.3, distance: 6 },
+};
+
+function RoomPointLight({ roomId, position, settings }: {
+  roomId: string;
+  position: [number, number, number];
+  settings: { color: string; intensity: number; distance: number };
+}) {
+  const activeRoomId = useAppStore((s) => s.ui.activeRoomId);
+  const roomAmbientTint = useAppStore((s) => s.ui.roomAmbientTint);
+  const lightRef = useRef<THREE.PointLight>(null);
+  const targetColor = useRef(new THREE.Color(settings.color));
+
+  useFrame((_, delta) => {
+    if (!lightRef.current) return;
+    const wantTint = activeRoomId === roomId && roomAmbientTint;
+    targetColor.current.set(wantTint ? roomAmbientTint : settings.color);
+    const t = 1 - Math.exp(-4 * delta);
+    lightRef.current.color.lerp(targetColor.current, t);
+    const targetIntensity = wantTint ? settings.intensity * 1.4 : settings.intensity;
+    lightRef.current.intensity += (targetIntensity - lightRef.current.intensity) * t;
+  });
+
+  return (
+    <pointLight
+      ref={lightRef}
+      position={position}
+      intensity={settings.intensity}
+      color={settings.color}
+      distance={settings.distance}
+      decay={2}
+    />
+  );
+}
+
 function SceneWarmLights() {
   const activeScenarioId = useAppStore(s => s.activeScenarioId);
+  const rooms = useAppStore(s => s.rooms);
 
   const glowEntry = activeScenarioId ? SCENARIO_GLOW[activeScenarioId] : null;
   const glowPos = glowEntry ? (ROOM_LIGHT_POS[glowEntry.room] ?? ROOM_LIGHT_POS.all) : null;
 
   return (
     <>
-      {/* Per-room warm ceiling pendants at the new room centres (13×10 plan) , warm pools
-          of light so each room reads against the dark mood. */}
-      <pointLight position={[ 2.5, 2.85, -2.0]} intensity={2.6} color="#FFD27A" distance={11} decay={2} />{/* living */}
-      <pointLight position={[-4.0, 2.85, -2.5]} intensity={2.2} color="#FFB860" distance={9}  decay={2} />{/* bedroom */}
-      <pointLight position={[-4.0, 2.85,  1.0]} intensity={1.8} color="#CFE4FF" distance={7}  decay={2} />{/* bathroom */}
-      <pointLight position={[-4.0, 2.85,  3.5]} intensity={2.0} color="#DCEBFF" distance={8}  decay={2} />{/* office */}
-      <pointLight position={[ 4.0, 2.85,  3.0]} intensity={2.2} color="#FFE6B0" distance={9}  decay={2} />{/* kitchen */}
-      <pointLight position={[ 0.0, 2.85,  3.0]} intensity={1.3} color="#FFE0B0" distance={6}  decay={2} />{/* hallway */}
+      {/* Per-room warm ceiling pendants at the exact room centres, warm pools
+          of light so each room reads against the dark mood. Each one lerps
+          toward useInteractionEffects.ts's ROOM_AMBIENT_TINT while its room
+          is the focused room (ui.roomAmbientTint). */}
+      {rooms.map(room => {
+        const settings = ROOM_LIGHT_SETTINGS[room.id] ?? { color: "#FFE0B0", intensity: 1.5, distance: 8 };
+        return (
+          <RoomPointLight
+            key={room.id}
+            roomId={room.id}
+            position={[room.position.x, 2.85, room.position.z]}
+            settings={settings}
+          />
+        );
+      })}
       {glowEntry && glowPos && (
         <pointLight
           key={activeScenarioId ?? ''}
@@ -241,12 +290,11 @@ export function DigitalTwinCanvas() {
     setDraggedAsset(null);
   }, [rooms, addPlacedObject, enterPlacementMode, setDraggedAsset]);
 
-  const isEditMode = ui.isLayoutEditMode && !ui.layoutLocked;
   const cursorClass = ui.isPlacementMode
     ? 'cursor-crosshair'
-    : isEditMode
-    ? isDragging ? 'cursor-grabbing' : 'cursor-grab'
-    : '';
+    : isDragging
+    ? 'cursor-grabbing'
+    : 'cursor-grab';
 
   return (
     <div
