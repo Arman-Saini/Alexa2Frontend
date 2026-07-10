@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useAppStore } from '../store/store';
 import { DEFAULT_PLACED_OBJECTS } from '../constants/defaults';
+import { onInteraction } from '../store/interactionEvents';
 
 // Resets the singleton store to the default home before each test so commands
 // don't leak state between cases.
@@ -44,5 +45,41 @@ describe('executeVoiceCommand (store integration via processCommand)', () => {
   it('returns a graceful fallback for unknown commands', () => {
     const resp = useAppStore.getState().executeVoiceCommand('order me a pizza');
     expect(resp.length).toBeGreaterThan(0);
+  });
+});
+
+describe('setActiveRoom interaction events', () => {
+  it('emits room:focus when a room becomes active', () => {
+    const events: string[] = [];
+    const unsubscribe = onInteraction((e) => events.push(e.type));
+
+    useAppStore.getState().setActiveRoom('kitchen');
+
+    expect(events).toContain('room:focus');
+    unsubscribe();
+    useAppStore.getState().setActiveRoom(null);
+  });
+
+  it('emits room:blur when the active room clears', () => {
+    useAppStore.getState().setActiveRoom('kitchen');
+    const events: string[] = [];
+    const unsubscribe = onInteraction((e) => events.push(e.type));
+
+    useAppStore.getState().setActiveRoom(null);
+
+    expect(events).toContain('room:blur');
+    unsubscribe();
+  });
+
+  it('does not re-emit room:focus for the same room', () => {
+    useAppStore.getState().setActiveRoom('kitchen');
+    const events: string[] = [];
+    const unsubscribe = onInteraction((e) => events.push(e.type));
+
+    useAppStore.getState().setActiveRoom('kitchen');
+
+    expect(events).toHaveLength(0);
+    unsubscribe();
+    useAppStore.getState().setActiveRoom(null);
   });
 });

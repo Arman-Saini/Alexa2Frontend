@@ -115,6 +115,8 @@ export interface UIState {
   draggedAssetType: AssetType | null;    // live drag from library panel
   isLayoutEditMode: boolean;             // drag-to-reposition objects on the 3D canvas
   layoutLocked: boolean;                 // once true, all positions are permanently frozen
+  roomAmbientTint: string | null;        // hex color the focused room's light lerps toward
+  partyMode: boolean;                    // dance-party easter egg strobe flag, auto-clears
 }
 
 export interface AlexaNotification {

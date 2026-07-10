@@ -15,6 +15,18 @@ import type {
 import { DEFAULT_ROOMS, ASSET_MAP, DEFAULT_ROUTINES, DEFAULT_SCENES } from '../constants/assets';
 import { DEFAULT_PLACED_OBJECTS } from '../constants/defaults';
 import { processCommand, type CommandResult } from './commandProcessor';
+import { useTourStore } from './tourStore';
+import { emitInteraction } from './interactionEvents';
+
+// One line Alexa says whenever a room becomes the focused room, whether
+// that's a click/zoom in the 3D view, the minimap, or a voice command.
+const ROOM_FOCUS_LINES: Record<string, string> = {
+  'living-room': "Living room. This is where movie night happens.",
+  kitchen: "Kitchen. I keep an eye on the stove and the fridge in here.",
+  'master-bedroom': "Bedroom. I'll keep it quiet and comfortable in here.",
+  bathroom: "Bathroom. I watch humidity here so mirrors don't fog up.",
+  office: "Office. Let me set the mood for focus.",
+};
 
 function generateId(): string {
   return crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
@@ -32,6 +44,10 @@ interface AppState {
   routines: Routine[];
   scenes: Scene[];
   simulationTick: number;
+  vacuumOn: boolean;
+  setVacuumOn: (on: boolean) => void;
+  dogFed: boolean;
+  setDogFed: (fed: boolean) => void;
 
   // Devices changed by the most recent command , drives the 3D confirm glow
   recentlyChangedIds: string[];
@@ -43,6 +59,9 @@ interface AppState {
 
   // Room actions
   setActiveRoom: (roomId: string | null) => void;
+  setRoomAmbientTint: (tint: string | null) => void;
+  partyModeTimeout: ReturnType<typeof setTimeout> | null;
+  setPartyMode: (on: boolean) => void;
   setHoveredRoom: (roomId: string | null) => void;
 
   // Object actions
@@ -155,6 +174,8 @@ const INITIAL_UI: UIState = {
   draggedAssetType: null,
   isLayoutEditMode: false,
   layoutLocked: false,
+  roomAmbientTint: null,
+  partyMode: false,
 };
 
 export const useAppStore = create<AppState>()(
@@ -174,6 +195,27 @@ export const useAppStore = create<AppState>()(
         routines: DEFAULT_ROUTINES,
         scenes: DEFAULT_SCENES,
         simulationTick: 0,
+        vacuumOn: true,
+        setVacuumOn: (on) => set({ vacuumOn: on }),
+
+        setRoomAmbientTint: (tint: string | null) =>
+          set((s) => ({ ui: { ...s.ui, roomAmbientTint: tint } })),
+
+        partyModeTimeout: null as ReturnType<typeof setTimeout> | null,
+        setPartyMode: (on: boolean) => {
+          const existing = get().partyModeTimeout;
+          if (existing) clearTimeout(existing);
+          set((s) => ({ ui: { ...s.ui, partyMode: on }, partyModeTimeout: null }));
+          if (on) {
+            const handle = setTimeout(() => {
+              set((s) => ({ ui: { ...s.ui, partyMode: false }, partyModeTimeout: null }));
+            }, 8000);
+            set({ partyModeTimeout: handle });
+          }
+        },
+
+        dogFed: false,
+        setDogFed: (fed) => set({ dogFed: fed }),
 
         recentlyChangedIds: [],
         setRecentlyChanged: (ids) => {
@@ -233,7 +275,15 @@ export const useAppStore = create<AppState>()(
         activeScenarioId: null,
         setActiveScenarioId: (id) => set({ activeScenarioId: id }),
 
-        setActiveRoom: (roomId) =>
+        setActiveRoom: (roomId) => {
+          const prevRoomId = get().ui.activeRoomId;
+          if (roomId && roomId !== prevRoomId && ROOM_FOCUS_LINES[roomId]) {
+            useTourStore.getState().setReply(ROOM_FOCUS_LINES[roomId]);
+          }
+          if (roomId !== prevRoomId) {
+            if (prevRoomId) emitInteraction({ type: 'room:blur', roomId: prevRoomId });
+            if (roomId) emitInteraction({ type: 'room:focus', roomId });
+          }
           set((s) => ({
             ui: {
               ...s.ui,
@@ -242,7 +292,8 @@ export const useAppStore = create<AppState>()(
               hoveredObjectId: null,
               activePanel: roomId !== s.ui.activeRoomId ? 'alexa' : s.ui.activePanel,
             },
-          })),
+          }));
+        },
 
         setHoveredRoom: (roomId) =>
           set((s) => ({ ui: { ...s.ui, hoveredRoomId: roomId } })),
@@ -516,17 +567,31 @@ export const useAppStore = create<AppState>()(
               get().addNotification(result.response, 'success', changedIds[0]);
             }
 
-            // 5. Jazz: play when speaker turns on, stop when off
+            if (result.vacuumAction !== undefined) {
+              set({ vacuumOn: result.vacuumAction });
+              get().addNotification(result.response, 'success');
+              if (result.vacuumAction === true) {
+                emitInteraction({ type: 'vacuum:patrol', roomId: 'living-room' });
+              }
+            }
+            if (result.feedDogAction !== undefined) {
+              set({ dogFed: result.feedDogAction });
+              get().addNotification(result.response, 'success');
+            }
+            if (result.partyAction) {
+              emitInteraction({ type: 'easter-egg:dance-party' });
+            }
+
+            // 5. Jazz: only for an actual "play music" command, not any speaker
+            //    isOn flip — otherwise turning an Echo on/off for any other
+            //    reason (a routine, a generic "turn on" command) would also
+            //    start/stop music nobody asked for.
             const speakerTypes = new Set(['echo-dot', 'echo-show']);
-            const turnedOnSpeakers = result.updates.filter(u => {
-              const o = placedObjects.find(p => p.id === u.id);
-              return o && speakerTypes.has(o.type) && u.changes.isOn === true;
-            });
             const turnedOffSpeakers = result.updates.filter(u => {
               const o = placedObjects.find(p => p.id === u.id);
               return o && speakerTypes.has(o.type) && u.changes.isOn === false;
             });
-            if (turnedOnSpeakers.length > 0) {
+            if (result.musicAction) {
               import('../utils/jazzPlayer').then(({ playJazz }) => playJazz()).catch(() => {});
             }
             if (turnedOffSpeakers.length > 0) {
@@ -621,6 +686,8 @@ export const useAppStore = create<AppState>()(
           doorOverrides: state.doorOverrides,
           furnitureOverrides: state.furnitureOverrides,
           windowOverrides: state.windowOverrides,
+          vacuumOn: state.vacuumOn,
+          dogFed: state.dogFed,
           ui: {
             isLayoutEditMode: state.ui.isLayoutEditMode,
             layoutLocked: state.ui.layoutLocked,
@@ -632,6 +699,8 @@ export const useAppStore = create<AppState>()(
             doorOverrides: typeof current.doorOverrides;
             furnitureOverrides: typeof current.furnitureOverrides;
             windowOverrides: typeof current.windowOverrides;
+            vacuumOn: boolean;
+            dogFed: boolean;
             ui: Partial<typeof current.ui>;
           }>;
           // Merge new default objects that weren't in the cached state
@@ -644,6 +713,8 @@ export const useAppStore = create<AppState>()(
             doorOverrides: p.doorOverrides ?? current.doorOverrides,
             furnitureOverrides: p.furnitureOverrides ?? current.furnitureOverrides,
             windowOverrides: p.windowOverrides ?? current.windowOverrides,
+            vacuumOn: p.vacuumOn ?? current.vacuumOn,
+            dogFed: p.dogFed ?? current.dogFed,
             ui: { ...current.ui, ...(p.ui ?? {}) },
           };
         },
