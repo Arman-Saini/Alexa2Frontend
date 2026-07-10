@@ -31,21 +31,21 @@ export function RobotVacuum() {
     return unsubscribe;
   }, []);
 
-  if (!room) return null;
-
-  const hw = room.width / 2 * 0.6;
-  const hd = room.depth / 2 * 0.6;
-  const dockX = room.position.x + hw;
-  const dockZ = room.position.z + hd;
-  const waypoints: [number, number][] = [
-    [dockX, dockZ],
-    [room.position.x - hw, room.position.z + hd],
-    [room.position.x - hw, room.position.z - hd],
-    [room.position.x + hw, room.position.z - hd],
-  ];
+  const hw = room ? room.width / 2 * 0.6 : 0;
+  const hd = room ? room.depth / 2 * 0.6 : 0;
+  const dockX = room ? room.position.x + hw : 0;
+  const dockZ = room ? room.position.z + hd : 0;
+  const waypoints: [number, number][] = room
+    ? [
+        [dockX, dockZ],
+        [room.position.x - hw, room.position.z + hd],
+        [room.position.x - hw, room.position.z - hd],
+        [room.position.x + hw, room.position.z - hd],
+      ]
+    : [];
 
   useFrame(() => {
-    if (!groupRef.current) return;
+    if (!room || !groupRef.current) return;
     if (!patrolling) {
       groupRef.current.position.set(dockX, 0.05, dockZ);
       return;
@@ -63,6 +63,8 @@ export function RobotVacuum() {
     const [tx, tz] = waypoints[nextIndex];
     groupRef.current.position.set(fx + (tx - fx) * legT, 0.05, fz + (tz - fz) * legT);
   });
+
+  if (!room) return null;
 
   return (
     <group ref={groupRef} position={[dockX, 0.05, dockZ]}>
