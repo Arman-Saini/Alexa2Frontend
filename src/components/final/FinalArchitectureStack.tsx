@@ -7,6 +7,7 @@ interface ArchitectureStackProps {
   ledColor: string;
   scrollProgress: number;
   dismantleMode?: boolean;
+  focusLayerIndex?: number | null;
   debugCpuOffsetY?: number;
   debugCpuPhase2Y?: number;
   debugCpuRestingY?: number;
@@ -22,6 +23,7 @@ export function FinalArchitectureStack({
   ledColor,
   scrollProgress,
   dismantleMode = false,
+  focusLayerIndex = null,
   debugCpuOffsetY = 1.05,
   debugCpuPhase2Y = 1.18,
   debugCpuRestingY = 0.0,
@@ -347,6 +349,7 @@ export function FinalArchitectureStack({
           index={idx}
           ledColor={ledColor}
           scrollProgress={scrollProgress}
+          focusLayerIndex={focusLayerIndex}
         />
       ))}
     </group>

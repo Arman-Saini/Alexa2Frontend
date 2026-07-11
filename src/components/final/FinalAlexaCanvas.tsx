@@ -19,6 +19,7 @@ interface FinalAlexaCanvasProps {
   isSinging: boolean;
   dismantleMode?: boolean;
   cpuScrollProgress?: number;
+  focusLayerIndex?: number | null;
   /** Bump to snap the orbit camera back to its default framing. */
   resetSignal?: number;
   debugMode?: boolean;
@@ -114,6 +115,7 @@ export function FinalAlexaCanvas({
   isSinging,
   dismantleMode = false,
   cpuScrollProgress = 0,
+  focusLayerIndex = null,
   resetSignal,
   debugMode = false,
   debugCpuOffsetY = 1.05,
@@ -143,6 +145,17 @@ export function FinalAlexaCanvas({
       camera={{ position: [0, 1.8, 5.0], fov: 45 }}
       style={{ background: 'transparent' }}
       gl={{ powerPreference: 'high-performance', antialias: true }}
+      dpr={[1, 2]}
+      onCreated={({ gl }) => {
+        // WebGL context loss (GPU driver reset, too many contexts, mobile
+        // backgrounding) otherwise freezes the canvas on a black frame with
+        // no visible signal — reload is the only reliable recovery r3f offers.
+        gl.domElement.addEventListener('webglcontextlost', (e) => {
+          e.preventDefault();
+          console.warn('[FinalAlexaCanvas] WebGL context lost — reloading.');
+          window.location.reload();
+        });
+      }}
     >
       {dismantleMode ? (
         <>
@@ -217,6 +230,7 @@ export function FinalAlexaCanvas({
           ledColor={dismantleMode ? '#ff3333' : ledColor}
           scrollProgress={cpuScrollProgress}
           dismantleMode={dismantleMode}
+          focusLayerIndex={focusLayerIndex}
           debugCpuOffsetY={debugCpuOffsetY}
           debugCpuPhase2Y={debugCpuPhase2Y}
           debugCpuRestingY={debugCpuRestingY}

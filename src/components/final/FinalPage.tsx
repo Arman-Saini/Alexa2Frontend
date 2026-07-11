@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import * as THREE from 'three';
 import { FinalAlexaCanvas } from './FinalAlexaCanvas';
+import { Canvas3DBoundary } from '../shared/Canvas3DBoundary';
 
 type ExpressionType = 'resting' | 'happy' | 'curious' | 'wink' | 'sleepy' | 'dizzy' | 'excited' | 'sad' | 'yawning';
 type LedModeType = 'solid' | 'pulse' | 'wave' | 'off';
@@ -330,29 +331,31 @@ export function FinalPage() {
         `}} />
 
         <div className="absolute inset-0">
-          <FinalAlexaCanvas
-            expression={expression}
-            bodyColor={bodyColor}
-            ledColor={ledColor}
-            ledMode={ledMode}
-            outlineThickness={outlineThickness}
-            explodedProgress={currentExplodedProgress}
-            isPanelOpen={isPanelOpen}
-            setIsPanelOpen={setIsPanelOpen}
-            isSpeaking={isSpeaking}
-            isSinging={isSinging}
-            dismantleMode={dismantleSequenceActive}
-            cpuScrollProgress={cpuScrollProgress}
-            debugCpuOffsetY={debugCpuOffsetY}
-            debugCpuPhase2Y={debugCpuPhase2Y}
-            debugCpuRestingY={debugCpuRestingY}
-            debugCamPanX={debugCamPanX}
-            debugCamOffsetY={debugCamOffsetY}
-            debugCamPanZ={debugCamPanZ}
-            debugCamZoom={debugCamZoom}
-            debugCamYaw={debugCamYaw}
-            debugCamPitch={debugCamPitch}
-          />
+          <Canvas3DBoundary>
+            <FinalAlexaCanvas
+              expression={expression}
+              bodyColor={bodyColor}
+              ledColor={ledColor}
+              ledMode={ledMode}
+              outlineThickness={outlineThickness}
+              explodedProgress={currentExplodedProgress}
+              isPanelOpen={isPanelOpen}
+              setIsPanelOpen={setIsPanelOpen}
+              isSpeaking={isSpeaking}
+              isSinging={isSinging}
+              dismantleMode={dismantleSequenceActive}
+              cpuScrollProgress={cpuScrollProgress}
+              debugCpuOffsetY={debugCpuOffsetY}
+              debugCpuPhase2Y={debugCpuPhase2Y}
+              debugCpuRestingY={debugCpuRestingY}
+              debugCamPanX={debugCamPanX}
+              debugCamOffsetY={debugCamOffsetY}
+              debugCamPanZ={debugCamPanZ}
+              debugCamZoom={debugCamZoom}
+              debugCamYaw={debugCamYaw}
+              debugCamPitch={debugCamPitch}
+            />
+          </Canvas3DBoundary>
         </div>
 
 

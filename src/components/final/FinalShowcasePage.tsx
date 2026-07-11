@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import * as THREE from 'three';
 import { FinalAlexaCanvas } from './FinalAlexaCanvas';
+import { Canvas3DBoundary } from '../shared/Canvas3DBoundary';
 
 type ExpressionType = 'resting' | 'happy' | 'curious' | 'wink' | 'sleepy' | 'dizzy' | 'excited' | 'sad' | 'yawning';
 type LedModeType = 'solid' | 'pulse' | 'wave' | 'off';
@@ -409,31 +410,33 @@ export function FinalShowcasePage() {
         `}} />
 
         <div className="absolute inset-0">
-          <FinalAlexaCanvas
-            expression={expression}
-            bodyColor={bodyColor}
-            ledColor={ledColor}
-            ledMode={ledMode}
-            outlineThickness={outlineThickness}
-            explodedProgress={currentExplodedProgress}
-            isPanelOpen={isPanelOpen}
-            setIsPanelOpen={setIsPanelOpen}
-            isSpeaking={isSpeaking}
-            isSinging={isSinging}
-            dismantleMode={dismantleSequenceActive}
-            cpuScrollProgress={cpuScrollProgress}
-            resetSignal={cameraResetSignal}
-            debugCpuOffsetY={debugCpuOffsetY}
-            debugCpuPhase2Y={debugCpuPhase2Y}
-            debugCpuRestingY={debugCpuRestingY}
-            debugCamPanX={debugCamPanX}
-            debugCamOffsetY={debugCamOffsetY}
-            debugCamPanZ={debugCamPanZ}
-            debugCamZoom={debugCamZoom}
-            debugCamYaw={debugCamYaw}
-            debugCamPitch={debugCamPitch}
-            alexaOpacityOverride={alexaOpacityOverride ?? undefined}
-          />
+          <Canvas3DBoundary>
+            <FinalAlexaCanvas
+              expression={expression}
+              bodyColor={bodyColor}
+              ledColor={ledColor}
+              ledMode={ledMode}
+              outlineThickness={outlineThickness}
+              explodedProgress={currentExplodedProgress}
+              isPanelOpen={isPanelOpen}
+              setIsPanelOpen={setIsPanelOpen}
+              isSpeaking={isSpeaking}
+              isSinging={isSinging}
+              dismantleMode={dismantleSequenceActive}
+              cpuScrollProgress={cpuScrollProgress}
+              resetSignal={cameraResetSignal}
+              debugCpuOffsetY={debugCpuOffsetY}
+              debugCpuPhase2Y={debugCpuPhase2Y}
+              debugCpuRestingY={debugCpuRestingY}
+              debugCamPanX={debugCamPanX}
+              debugCamOffsetY={debugCamOffsetY}
+              debugCamPanZ={debugCamPanZ}
+              debugCamZoom={debugCamZoom}
+              debugCamYaw={debugCamYaw}
+              debugCamPitch={debugCamPitch}
+              alexaOpacityOverride={alexaOpacityOverride ?? undefined}
+            />
+          </Canvas3DBoundary>
         </div>
 
         {isSinging && (
@@ -544,7 +547,6 @@ export function FinalShowcasePage() {
               <section className="h-[175vh] w-full flex flex-col justify-center items-center font-mono" />
 
               <section className="h-screen w-full flex flex-col justify-center items-center font-mono">
-                {/* Commented out as requested
                 <div
                   className="p-6 max-w-xl w-full backdrop-blur-md border rounded-xl transition-all duration-300 pointer-events-auto shadow-lg"
                   style={{
@@ -586,7 +588,7 @@ export function FinalShowcasePage() {
                         <span>~100–500ms</span>
                       </div>
                       <p className="opacity-85 mt-1 text-[11px] leading-relaxed text-[#a8a198]">
-                        <strong>Where:</strong> Home Hub Local Cache. Searches semantic cache & runs small local language models to resolve paraphrased queries without going to cloud.
+                        <strong>Where:</strong> Home Hub Local Cache. Recalls rules the cloud already reasoned out once — no model call, no round trip.
                       </p>
                     </div>
 
@@ -601,7 +603,6 @@ export function FinalShowcasePage() {
                     </div>
                   </div>
                 </div>
-                */}
               </section>
 
               {/* Spacer before next card/phase */}

@@ -5,13 +5,44 @@ import { MeshTransmissionMaterial, Edges, Html } from '@react-three/drei';
 
 
 
+export const LAYER_DETAILS = [
+  {
+    title: "FAIL-SAFE CONTROL BASE (T0)",
+    desc: "Always-on physical hardware base. Runs actuator-local fail-safe timer safety cutoffs."
+  },
+  {
+    title: "ACOUSTIC EMBEDDINGS (T1)",
+    desc: "Always-on edge NPU. Emits audio embeddings for zero-shot sound discovery."
+  },
+  {
+    title: "MCP SERVICE INTERPOSER",
+    desc: "Home hub server aggregating device sensors and actuators as local MCP schemas."
+  },
+  {
+    title: "EDGE CACHE & RULE ENGINE (T2 & T0)",
+    desc: "T0 deterministic triggers; T2 caches rules the cloud already reasoned out once, so repeat events resolve without a model call."
+  },
+  {
+    title: "ONTOLOGY ADAPTER SHIELD",
+    desc: "Ontology schema mappings, dynamic driver adapters, and policy authorization filters."
+  },
+  {
+    title: "BEDROCK MULTI-AGENT (T3)",
+    desc: "Supervisor agent plans, delegates to at most two specialists — Commerce, Home-control, Safety/Policy, Knowledge/Tutor. Never a swarm."
+  }
+];
+
 interface LayerGroupProps {
   index: number;
   ledColor: string;
   scrollProgress: number; // Prop passed from parent to calculate tracing progress
+  /** When set, overrides the scroll-driven pose: only this index lifts, all
+   *  others stay flat. Used by /showcase-live's sequential per-layer reveal;
+   *  every other consumer leaves this undefined and gets unchanged behavior. */
+  focusLayerIndex?: number | null;
 }
 
-export function LayerGroup({ index, ledColor, scrollProgress }: LayerGroupProps) {
+export function LayerGroup({ index, ledColor, scrollProgress, focusLayerIndex }: LayerGroupProps) {
   const groupRef = useRef<THREE.Group>(null);
   const fanRef = useRef<THREE.Mesh>(null);
   const ringRef = useRef<THREE.Mesh>(null);
@@ -95,34 +126,7 @@ export function LayerGroup({ index, ledColor, scrollProgress }: LayerGroupProps)
     ? 0
     : (scrollProgress < 0.25 ? (scrollProgress - 0.20) / 0.05 : (scrollProgress < 0.35 ? 1.0 : 1.0 - (scrollProgress - 0.35) / 0.05));
 
-  const details = useMemo(() => [
-    {
-      title: "FAIL-SAFE CONTROL BASE (T0)",
-      desc: "Always-on physical hardware base. Runs actuator-local fail-safe timer safety cutoffs."
-    },
-    {
-      title: "ACOUSTIC EMBEDDINGS (T1)",
-      desc: "Always-on edge NPU. Emits audio embeddings for zero-shot sound discovery."
-    },
-    {
-      title: "MCP SERVICE INTERPOSER",
-      desc: "Home hub server aggregating device sensors and actuators as local MCP schemas."
-    },
-    {
-      title: "EDGE SLM & RULE ENGINE (T2 & T0)",
-      desc: "T0 deterministic triggers and resident Edge SLM routing routines locally."
-    },
-    {
-      title: "ONTOLOGY ADAPTER SHIELD",
-      desc: "Ontology schema mappings, dynamic driver adapters, and policy authorization filters."
-    },
-    {
-      title: "BEDROCK MULTI-AGENT (T3)",
-      desc: "Supervisor agent plans, delegates to at most two specialists — Commerce, Home-control, Safety/Policy, Knowledge/Tutor. Never a swarm."
-    }
-  ], []);
-
-  const currentDetails = details[index];
+  const currentDetails = LAYER_DETAILS[index];
 
   // Interpolated colors for wireframe transitions
   const activeColor = useMemo(() => {
@@ -177,7 +181,19 @@ export function LayerGroup({ index, ledColor, scrollProgress }: LayerGroupProps)
     let targetX = 0;
     let targetY = 0;
 
-    if (s < 0.20) {
+    if (focusLayerIndex !== undefined && focusLayerIndex !== null) {
+      // Sequential per-layer reveal (/showcase-live): only the focused
+      // index lifts, the rest stay flat — replaces the scroll-phase pose
+      // entirely while active, independent of `s`.
+      const splayX = (index - 2.5) * 6.5;
+      if (index === focusLayerIndex) {
+        targetX = splayX;
+        targetY = 1.4;
+      } else {
+        targetX = 0;
+        targetY = 0;
+      }
+    } else if (s < 0.20) {
       // Phase 1: Rise stacked together (0.0 -> 0.20)
       targetX = 0;
       targetY = 0;
@@ -1417,12 +1433,14 @@ export function LayerGroup({ index, ledColor, scrollProgress }: LayerGroupProps)
             }
             center
             style={{
-              opacity: traceProgress,
+              opacity: (focusLayerIndex !== undefined && focusLayerIndex !== null)
+                ? (focusLayerIndex === index ? 1 : 0)
+                : traceProgress,
               transition: 'opacity 150ms ease-out',
               pointerEvents: 'none',
             }}
           >
-            <div 
+            <div
               className="flex flex-col p-3 rounded-[var(--r-md)] border backdrop-blur-md transition-colors duration-150 shadow-md"
               style={{
                 width: '210px',

@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { ScrollReveal } from '../shared/ScrollReveal';
 import { GlassCard } from '../shared/GlassCard';
 import { Act2_OntologyGraph } from './Act2_OntologyGraph';
-import { Act2_TraceReadout } from './Act2_TraceReadout';
+import { Act2_BrainPanel } from './Act2_BrainPanel';
 import { useTourStore } from '../../store/tourStore';
 import { useActStore } from '../../store/actStore';
 
@@ -87,8 +87,8 @@ export function Act2_CentralBrain() {
       </ScrollReveal>
 
       <ScrollReveal delay={0.18}>
-        <div style={{ alignSelf: 'flex-end', marginRight: 'var(--space-4)', pointerEvents: 'auto' }}>
-          <Act2_TraceReadout />
+        <div style={{ width: '100%', maxWidth: 680, pointerEvents: 'auto' }}>
+          <Act2_BrainPanel />
         </div>
       </ScrollReveal>
     </div>

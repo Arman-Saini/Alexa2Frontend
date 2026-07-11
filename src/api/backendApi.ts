@@ -144,6 +144,8 @@ export const backendApi = {
     apiClient.post<ApiResult>(endpoints.ruleConfirm(homeId, proposalId)),
   rejectRule: (homeId = h, proposalId: string) =>
     apiClient.post<ApiResult>(endpoints.ruleReject(homeId, proposalId)),
+  deleteRule: (homeId = h, ruleId: string) =>
+    apiClient.delete<ApiResult>(endpoints.ruleDelete(homeId, ruleId)),
 
   // Voice
   getVoiceConfig: () => apiClient.get<VoiceConfig>(endpoints.voiceConfig),

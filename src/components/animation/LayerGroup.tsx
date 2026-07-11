@@ -109,8 +109,8 @@ export function LayerGroup({ index, ledColor, scrollProgress }: LayerGroupProps)
       desc: "Home hub server aggregating device sensors and actuators as local MCP schemas."
     },
     {
-      title: "EDGE SLM & RULE ENGINE (T2 & T0)",
-      desc: "T0 deterministic triggers and resident Edge SLM routing routines locally."
+      title: "EDGE CACHE & RULE ENGINE (T2 & T0)",
+      desc: "T0 deterministic triggers; T2 caches rules the cloud already reasoned out once, so repeat events resolve without a model call."
     },
     {
       title: "ONTOLOGY ADAPTER SHIELD",

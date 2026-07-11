@@ -5,7 +5,7 @@ import { useTourStore } from '../../store/tourStore';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { emitInteraction } from '../../store/interactionEvents';
 
-const SIZE = 190;
+const SIZE = 260;
 const EDGE_PAD = 24;
 
 // Shown when nothing real has happened yet — rotates so the avatar always

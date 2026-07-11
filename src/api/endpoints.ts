@@ -44,6 +44,7 @@ export const endpoints = {
   rulesProposed: (homeId = h) => `/api/homes/${homeId}/rules/proposed`,
   ruleConfirm: (homeId = h, proposalId: string) => `/api/homes/${homeId}/rules/proposed/${proposalId}/confirm`,
   ruleReject: (homeId = h, proposalId: string) => `/api/homes/${homeId}/rules/proposed/${proposalId}/reject`,
+  ruleDelete: (homeId = h, ruleId: string) => `/api/homes/${homeId}/rules/${ruleId}`,
 
   // ── Events ────────────────────────────────────────────────────────
   event: (homeId = h) => `/api/homes/${homeId}/event`,

@@ -24,7 +24,7 @@ export function ActNav() {
   const currentAct = useActStore((s) => s.currentAct);
   const goToAct = useActStore((s) => s.goToAct);
   const resetToRest = useActStore((s) => s.resetToRest);
-  const [devMenuOpen, setDevMenuOpen] = useState(false);
+  // const [devMenuOpen, setDevMenuOpen] = useState(false);
 
   return (
     <nav
@@ -80,7 +80,7 @@ export function ActNav() {
               <span
                 style={{
                   fontFamily: 'var(--font-body)',
-                  fontSize: 11,
+                  fontSize: 10,
                   fontWeight: 500,
                   letterSpacing: '0.02em',
                   color: active ? 'var(--text-primary)' : 'var(--text-tertiary)',
@@ -153,9 +153,9 @@ export function ActNav() {
         See how it works ↓
       </Link>
 
-      <div style={{ width: 1, height: 16, backgroundColor: 'var(--void-border)' }} />
+      {/*<div style={{ width: 1, height: 16, backgroundColor: 'var(--void-border)' }} />*/}
 
-      <div style={{ position: 'relative' }}>
+      {/*<div style={{ position: 'relative' }}>
         <button
           type="button"
           onClick={() => setDevMenuOpen((v) => !v)}
@@ -171,9 +171,9 @@ export function ActNav() {
           }}
         >
           dev ↗
-        </button>
+        </button>*/}
 
-        {devMenuOpen && (
+        {/*{devMenuOpen && (
           <div
             style={{
               position: 'absolute',
@@ -216,8 +216,8 @@ export function ActNav() {
               <DemoControls />
             </div>
           </div>
-        )}
-      </div>
+        )}*/}
+
     </nav>
   );
 }
