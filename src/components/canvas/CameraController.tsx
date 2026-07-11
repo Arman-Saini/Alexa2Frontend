@@ -13,7 +13,7 @@ const ISO_POS  = new THREE.Vector3(ISO_DIST, ISO_DIST * 0.9, ISO_DIST);
 const HOUSE_VIEW = {
   position: ISO_POS.clone(),
   target:   new THREE.Vector3(0, 0, 0),
-  zoom:     20,
+  zoom:     30,
 };
 
 function getRoomView(room: { position: { x: number; y: number; z: number }; width: number; depth: number }) {

@@ -13,11 +13,8 @@ import { SmartphoneWidget } from './components/phone/SmartphoneWidget';
 import { AmbientBackdrop } from './components/shared/AmbientBackdrop';
 import { useInteractionEffects } from './hooks/useInteractionEffects';
 import { useIsMobileViewport } from './hooks/useIsMobileViewport';
-import { useStoryStore } from './store/storyStore';
-import { StoryScroll } from './components/story/StoryScroll';
 
 function Home() {
-  const mode = useStoryStore((s) => s.mode);
   const isMobile = useIsMobileViewport();
   useInteractionEffects();
 
@@ -39,7 +36,7 @@ function Home() {
       <div style={{ position: 'absolute', inset: 0 }}>
         <DigitalTwinCanvas />
       </div>
-      {mode === 'story' ? <StoryScroll /> : <ActShell />}
+      <ActShell />
     </div>
   );
 }
@@ -63,5 +60,3 @@ export default function App() {
     </BrowserRouter>
   );
 }
-
-
