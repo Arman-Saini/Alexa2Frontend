@@ -1,5 +1,6 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { useActStore } from '../../store/actStore';
+import { useTourStore } from '../../store/tourStore';
 import { useLiquidGlass } from '../../hooks/useLiquidGlass';
 
 interface SkillCard {
@@ -65,6 +66,12 @@ export function Act4_AppStore() {
   const headlineGlassRef = useRef<HTMLDivElement>(null);
   useLiquidGlass(glassRef, { borderRadius: 24, scale: -100, frost: 0.08 });
   useLiquidGlass(headlineGlassRef, { borderRadius: 24, scale: -100, frost: 0.08 });
+
+  // Collapse the phone dock — it may have been opened by Act3 in a previous
+  // replay. Skills Store has nothing to do with the phone widget.
+  useEffect(() => {
+    useTourStore.getState().setDockExpanded(false);
+  }, []);
 
   const skill = SKILLS[idx];
 
