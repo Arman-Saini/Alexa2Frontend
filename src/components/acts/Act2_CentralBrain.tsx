@@ -59,7 +59,7 @@ export function Act2_CentralBrain() {
           </p>
           <button
             type="button"
-            onClick={() => useActStore.getState().goToAct(3)}
+            onClick={() => useActStore.getState().goToAct(4)}
             style={{
               marginTop: 'var(--space-2)',
               background: 'var(--copper-500)',
@@ -73,7 +73,7 @@ export function Act2_CentralBrain() {
               cursor: 'pointer',
             }}
           >
-            Next: Try a command →
+            Next: Skills Store →
           </button>
         </div>
       </ScrollReveal>

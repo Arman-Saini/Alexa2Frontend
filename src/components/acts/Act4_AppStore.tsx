@@ -2,38 +2,62 @@ import { useRef, useState } from 'react';
 import { useActStore } from '../../store/actStore';
 import { useLiquidGlass } from '../../hooks/useLiquidGlass';
 
-interface AppStoreSection {
+interface SkillCard {
   icon: string;
   title: string;
+  author: string;
   body: string;
+  tag: string;
 }
 
-const SECTIONS: AppStoreSection[] = [
+const SKILLS: SkillCard[] = [
   {
     icon: '🛒',
-    title: 'The Alexa Skills Store',
-    body: 'Thousands of skills built by developers and brands — each one extends what Alexa can do. Enable a skill once, and it lives in every Echo in your home.',
+    title: 'Amazon Fresh',
+    author: 'Amazon Alexa',
+    body: 'Order groceries automatically. Says "order fresh milk" and Alexa handles it — linked with Amazon Pay for seamless billing.',
+    tag: 'Shopping',
   },
   {
-    icon: '🧠',
-    title: 'Skills as Superpowers',
-    body: 'Your smart home can understand food delivery, gym routines, doctor reminders, prayer times, and more. Each skill plugs into the same brain that runs your house.',
+    icon: '📒',
+    title: 'Amazon Bookkeeper',
+    author: 'Amazon Alexa',
+    body: 'Digitizes unorganized local commerce — laundry, milk, house help. Log it by voice, settle instantly via Amazon Pay UPI.',
+    tag: 'Finance',
   },
   {
-    icon: '🔗',
-    title: 'Works with Everything',
-    body: 'Alexa connects to Philips Hue, Samsung SmartThings, Nest, Ring, and hundreds of other ecosystems. One voice — every device, every brand.',
+    icon: '🍱',
+    title: 'Zomato Food Delivery',
+    author: 'Zomato',
+    body: 'Reorder your regular dish the moment the kitchen sensor notices the fridge is running low. No app, no clicks.',
+    tag: 'Food',
   },
   {
-    icon: '📱',
-    title: 'The Companion App',
-    body: 'Browse skills, manage routines, see a live log of every command and automation — all from your phone. The app is the control room your voice never shows.',
+    icon: '🔧',
+    title: 'Urban Company',
+    author: 'Urban Company',
+    body: "Book a technician automatically when a device reports a fault state — before you even notice something's wrong.",
+    tag: 'Home Services',
+  },
+  {
+    icon: '🛁',
+    title: 'Swiggy Instamart',
+    author: 'Swiggy',
+    body: 'Grocery top-ups triggered by the same pantry signals your home already tracks. Instant delivery, zero effort.',
+    tag: 'Shopping',
+  },
+  {
+    icon: '❄️',
+    title: 'Ecobee HVAC Sync',
+    author: 'Ecobee',
+    body: 'Mirror your smart thermostat schedule from Hearth onto a real HVAC controller — energy savings happen automatically.',
+    tag: 'Climate',
   },
 ];
 
 /**
- * Act 4 — "Extend Anything". Explains the Alexa Skills Store and companion
- * app ecosystem before handing off to freeplay.
+ * Act 4 — "Skills Store". Showcases real ecosystem integrations from the
+ * app store before handing off to the Try It act (Act 3).
  */
 export function Act4_AppStore() {
   const [idx, setIdx] = useState(0);
@@ -42,7 +66,7 @@ export function Act4_AppStore() {
   useLiquidGlass(glassRef, { borderRadius: 24, scale: -100, frost: 0.08 });
   useLiquidGlass(headlineGlassRef, { borderRadius: 24, scale: -100, frost: 0.08 });
 
-  const section = SECTIONS[idx];
+  const skill = SKILLS[idx];
 
   return (
     <div
@@ -84,9 +108,20 @@ export function Act4_AppStore() {
           >
             Extend anything
           </h2>
+          <p
+            style={{
+              fontFamily: 'var(--font-body)',
+              fontSize: '0.85rem',
+              color: 'var(--text-secondary)',
+              textAlign: 'center',
+              margin: 'var(--space-1) 0 0',
+            }}
+          >
+            {SKILLS.length}+ skills in the Alexa Skills Store
+          </p>
         </div>
 
-        {/* Info card */}
+        {/* Skill card */}
         <div
           ref={glassRef}
           className="max-w-md"
@@ -96,35 +131,62 @@ export function Act4_AppStore() {
             border: '1px solid rgba(255, 255, 255, 0.25)',
             backgroundColor: 'var(--glass-bg)',
             boxShadow: '0 8px 32px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.3)',
+            minWidth: 300,
           }}
         >
-          <div style={{ fontSize: '2rem', marginBottom: 'var(--space-3)', textAlign: 'center' }}>
-            {section.icon}
+          {/* Tag */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-3)' }}>
+            <span
+              style={{
+                fontFamily: 'var(--font-body)',
+                fontSize: '11px',
+                fontWeight: 600,
+                letterSpacing: '0.06em',
+                textTransform: 'uppercase',
+                color: 'var(--ember-500)',
+                background: 'rgba(255, 120, 50, 0.1)',
+                padding: '2px 8px',
+                borderRadius: 99,
+              }}
+            >
+              {skill.tag}
+            </span>
+            <span style={{ fontSize: '1.6rem' }}>{skill.icon}</span>
           </div>
+
           <h3
             style={{
               fontFamily: 'var(--font-display)',
               fontWeight: 600,
-              fontSize: '1.1rem',
+              fontSize: '1.05rem',
               color: 'var(--text-primary)',
               margin: 0,
-              marginBottom: 'var(--space-2)',
-              textAlign: 'center',
+              marginBottom: 'var(--space-1)',
             }}
           >
-            {section.title}
+            {skill.title}
           </h3>
+          <p
+            style={{
+              fontFamily: 'var(--font-body)',
+              fontSize: '0.78rem',
+              color: 'var(--text-tertiary)',
+              margin: 0,
+              marginBottom: 'var(--space-3)',
+            }}
+          >
+            by {skill.author}
+          </p>
           <p
             style={{
               fontFamily: 'var(--font-body)',
               fontSize: '0.9rem',
               color: 'var(--text-secondary)',
               margin: 0,
-              lineHeight: 1.5,
-              textAlign: 'center',
+              lineHeight: 1.55,
             }}
           >
-            {section.body}
+            {skill.body}
           </p>
         </div>
 
@@ -134,7 +196,7 @@ export function Act4_AppStore() {
             type="button"
             onClick={() => setIdx((i) => Math.max(0, i - 1))}
             disabled={idx === 0}
-            aria-label="Previous"
+            aria-label="Previous skill"
             style={{
               width: 36, height: 36, borderRadius: '50%',
               border: '1px solid rgba(255,255,255,0.25)',
@@ -149,12 +211,12 @@ export function Act4_AppStore() {
           </button>
 
           <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
-            {SECTIONS.map((_, i) => (
+            {SKILLS.map((_, i) => (
               <button
                 key={i}
                 type="button"
                 onClick={() => setIdx(i)}
-                aria-label={`Card ${i + 1}`}
+                aria-label={`Skill ${i + 1}`}
                 style={{
                   width: i === idx ? 20 : 8,
                   height: 8,
@@ -171,16 +233,16 @@ export function Act4_AppStore() {
 
           <button
             type="button"
-            onClick={() => setIdx((i) => Math.min(SECTIONS.length - 1, i + 1))}
-            disabled={idx === SECTIONS.length - 1}
-            aria-label="Next section"
+            onClick={() => setIdx((i) => Math.min(SKILLS.length - 1, i + 1))}
+            disabled={idx === SKILLS.length - 1}
+            aria-label="Next skill"
             style={{
               width: 36, height: 36, borderRadius: '50%',
               border: '1px solid rgba(255,255,255,0.25)',
-              background: idx === SECTIONS.length - 1 ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.12)',
-              color: idx === SECTIONS.length - 1 ? 'rgba(255,255,255,0.25)' : 'var(--text-primary)',
+              background: idx === SKILLS.length - 1 ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.12)',
+              color: idx === SKILLS.length - 1 ? 'rgba(255,255,255,0.25)' : 'var(--text-primary)',
               fontSize: '1.1rem',
-              cursor: idx === SECTIONS.length - 1 ? 'default' : 'pointer',
+              cursor: idx === SKILLS.length - 1 ? 'default' : 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}
           >
@@ -188,10 +250,10 @@ export function Act4_AppStore() {
           </button>
         </div>
 
-        {/* CTA to freeplay */}
+        {/* CTA → Act3 (Try it) */}
         <button
           type="button"
-          onClick={() => useActStore.getState().goToAct('freeplay')}
+          onClick={() => useActStore.getState().goToAct(3)}
           style={{
             marginTop: 'var(--space-2)',
             background: 'var(--copper-500)',
@@ -205,7 +267,7 @@ export function Act4_AppStore() {
             cursor: 'pointer',
           }}
         >
-          Explore freely →
+          Try it yourself →
         </button>
       </div>
     </div>

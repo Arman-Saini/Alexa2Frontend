@@ -8,11 +8,11 @@ const ACT_LABELS: Record<Exclude<ActId, 'freeplay'>, string> = {
   0: 'Hi',
   1: 'Sensing',
   2: 'Brain',
+  4: 'Skills',
   3: 'Try it',
-  4: 'App Store',
 };
 
-const ACT_IDS: Exclude<ActId, 'freeplay'>[] = [0, 1, 2, 3, 4];
+const ACT_IDS: Exclude<ActId, 'freeplay'>[] = [0, 1, 2, 4, 3];
 
 /**
  * Minimal persistent nav — thin glass strip, corner-anchored. Plain-language

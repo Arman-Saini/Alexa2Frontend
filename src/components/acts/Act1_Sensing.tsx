@@ -13,28 +13,28 @@ interface SensingSection {
 
 const SECTIONS: SensingSection[] = [
   {
-    headline: 'I watch every room',
-    body: 'Living room, kitchen, bathroom, office, bedroom — each one checks in with me all the time, not just when something changes.',
+    headline: 'I interact with sensors in every room',
+    body: 'Each room has sensors that share what they know — temperature, motion, air quality. That data stays inside your home and never leaves without your permission.',
     roomId: null,
-    say: "I'm always watching — every room, all the time.",
+    say: "I connect with sensors throughout your home — all data stays local.",
   },
   {
-    headline: 'I notice when you move',
-    body: "Motion and open doors tell me where people are, so I know the difference between empty and quiet.",
+    headline: 'I notice activity, not people',
+    body: "Motion sensors tell me a room is in use — not who's in it, not what they're doing. You stay private; your home just gets smarter about when to act.",
     roomId: 'kitchen',
-    say: 'I can tell when someone walks into the kitchen.',
+    say: 'I can tell a room is being used — without tracking individuals.',
   },
   {
-    headline: 'I feel the room, too',
-    body: 'Temperature, humidity, and air quality all feed into one picture of how the house feels right now.',
+    headline: 'I read the room',
+    body: "Temperature, humidity, and air quality give me a sense of comfort — so I can suggest adjustments before you even feel uncomfortable, not because I'm watching.",
     roomId: 'master-bedroom',
-    say: "I can feel if a room's getting too warm — like the bedroom, right now.",
+    say: "I can sense if a room is getting too warm and suggest a fix.",
   },
   {
-    headline: 'Safety comes first',
-    body: 'Smoke alarms and doorbells get to me fastest of all — nothing waits in line behind small stuff.',
+    headline: 'Safety signals get priority',
+    body: 'Smoke alarms, door sensors, and doorbells bypass everything else. You set what matters — I just make sure those alerts never get lost in the noise.',
     roomId: null,
-    say: "If something's actually wrong, I hear about it first.",
+    say: "Safety alerts always come first, no matter what else is happening.",
   },
 ];
 

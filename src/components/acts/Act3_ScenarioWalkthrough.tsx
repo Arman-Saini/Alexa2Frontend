@@ -28,7 +28,7 @@ export function Act3_ScenarioWalkthrough() {
   useEffect(() => {
     const unsubscribe = useTourStore.subscribe((state) => {
       if (state.lastReplyAt !== null && state.lastReplyAt !== baselineReplyAt.current) {
-        useActStore.getState().goToAct(4);
+        useActStore.getState().goToAct('freeplay');
       }
     });
     return unsubscribe;
@@ -103,7 +103,7 @@ export function Act3_ScenarioWalkthrough() {
       </p>
       <button
         type="button"
-        onClick={() => useActStore.getState().goToAct(4)}
+        onClick={() => useActStore.getState().goToAct('freeplay')}
         style={{
           marginTop: 'var(--space-2)',
           background: 'transparent',
@@ -117,7 +117,7 @@ export function Act3_ScenarioWalkthrough() {
           cursor: 'pointer',
         }}
       >
-        Skip → App Store
+        Skip → Explore freely
       </button>
       </div>
     </div>
