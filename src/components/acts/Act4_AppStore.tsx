@@ -253,7 +253,7 @@ export function Act4_AppStore() {
         {/* CTA → Act3 (Try it) */}
         <button
           type="button"
-          onClick={() => useActStore.getState().goToAct(3)}
+          onClick={() => useActStore.getState().goToAct(2)}
           style={{
             marginTop: 'var(--space-2)',
             background: 'var(--copper-500)',
@@ -262,12 +262,12 @@ export function Act4_AppStore() {
             fontFamily: 'var(--font-display)',
             fontWeight: 600,
             fontSize: '13px',
-            padding: 'var(--space-2) var(--space-5)',
+            padding: 'var(--space-3) var(--space-6)',
             borderRadius: 'var(--r-md)',
             cursor: 'pointer',
           }}
         >
-          Try it yourself →
+          Next: How I decide →
         </button>
       </div>
     </div>

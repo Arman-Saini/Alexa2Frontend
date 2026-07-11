@@ -205,7 +205,7 @@ export function Act1_Sensing() {
 
       <button
         type="button"
-        onClick={() => useActStore.getState().goToAct(2)}
+        onClick={() => useActStore.getState().goToAct(4)}
         style={{
           marginTop: 'var(--space-2)',
           background: 'var(--copper-500)',
@@ -214,12 +214,12 @@ export function Act1_Sensing() {
           fontFamily: 'var(--font-display)',
           fontWeight: 600,
           fontSize: '13px',
-          padding: 'var(--space-2) var(--space-5)',
+          padding: 'var(--space-3) var(--space-6)',
           borderRadius: 'var(--r-md)',
           cursor: 'pointer',
         }}
       >
-        Next: How I decide →
+        Next: Skills Store →
       </button>
       </div>
     </div>
