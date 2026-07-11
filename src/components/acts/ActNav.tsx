@@ -139,6 +139,22 @@ export function ActNav() {
 
       <div style={{ width: 1, height: 16, backgroundColor: 'var(--void-border)' }} />
 
+      <Link
+        to="/showcase"
+        style={{
+          fontFamily: 'var(--font-body)',
+          fontSize: 11,
+          fontWeight: 500,
+          color: 'var(--text-tertiary)',
+          textDecoration: 'none',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        See how it works ↓
+      </Link>
+
+      <div style={{ width: 1, height: 16, backgroundColor: 'var(--void-border)' }} />
+
       <div style={{ position: 'relative' }}>
         <button
           type="button"
