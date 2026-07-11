@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import { type ThreeEvent, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useAppStore } from '../../store/store';
+import { useStoryStore } from '../../store/storyStore';
 import { emitInteraction } from '../../store/interactionEvents';
 import type { PlacedObject } from '../../types';
 import { TOON_GRADIENT } from './ToonMaterial';
@@ -113,6 +114,7 @@ export function PlacedObjectMesh({ obj }: { obj: PlacedObject }) {
   });
 
   const handleClick = (e: ThreeEvent<MouseEvent>) => {
+    if (useStoryStore.getState().mode !== 'interactive') return;
     if (ui.isPlacementMode || isEditMode) return;
     e.stopPropagation();
     setSelectedObject(isSelected ? null : obj.id);
@@ -125,6 +127,7 @@ export function PlacedObjectMesh({ obj }: { obj: PlacedObject }) {
   };
 
   const handlePointerDown = (e: ThreeEvent<PointerEvent>) => {
+    if (useStoryStore.getState().mode !== 'interactive') return;
     if (!isEditMode) return;
     e.stopPropagation();
     draggingObjectIdRef.current = obj.id;
@@ -138,11 +141,13 @@ export function PlacedObjectMesh({ obj }: { obj: PlacedObject }) {
       onClick={handleClick}
       onPointerDown={handlePointerDown}
       onPointerOver={(e) => {
+        if (useStoryStore.getState().mode !== 'interactive') return;
         e.stopPropagation();
         setHoveredObject(obj.id);
         document.body.style.cursor = isEditMode ? 'grab' : 'pointer';
       }}
       onPointerOut={() => {
+        if (useStoryStore.getState().mode !== 'interactive') return;
         setHoveredObject(null);
         document.body.style.cursor = 'default';
       }}

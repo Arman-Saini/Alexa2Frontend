@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import { type ThreeEvent, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useAppStore } from '../../store/store';
+import { useStoryStore } from '../../store/storyStore';
 import { useActStore } from '../../store/actStore';
 import type { Room } from '../../types';
 
@@ -76,6 +77,7 @@ export function RoomMesh({ room, isActive, isHovered }: RoomMeshProps) {
   const floorColor = isActive ? palette.active : isHovered ? palette.accent : palette.floor;
 
   const handleClick = (e: ThreeEvent<MouseEvent>) => {
+    if (useStoryStore.getState().mode !== 'interactive') return;
     if (ui.isPlacementMode) return;
     e.stopPropagation();
     const nextActive = !isActive;
@@ -85,11 +87,13 @@ export function RoomMesh({ room, isActive, isHovered }: RoomMeshProps) {
     }
   };
   const handleOver = (e: ThreeEvent<PointerEvent>) => {
+    if (useStoryStore.getState().mode !== 'interactive') return;
     e.stopPropagation();
     setHoveredRoom(room.id);
     document.body.style.cursor = 'pointer';
   };
   const handleOut = () => {
+    if (useStoryStore.getState().mode !== 'interactive') return;
     setHoveredRoom(null);
     document.body.style.cursor = 'default';
   };
