@@ -309,7 +309,7 @@ export function DigitalTwinCanvas() {
       <Canvas
         orthographic
         shadows
-        camera={{ position: [15, 13.5, 15], zoom: 40, near: -500, far: 500 }}
+        camera={{ position: [15, 13.5, 15], zoom: 45, near: -500, far: 500 }}
         gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
         onCreated={({ gl }) => {
           gl.toneMapping = THREE.ACESFilmicToneMapping;
@@ -343,8 +343,8 @@ export function DigitalTwinCanvas() {
               ONE: THREE.TOUCH.ROTATE,
               TWO: THREE.TOUCH.DOLLY_PAN,
             }}
-            minZoom={22}
-            maxZoom={130}
+            minZoom={30}
+            maxZoom={160}
             maxPolarAngle={Math.PI / 2.15}
             minPolarAngle={Math.PI / 5}
             minDistance={5}

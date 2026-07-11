@@ -13,8 +13,10 @@ const ISO_POS  = new THREE.Vector3(ISO_DIST, ISO_DIST * 0.9, ISO_DIST);
 const HOUSE_VIEW = {
   position: ISO_POS.clone(),
   target:   new THREE.Vector3(0, 0, 0),
-  zoom:     30,
+  zoom:     45,
 };
+
+const ZOOM_PERSIST_KEY = 'dt_camera_zoom';
 
 function getRoomView(room: { position: { x: number; y: number; z: number }; width: number; depth: number }) {
   const rx = room.position.x;
@@ -37,7 +39,8 @@ export function CameraController() {
   const targetPos    = useRef(HOUSE_VIEW.position.clone());
   const targetLook   = useRef(HOUSE_VIEW.target.clone());
   const currentLook  = useRef(HOUSE_VIEW.target.clone());
-  const targetZoom   = useRef(HOUSE_VIEW.zoom);
+  const savedZoom    = typeof window !== 'undefined' ? parseFloat(localStorage.getItem(ZOOM_PERSIST_KEY) ?? '') : NaN;
+  const targetZoom   = useRef(!isNaN(savedZoom) ? savedZoom : HOUSE_VIEW.zoom);
 
   // Remember the user's zoom level before entering a room so we can restore it.
   const savedUserZoom = useRef<number | null>(null);
@@ -93,6 +96,11 @@ export function CameraController() {
       targetZoom.current = state.zoom;
       cameraTransitionRef.current = true;
     } else {
+      // Persist current zoom to localStorage so reload restores it
+      const ortho = camera as THREE.OrthographicCamera;
+      if (ortho.isOrthographicCamera) {
+        localStorage.setItem(ZOOM_PERSIST_KEY, String(ortho.zoom));
+      }
       // cameraTransitionRef is cleared by OrbitControls onStart , user interaction wins
       if (!cameraTransitionRef.current) return;
     }

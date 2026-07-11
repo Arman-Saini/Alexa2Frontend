@@ -13,7 +13,7 @@ const KEYFRAMES: { progress: number; state: CameraState }[] = [
     state: {
       position: new THREE.Vector3(45, 30, 45), // Wide establishing shot
       target: new THREE.Vector3(0, 0, 0),
-      zoom: 22,
+      zoom: 33,
     },
   },
   {
@@ -21,7 +21,7 @@ const KEYFRAMES: { progress: number; state: CameraState }[] = [
     state: {
       position: new THREE.Vector3(12, 10, 12), // Kitchen push-in
       target: new THREE.Vector3(5, 0.5, 5),
-      zoom: 56,
+      zoom: 84,
     },
   },
   {
@@ -29,7 +29,7 @@ const KEYFRAMES: { progress: number; state: CameraState }[] = [
     state: {
       position: new THREE.Vector3(22, 15, 22), // Hallway pull-back
       target: new THREE.Vector3(0, 0.5, 0),
-      zoom: 34,
+      zoom: 51,
     },
   },
   {
@@ -37,15 +37,15 @@ const KEYFRAMES: { progress: number; state: CameraState }[] = [
     state: {
       position: new THREE.Vector3(10, 28, 10), // Upward cloud-escalation tilt
       target: new THREE.Vector3(0, 4, 0),
-      zoom: 45,
+      zoom: 68,
     },
   },
   {
     progress: 1.0,
     state: {
-      position: new THREE.Vector3(28, 25.2, 28), // Settle back to default HOUSE_VIEW (ISO_DIST = 28)
+      position: new THREE.Vector3(28, 25.2, 28), // Settle back to default HOUSE_VIEW
       target: new THREE.Vector3(0, 0, 0),
-      zoom: 30,
+      zoom: 45,
     },
   },
 ];
