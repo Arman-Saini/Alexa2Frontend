@@ -439,6 +439,7 @@ export function SmartphoneWidget({
         transcript: utterance,
         speaker_id: 'owner_1',
         request_id: newId,
+        installed_skills: skills.filter((s) => s.installed).map((s) => s.id),
       },
     });
 
