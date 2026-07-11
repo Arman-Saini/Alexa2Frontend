@@ -54,21 +54,21 @@ export function Act2_CentralBrain() {
               margin: 0,
             }}
           >
-            Every sensor reading turns into something I understand — is a light on, is someone home,
-            is the stove too hot — so I can act on what's actually happening, not just raw numbers.
+            Every sensor reading turns into something I understand: is a light on, is someone home,
+            is the stove too hot. I act on what's actually happening, not just raw numbers.
           </p>
           <button
             type="button"
             onClick={() => useActStore.getState().goToAct(4)}
             style={{
-              marginTop: 'var(--space-2)',
+              marginTop: 'var(--space-4)',
               background: 'var(--copper-500)',
               color: 'var(--void-950)',
               border: 'none',
               fontFamily: 'var(--font-display)',
               fontWeight: 600,
               fontSize: '13px',
-              padding: 'var(--space-2) var(--space-5)',
+              padding: 'var(--space-3) var(--space-6)',
               borderRadius: 'var(--r-md)',
               cursor: 'pointer',
             }}

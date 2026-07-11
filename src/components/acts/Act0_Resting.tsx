@@ -22,7 +22,7 @@ export function Act0_Resting() {
 
   useEffect(() => {
     useTourStore.getState().setReply(
-      "Hi — I'm Alexa. This is your home, live."
+      "Hi, I'm Alexa. This is your home, live."
     );
   }, []);
 
@@ -108,7 +108,7 @@ export function Act0_Resting() {
         >
           This app is a live digital twin of your smart home: sensing,
           reasoning, and acting shown as they happen, so you can see exactly
-          what Alexa hears, decides, and does — not just the end result.
+          what Alexa hears, decides, and does. Not just the end result.
         </p>
         <button
           data-anime

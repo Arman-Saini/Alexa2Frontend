@@ -14,25 +14,25 @@ interface SensingSection {
 const SECTIONS: SensingSection[] = [
   {
     headline: 'I interact with sensors in every room',
-    body: 'Each room has sensors that share what they know — temperature, motion, air quality. That data stays inside your home and never leaves without your permission.',
+    body: 'Each room has sensors that share what they know: temperature, motion, air quality. That data stays inside your home and never leaves without your permission.',
     roomId: null,
-    say: "I connect with sensors throughout your home — all data stays local.",
+    say: "I connect with sensors throughout your home. All data stays local.",
   },
   {
     headline: 'I notice activity, not people',
-    body: "Motion sensors tell me a room is in use — not who's in it, not what they're doing. You stay private; your home just gets smarter about when to act.",
+    body: "Motion sensors tell me a room is in use, not who's in it or what they're doing. You stay private; your home just gets smarter about when to act.",
     roomId: 'kitchen',
-    say: 'I can tell a room is being used — without tracking individuals.',
+    say: 'I can tell a room is being used, without tracking individuals.',
   },
   {
     headline: 'I read the room',
-    body: "Temperature, humidity, and air quality give me a sense of comfort — so I can suggest adjustments before you even feel uncomfortable, not because I'm watching.",
+    body: "Temperature, humidity, and air quality give me a sense of comfort, so I can suggest adjustments before you even feel uncomfortable. Not because I'm watching.",
     roomId: 'master-bedroom',
     say: "I can sense if a room is getting too warm and suggest a fix.",
   },
   {
     headline: 'Safety signals get priority',
-    body: 'Smoke alarms, door sensors, and doorbells bypass everything else. You set what matters — I just make sure those alerts never get lost in the noise.',
+    body: 'Smoke alarms, door sensors, and doorbells bypass everything else. You set what matters, and I make sure those alerts never get lost in the noise.',
     roomId: null,
     say: "Safety alerts always come first, no matter what else is happening.",
   },

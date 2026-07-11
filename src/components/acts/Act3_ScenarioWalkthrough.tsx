@@ -99,7 +99,7 @@ export function Act3_ScenarioWalkthrough() {
           maxWidth: 480,
         }}
       >
-        Drag anywhere to orbit the house, scroll to zoom — you can move the camera around freely while you try it.
+        Drag anywhere to orbit the house, scroll to zoom. Move the camera around freely while you try it.
       </p>
       <button
         type="button"

@@ -15,14 +15,14 @@ const SKILLS: SkillCard[] = [
     icon: '🛒',
     title: 'Amazon Fresh',
     author: 'Amazon Alexa',
-    body: 'Order groceries automatically. Says "order fresh milk" and Alexa handles it — linked with Amazon Pay for seamless billing.',
+    body: 'Order groceries automatically. Say "order fresh milk" and Alexa handles it, linked with Amazon Pay for seamless billing.',
     tag: 'Shopping',
   },
   {
     icon: '📒',
     title: 'Amazon Bookkeeper',
     author: 'Amazon Alexa',
-    body: 'Digitizes unorganized local commerce — laundry, milk, house help. Log it by voice, settle instantly via Amazon Pay UPI.',
+    body: 'Digitizes unorganized local commerce: laundry, milk, house help. Log it by voice, settle instantly via Amazon Pay UPI.',
     tag: 'Finance',
   },
   {
@@ -36,7 +36,7 @@ const SKILLS: SkillCard[] = [
     icon: '🔧',
     title: 'Urban Company',
     author: 'Urban Company',
-    body: "Book a technician automatically when a device reports a fault state — before you even notice something's wrong.",
+    body: "Book a technician automatically when a device reports a fault state. Happens before you even notice something's wrong.",
     tag: 'Home Services',
   },
   {
@@ -50,7 +50,7 @@ const SKILLS: SkillCard[] = [
     icon: '❄️',
     title: 'Ecobee HVAC Sync',
     author: 'Ecobee',
-    body: 'Mirror your smart thermostat schedule from Hearth onto a real HVAC controller — energy savings happen automatically.',
+    body: 'Mirror your smart thermostat schedule from Hearth onto a real HVAC controller. Energy savings happen automatically.',
     tag: 'Climate',
   },
 ];
