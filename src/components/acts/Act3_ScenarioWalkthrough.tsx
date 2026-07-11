@@ -112,7 +112,7 @@ export function Act3_ScenarioWalkthrough() {
           fontFamily: 'var(--font-display)',
           fontWeight: 500,
           fontSize: '13px',
-          padding: 'var(--space-2) var(--space-5)',
+          padding: 'var(--space-3) var(--space-6)',
           borderRadius: 'var(--r-md)',
           cursor: 'pointer',
         }}
