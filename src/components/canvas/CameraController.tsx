@@ -89,7 +89,7 @@ export function CameraController() {
   const storyProgress = useStoryStore((s) => s.storyProgress);
 
   useFrame((_, delta) => {
-    if (mode === 'story') {
+    if (mode === 'story' && storyProgress > 0) {
       const state = getStoryCameraState(storyProgress);
       targetPos.current.copy(state.position);
       targetLook.current.copy(state.target);

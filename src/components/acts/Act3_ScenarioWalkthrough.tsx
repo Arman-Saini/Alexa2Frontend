@@ -28,7 +28,7 @@ export function Act3_ScenarioWalkthrough() {
   useEffect(() => {
     const unsubscribe = useTourStore.subscribe((state) => {
       if (state.lastReplyAt !== null && state.lastReplyAt !== baselineReplyAt.current) {
-        useActStore.getState().goToAct('freeplay');
+        useActStore.getState().goToAct(4);
       }
     });
     return unsubscribe;
@@ -101,6 +101,24 @@ export function Act3_ScenarioWalkthrough() {
       >
         Drag anywhere to orbit the house, scroll to zoom — you can move the camera around freely while you try it.
       </p>
+      <button
+        type="button"
+        onClick={() => useActStore.getState().goToAct(4)}
+        style={{
+          marginTop: 'var(--space-2)',
+          background: 'transparent',
+          color: 'var(--text-secondary)',
+          border: '1px solid rgba(255,255,255,0.2)',
+          fontFamily: 'var(--font-display)',
+          fontWeight: 500,
+          fontSize: '13px',
+          padding: 'var(--space-2) var(--space-5)',
+          borderRadius: 'var(--r-md)',
+          cursor: 'pointer',
+        }}
+      >
+        Skip → App Store
+      </button>
       </div>
     </div>
   );

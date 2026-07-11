@@ -8,6 +8,7 @@ import { Act1_Sensing } from './Act1_Sensing';
 import { Act2_CentralBrain } from './Act2_CentralBrain';
 import { Act2_TraceReadout } from './Act2_TraceReadout';
 import { Act3_ScenarioWalkthrough } from './Act3_ScenarioWalkthrough';
+import { Act4_AppStore } from './Act4_AppStore';
 import { Act3_StepDiagram } from './Act3_StepDiagram';
 import { PhoneTraceReadout } from '../phone/PhoneTraceReadout';
 import { ModuleCartridge } from '../ecosystem/ModuleCartridge';
@@ -51,6 +52,7 @@ export function ActShell() {
           {currentAct === 1 && <Act1_Sensing />}
           {currentAct === 2 && <Act2_CentralBrain />}
           {currentAct === 3 && <Act3_ScenarioWalkthrough />}
+          {currentAct === 4 && <Act4_AppStore />}
         </motion.div>
       </AnimatePresence>
 

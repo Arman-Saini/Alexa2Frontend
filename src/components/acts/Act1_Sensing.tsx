@@ -140,24 +140,67 @@ export function Act1_Sensing() {
         </p>
       </div>
 
-      <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-        {SECTIONS.map((_, i) => (
-          <button
-            key={i}
-            type="button"
-            onClick={() => setActive(i)}
-            aria-label={`Section ${i + 1}`}
-            style={{
-              width: 8,
-              height: 8,
-              borderRadius: '50%',
-              border: 'none',
-              padding: 0,
-              backgroundColor: i === active ? 'var(--ember-500)' : 'var(--void-border)',
-              cursor: 'pointer',
-            }}
-          />
-        ))}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
+        <button
+          type="button"
+          onClick={() => setActive((a) => Math.max(0, a - 1))}
+          disabled={active === 0}
+          aria-label="Previous"
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: '50%',
+            border: '1px solid rgba(255,255,255,0.25)',
+            background: active === 0 ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.12)',
+            color: active === 0 ? 'rgba(255,255,255,0.25)' : 'var(--text-primary)',
+            fontSize: '1.1rem',
+            cursor: active === 0 ? 'default' : 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          ‹
+        </button>
+
+        <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
+          {SECTIONS.map((_, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => setActive(i)}
+              aria-label={`Section ${i + 1}`}
+              style={{
+                width: i === active ? 20 : 8,
+                height: 8,
+                borderRadius: 4,
+                border: 'none',
+                padding: 0,
+                backgroundColor: i === active ? 'var(--ember-500)' : 'var(--void-border)',
+                cursor: 'pointer',
+                transition: 'width 0.25s ease, background-color 0.2s',
+              }}
+            />
+          ))}
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setActive((a) => Math.min(SECTIONS.length - 1, a + 1))}
+          disabled={active === SECTIONS.length - 1}
+          aria-label="Next"
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: '50%',
+            border: '1px solid rgba(255,255,255,0.25)',
+            background: active === SECTIONS.length - 1 ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.12)',
+            color: active === SECTIONS.length - 1 ? 'rgba(255,255,255,0.25)' : 'var(--text-primary)',
+            fontSize: '1.1rem',
+            cursor: active === SECTIONS.length - 1 ? 'default' : 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          ›
+        </button>
       </div>
 
       <button
