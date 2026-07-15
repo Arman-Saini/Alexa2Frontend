@@ -9,9 +9,8 @@ export type DisplayTier = 'T0·local' | 'T1·local' | 'T3·cloud';
 // Single source of truth for which pipeline-demo scenario a resolved
 // backend tier maps to. Consumed by both this store and (indirectly, via
 // requestByTier) the future /main-v2 page.
-export const TIER_TO_SCENARIO: Record<DisplayTier, Scenario['id']> = {
-  'T0·local': 'khata-t0',
-  'T1·local': 'lights-t1',
+export const TIER_TO_SCENARIO: Partial<Record<DisplayTier, Scenario['id']>> = {
+  'T0·local': 'living-room-auto-off-t0',
   'T3·cloud': 'hue-t3',
 };
 

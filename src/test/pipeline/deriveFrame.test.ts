@@ -233,12 +233,19 @@ describe('effect windows', () => {
 });
 
 describe('frame field passthroughs', () => {
+  it('keeps living-room auto-off focused on sensor, T0, actuation, and completion only', () => {
+    const scenario = SCENARIOS.find((entry) => entry.id === 'living-room-auto-off-t0')!;
+    expect(scenario.stages.map((stage) => stage.id)).toEqual(['presence', 'reflex', 'actuate', 'close']);
+    expect(scenario.stages.some((stage) => stage.tier === 'T1' || stage.tier === 'T2' || stage.tier === 'T3')).toBe(false);
+    expect(scenario.stages.flatMap((stage) => stage.effects ?? []).map((effect) => effect.kind)).toEqual(['device-actuate']);
+  });
+
   it('uses medium-strength physical focus for every resolved layer', () => {
-    const scenario = SCENARIOS.find((entry) => entry.id === 'lights-t1')!;
-    const stageIndex = scenario.stages.findIndex((stage) => stage.id === 't1-nlu');
+    const scenario = SCENARIOS.find((entry) => entry.id === 'living-room-auto-off-t0')!;
+    const stageIndex = scenario.stages.findIndex((stage) => stage.id === 'reflex');
     const frame = deriveFrame(scenario, stageIndex, 0.7, 0);
     expect(frame.focusStrength).toBe(0.55);
-    expect(frame.layerLifts[1]).toBeCloseTo(0.55, 12);
+    expect(frame.layerLifts[0]).toBeCloseTo(0.55, 12);
   });
 
   it('heart carries the stage pulse and flowPath; expression defaults to resting', () => {
@@ -290,12 +297,12 @@ describe('frame field passthroughs', () => {
   });
 
   it('cameraFocus pans toward the focus layer and scales with the lift envelope', () => {
-    const scenario = SCENARIOS.find((s) => s.id === 'lights-t1')!;
-    const i = scenario.stages.findIndex((s) => s.id === 't1-nlu'); // focus {layer:1, zoom:1.5}
+    const scenario = SCENARIOS.find((s) => s.id === 'living-room-auto-off-t0')!;
+    const i = scenario.stages.findIndex((s) => s.id === 'reflex'); // focus {layer:0, zoom:1.45}
     const mid = deriveFrame(scenario, i, 0.7, 0); // envelope = 1
     expect(mid.cameraFocus).not.toBeNull();
-    expect(mid.cameraFocus!.panX).toBeCloseTo((1 - 2.5) * 1.3, 9);
-    expect(mid.cameraFocus!.zoomMul).toBeCloseTo(1.5, 9);
+    expect(mid.cameraFocus!.panX).toBeCloseTo((0 - 2.5) * 1.3, 9);
+    expect(mid.cameraFocus!.zoomMul).toBeCloseTo(1.45, 9);
     // envelope 0 at stage start → represented as null
     expect(deriveFrame(scenario, i, 0, 0).cameraFocus).toBeNull();
     // and at the very end of the stage (lift ramped fully out)

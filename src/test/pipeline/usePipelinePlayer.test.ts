@@ -85,7 +85,7 @@ afterEach(() => {
 describe('usePipelinePlayer — rAF loop discipline', () => {
   it('registers no rAF while idle, exactly one per frame cycle while loaded', () => {
     expect(rafCallbacks.size).toBe(0);
-    act(() => latest.load('lights-t1'));
+    act(() => latest.load('living-room-auto-off-t0'));
     expect(rafCallbacks.size).toBe(1);
     for (let i = 0; i < 5; i++) {
       pump(16);
@@ -102,7 +102,7 @@ describe('usePipelinePlayer — rAF loop discipline', () => {
   });
 
   it('clamps dt: a 500ms frame gap advances stageT by at most 100ms worth', () => {
-    act(() => latest.load('lights-t1', true));
+    act(() => latest.load('living-room-auto-off-t0', true));
     pump(16); // priming tick establishes lastTime (dt = 0)
     expect(latest.frameRef.current!.stageT).toBe(0);
     pump(500);
@@ -134,14 +134,14 @@ describe('usePipelinePlayer — no per-frame re-renders', () => {
 
 describe('usePipelinePlayer — subscribe', () => {
   it('receives a frame every pumped tick; unsubscribe stops delivery', () => {
-    act(() => latest.load('lights-t1'));
+    act(() => latest.load('living-room-auto-off-t0'));
     const frames: DerivedFrame[] = [];
     const unsubscribe = latest.subscribe((f) => frames.push(f));
     pump(16);
     pump(16);
     pump(16);
     expect(frames.length).toBe(3);
-    expect(frames[0].stage.id).toBe('wake');
+    expect(frames[0].stage.id).toBe('presence');
     unsubscribe();
     pump(16);
     expect(frames.length).toBe(3);
@@ -170,7 +170,7 @@ describe('usePipelinePlayer — seek and play semantics', () => {
   });
 
   it('play() resumes from the current position — it never restarts', () => {
-    act(() => latest.load('lights-t1', true));
+    act(() => latest.load('living-room-auto-off-t0', true));
     pump(16);
     for (let i = 0; i < 10; i++) pump(100); // 1000ms into stage 0 (4000ms)
     const before = latest.frameRef.current!.stageT;
@@ -226,7 +226,7 @@ describe('usePipelinePlayer — prev()/next() semantics', () => {
 
 describe('usePipelinePlayer — visibilitychange', () => {
   it('suspends the loop while hidden and resumes honoring wasPlaying', () => {
-    act(() => latest.load('lights-t1', true));
+    act(() => latest.load('living-room-auto-off-t0', true));
     pump(16);
     expect(rafCallbacks.size).toBe(1);
 
@@ -251,7 +251,7 @@ describe('usePipelinePlayer — visibilitychange', () => {
   });
 
   it('does not force playback on resume when it was paused before hiding', () => {
-    act(() => latest.load('lights-t1'));
+    act(() => latest.load('living-room-auto-off-t0'));
     expect(latest.playing).toBe(false);
 
     setDocumentHidden(true);
@@ -272,7 +272,7 @@ describe('usePipelinePlayer — visibilitychange', () => {
 
 describe('usePipelinePlayer — stop() and end behavior', () => {
   it('stop() clears the scenario, frameRef, and the loop', () => {
-    act(() => latest.load('lights-t1', true));
+    act(() => latest.load('living-room-auto-off-t0', true));
     pump(16);
     expect(latest.frameRef.current).not.toBeNull();
     act(() => latest.stop());

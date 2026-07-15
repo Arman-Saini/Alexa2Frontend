@@ -172,7 +172,7 @@ export function LayerGroup({
   // allocating a new THREE.Color every node, every frame).
   const tempColor = useMemo(() => new THREE.Color(), []);
 
-  // Generate random movement seeds for the 16 floating data nodes on the top plate
+  // Stable movement seeds keep a replay visually identical on every mount.
   const nodeSeeds = useMemo(() => {
     return Array.from({ length: 16 }, (_, i) => {
       const row = i % 4;
@@ -183,13 +183,13 @@ export function LayerGroup({
       return {
         baseX,
         baseZ,
-        phaseX: Math.random() * Math.PI * 2,
-        phaseY: Math.random() * Math.PI * 2,
-        phaseZ: Math.random() * Math.PI * 2,
-        speedX: 0.6 + Math.random() * 0.8,
-        speedY: 0.8 + Math.random() * 1.0,
-        speedZ: 0.6 + Math.random() * 0.8,
-        amplitude: 0.15 + Math.random() * 0.2,
+        phaseX: ((i * 37) % 16) / 16 * Math.PI * 2,
+        phaseY: ((i * 53 + 3) % 16) / 16 * Math.PI * 2,
+        phaseZ: ((i * 71 + 7) % 16) / 16 * Math.PI * 2,
+        speedX: 0.6 + ((i * 11) % 9) / 10,
+        speedY: 0.8 + ((i * 7) % 11) / 10,
+        speedZ: 0.6 + ((i * 5) % 9) / 10,
+        amplitude: 0.15 + ((i * 13) % 6) / 20,
       };
     });
   }, []);
@@ -327,7 +327,7 @@ export function LayerGroup({
       if (cap2Ref.current) cap2Ref.current.position.x = x2;
     }
 
-    if (index === 2) {
+    if (index === 2 && microAnimBoost > 0.001) {
       // Cyber rings and orbitals remain static
       if (ringRef.current) ringRef.current.rotation.set(Math.PI / 2, 0, 0);
       if (innerRingRef.current) innerRingRef.current.rotation.set(0, 0, 0);
@@ -422,6 +422,11 @@ export function LayerGroup({
       if (idleGearRef.current) {
         idleGearRef.current.rotation.y = elapsed * 1.2;
       }
+    } else if (index === 2) {
+      // Never run or reveal the decorative gear loop outside an actuation beat.
+      if (gearGroupRef.current) gearGroupRef.current.scale.set(0, 0, 0);
+      gearMaterial.opacity = 0;
+      if (gearLabelDivRef.current) gearLabelDivRef.current.style.opacity = '0';
     }
 
     if (index === 3) {

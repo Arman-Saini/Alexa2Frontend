@@ -12,8 +12,8 @@ function isValidPathNode(n: unknown): n is PathNodeId {
 }
 
 describe('SCENARIOS data invariants', () => {
-  it('has exactly 5 scenarios', () => {
-    expect(SCENARIOS.length).toBe(5);
+  it('has exactly 4 scenarios', () => {
+    expect(SCENARIOS.length).toBe(4);
   });
 
   for (const scenario of SCENARIOS) {
@@ -60,9 +60,9 @@ describe('SCENARIOS data invariants', () => {
         }
       });
 
-      it('total scenario duration is between 40000 and 120000 ms', () => {
+      it('total scenario duration fits its demonstration scope', () => {
         const total = scenario.stages.reduce((sum, s) => sum + s.durationMs, 0);
-        expect(total).toBeGreaterThanOrEqual(40000);
+        expect(total).toBeGreaterThanOrEqual(scenario.id === 'living-room-auto-off-t0' ? 12000 : 40000);
         expect(total).toBeLessThanOrEqual(120000);
       });
 

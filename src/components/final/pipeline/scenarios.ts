@@ -3,87 +3,49 @@ import { TIER_META } from './types';
 import { PULSE_IO, PULSE_T0, PULSE_T1, PULSE_T2, PULSE_T3 } from './poses';
 
 // ─────────────────────────────────────────────────────────────────────────
-// A — lights-t1 · "Turn on the living room lights" (T1 fast path, ~50s)
+// A — living-room-auto-off-t0 · presence leaves → lights off (silent T0, ~21s)
 // ─────────────────────────────────────────────────────────────────────────
-const lightsT1: Scenario = {
-  id: 'lights-t1',
-  label: 'Turn on the living room lights',
-  utterance: 'Turn on the living room lights',
+const livingRoomAutoOffT0: Scenario = {
+  id: 'living-room-auto-off-t0',
+  label: 'Living room empty → lights off',
+  utterance: 'Presence sensor: living room empty for 5 minutes',
   language: 'en',
-  finalTier: 'T1',
-  accent: TIER_META.T1.color,
-  icon: '💡',
+  finalTier: 'T0',
+  accent: TIER_META.T0.color,
+  icon: '◌',
   stages: [
     {
-      id: 'wake', tier: 'IO', title: 'IO · WAKE — On-device wake word detection',
-      body: 'Wake word fires on-device — nothing has left the room yet.',
-      tech: 'Wake word · on-device DSP · <5ms · $0',
-      activeLayer: null, cameraPose: 'assembled', flowPath: ['mic'],
-      pulse: PULSE_IO, durationMs: 4000, expression: 'curious',
+      id: 'presence', tier: 'IO', title: 'LIVING ROOM · PRESENCE SENSOR',
+      body: 'Room empty for five minutes. No one asked.',
+      tech: 'presence=false · unoccupied_for=5m · local sensor event',
+      activeLayer: null, cameraPose: 'assembled', flowPath: ['device'],
+      pulse: PULSE_IO, durationMs: 4200, expression: 'resting',
     },
     {
-      id: 'open', tier: 'IO', title: 'IO · INSIDE THE SHELL — Opening the CPU stack',
-      body: "Let's look inside while it works.",
-      tech: 'Shell hinge open · CPU stack exposed',
-      activeLayer: null, cameraPose: 'shell-open', flowPath: ['mic'],
-      pulse: PULSE_IO, durationMs: 5000, expression: 'excited',
+      id: 'reflex', tier: 'T0', title: 'T0 · REFLEX — COMPILED RULE FIRES',
+      body: 'Approved convenience rule matches. It runs on-device in under 10ms.',
+      tech: 'room_unoccupied → living_room_lights_off · <10ms · $0',
+      badges: ['LOCAL RULE', 'REGIME ✓'],
+      activeLayer: 0, cameraPose: 'splay-flat', cameraFocus: { layer: 0, zoom: 1.45 },
+      flowPath: ['device', 0], pulse: PULSE_T0, durationMs: 7200, latencyMs: 6,
     },
     {
-      id: 'stt', tier: 'IO', title: 'IO · STT — Speech to text',
-      body: 'Speech becomes text — already in English, so no translation is needed.',
-      tech: 'Groq Whisper STT · translate passthrough (EN)',
-      badges: ['EN'],
-      activeLayer: 1, cameraPose: 'splay-flat', flowPath: ['mic', 1],
+      id: 'actuate', tier: 'IO', title: 'LIVING ROOM · LIGHTS OFF',
+      body: 'Lights switch off silently. No cloud call. No spoken confirmation.',
+      tech: 'executeTool · living_room_lights.power=false',
+      activeLayer: 2, cameraPose: 'splay-flat', flowPath: [0, 2, 'device'],
       pulse: PULSE_IO, durationMs: 6000,
+      effects: [{ at: 0.28, durationMs: 2800, kind: 'device-actuate', anchor: 'device', label: 'living room lights · off' }],
     },
     {
-      id: 't0-check', tier: 'T0', title: 'T0 · REFLEX — Checking compiled rules',
-      body: 'First stop, always: the reflex table. No compiled rule matches.',
-      tech: 'runT0RuleEngine · pattern match · <10ms · $0',
-      badges: ['NO MATCH'],
-      activeLayer: 0, cameraPose: 'splay-flat', flowPath: [1, 0],
-      pulse: PULSE_T0, durationMs: 6000, latencyMs: 8,
-    },
-    {
-      id: 't1-nlu', tier: 'T1', title: 'T1 · PERCEPTION — Local intent match',
-      body: 'Local perception matches `light_on(living_room)` with regex NLU. No cloud, no cost.',
-      tech: 'regex NLU · Hinglish patterns · <100ms · $0',
-      badges: ['MATCH'],
-      activeLayer: 1, cameraPose: 'splay-flat', cameraFocus: { layer: 1, zoom: 1.5 },
-      flowPath: [0, 1], pulse: PULSE_T1, durationMs: 8000, latencyMs: 60,
-    },
-    {
-      id: 'actuate', tier: 'IO', title: 'IO · ACTUATE — MCP device interposer',
-      body: 'The interposer dispatches the command straight to the device.',
-      tech: 'executeTool · MCP device interposer · Hue bridge',
-      activeLayer: 2, cameraPose: 'splay-flat', flowPath: [1, 2, 'device'],
-      pulse: PULSE_IO, durationMs: 7000,
-      effects: [{ at: 0.4, durationMs: 3000, kind: 'device-actuate', anchor: 'device', label: 'hue.light_on → LIVING_ROOM' }],
-    },
-    {
-      id: 'log', tier: 'IO', title: 'IO · MEMORY — Event history log',
-      body: 'Every resolution is remembered — event history feeds the nightly rule miner.',
-      tech: 'event log write · feeds 02:00 nightly miner',
-      activeLayer: 3, cameraPose: 'splay-flat', flowPath: [2, 3],
-      pulse: PULSE_IO, durationMs: 5000,
-      effects: [{ at: 0.3, durationMs: 2500, kind: 'event-log', anchor: 3, label: 'event logged · light_on' }],
-    },
-    {
-      id: 'respond', tier: 'IO', title: 'IO · RESPOND — Text to speech',
-      body: 'The answer is spoken back, in English.',
-      tech: 'buildSpokenResponse → Polly en-IN',
-      activeLayer: null, cameraPose: 'rejoin', flowPath: [1, 'mic'],
-      pulse: PULSE_IO, durationMs: 6000, expression: 'happy',
-    },
-    {
-      id: 'close', tier: 'IO', title: 'IO · TRACE — What just happened',
-      body: 'Trace: `[device, t0, t1]` · "Thinks locally" · ~70ms · $0',
-      tech: '[device, t0, t1] · "Thinks locally" · ~70ms · $0',
+      id: 'close', tier: 'IO', title: 'COMPLETE · SILENT LOCAL ROUTINE',
+      body: 'Living room lights are off.',
+      tech: '[device, t0] · 6ms · $0',
       activeLayer: null, cameraPose: 'closed', flowPath: [],
-      pulse: PULSE_IO, durationMs: 4000,
+      pulse: PULSE_IO, durationMs: 3600, expression: 'resting',
     },
   ],
-  summary: { response: 'Living room lights on.', latencyMs: 72, costUsd: 0, tierTag: 'T1·local' },
+  summary: { response: 'Living room lights off.', latencyMs: 6, costUsd: 0, tierTag: 'T0·local' },
 };
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -272,85 +234,7 @@ const hueT3: Scenario = {
   summary: { response: 'Done — relax scene set for tonight.', latencyMs: 2400, costUsd: 0.0038, tierTag: 'T3·cloud' },
 };
 
-// ─────────────────────────────────────────────────────────────────────────
-// D — routine-t0 · Sensor: water tank full → motor auto-off (~55s, no wake word)
-// ─────────────────────────────────────────────────────────────────────────
-const routineT0: Scenario = {
-  id: 'routine-t0',
-  label: 'Silent routine: tank full → motor off',
-  utterance: 'Water tank sensor: 98% full (no wake word — automated routine trigger)',
-  language: 'en',
-  finalTier: 'T0',
-  accent: TIER_META.T0.color,
-  icon: '💧',
-  stages: [
-    {
-      id: 'sensor', tier: 'IO', title: 'IO · SENSOR — Tank sensor trigger (no wake word)',
-      body: 'No one spoke. A tank sensor reports 98%.',
-      tech: 'sensor event · water_tank_level=98% · no wake word',
-      activeLayer: null, cameraPose: 'assembled', flowPath: ['device'],
-      pulse: PULSE_IO, durationMs: 5000, expression: 'sleepy',
-    },
-    {
-      id: 'reflex', tier: 'T0', title: 'T0 · REFLEX — Compiled routine fires',
-      body: 'A compiled reflex fires in under 10ms: `water_motor_auto_off`. Regime guard passes (NORMAL). Trigger #34.',
-      tech: 'runT0RuleEngine · water_motor_auto_off · <10ms · $0',
-      badges: ['REGIME ✓', 'trigger_count: 34'],
-      activeLayer: 0, cameraPose: 'splay-flat', cameraFocus: { layer: 0, zoom: 1.5 },
-      flowPath: ['device', 0], pulse: PULSE_T0, durationMs: 9000, latencyMs: 6,
-    },
-    {
-      id: 'actuate', tier: 'IO', title: 'IO · ACTUATE — MCP device interposer',
-      body: 'The motor is switched off, silently — no one needed to ask.',
-      tech: 'executeTool · motor.off',
-      activeLayer: 2, cameraPose: 'splay-flat', flowPath: [0, 2, 'device'],
-      pulse: PULSE_IO, durationMs: 6000,
-      effects: [{ at: 0.3, durationMs: 2500, kind: 'device-actuate', anchor: 'device', label: 'motor.off' }],
-    },
-    {
-      id: 'origin-1', tier: 'T3', title: 'T3 · REASON — Where reflexes come from',
-      body: 'Where did that rule come from? Every night at 02:00 a classical miner (no LLM) reads event history and finds this pattern, confidence 0.91.',
-      tech: 'nightly rule miner · classical stats, no LLM · 02:00',
-      badges: ['NIGHTLY MINER · conf 0.91 ≥ 0.85'],
-      activeLayer: 5, cameraPose: 'splay-flat', flowPath: [3, 5],
-      pulse: PULSE_T3, durationMs: 10000,
-    },
-    {
-      id: 'origin-2', tier: 'T3', title: 'T3 · REASON — Forging the new rule',
-      body: '≥0.85 auto-promotes; below that the user confirms.',
-      tech: 'confidence ≥0.85 → auto-promote',
-      activeLayer: 5, cameraPose: 'splay-flat', flowPath: [5],
-      pulse: PULSE_T3, durationMs: 8000,
-      effects: [{ at: 0.3, durationMs: 3500, kind: 'rule-forge', anchor: 5, label: 'rule: water_motor_auto_off' }],
-    },
-    {
-      id: 'promote', tier: 'T0', title: 'T0 · REFLEX — Rule promoted from cloud',
-      body: "The forged rule descends to the reflex layer. Reasoning was expensive exactly once — now it's free forever.",
-      tech: 'rule_promote · T3 → T0 · one-time cost',
-      activeLayer: 0, cameraPose: 'splay-flat', flowPath: [5, 0],
-      pulse: PULSE_T0, durationMs: 9000,
-      effects: [{ at: 0.15, durationMs: 5000, kind: 'rule-promote', anchor: 0, label: 'promoted → T0 reflex' }],
-    },
-    {
-      id: 'log', tier: 'IO', title: 'IO · MEMORY — Event history log',
-      body: 'Every resolution is remembered — event history feeds the nightly rule miner.',
-      tech: 'event log write · feeds 02:00 nightly miner',
-      activeLayer: 3, cameraPose: 'splay-flat', flowPath: [0, 3],
-      pulse: PULSE_IO, durationMs: 4000,
-      effects: [{ at: 0.3, durationMs: 2000, kind: 'event-log', anchor: 3, label: 'event logged · water_motor_auto_off' }],
-    },
-    {
-      id: 'close', tier: 'IO', title: 'IO · TRACE — What just happened',
-      body: 'Trace: `[device,t0]` · "Instant reflex" · 6ms · $0',
-      tech: '[device,t0] · "Instant reflex" · 6ms · $0',
-      activeLayer: null, cameraPose: 'closed', flowPath: [],
-      pulse: PULSE_IO, durationMs: 4000, expression: 'resting',
-    },
-  ],
-  summary: { response: '(silent routine) Water motor off — tank full.', latencyMs: 6, costUsd: 0, tierTag: 'T0·local' },
-};
-
-// E — storage-tour: one factual end-to-end learning loop. Fast paths above do
+// D — storage-tour: one factual end-to-end learning loop. Fast paths above do
 // not pretend to write every store; this dedicated tour makes each boundary
 // explicit without weakening their accuracy.
 const storageTour: Scenario = {
@@ -427,4 +311,4 @@ const storageTour: Scenario = {
   summary: { response: 'Memory tour complete. Next matching request can run locally.', latencyMs: 8, costUsd: 0, tierTag: 'T0·local' },
 };
 
-export const SCENARIOS: Scenario[] = [lightsT1, khataT0, hueT3, routineT0, storageTour];
+export const SCENARIOS: Scenario[] = [livingRoomAutoOffT0, khataT0, hueT3, storageTour];

@@ -20,7 +20,6 @@ import { FinalAlexaCanvas } from '../FinalAlexaCanvas';
 import { SmartphoneWidget, type ChatSummary } from '../../phone/SmartphoneWidget';
 import { useIsMobileViewport } from '../../../hooks/useIsMobileViewport';
 import { PipelineHud } from './PipelineHud';
-import { PipelineGuideAvatar } from './PipelineGuideAvatar';
 import { StorageGraph } from './StorageGraph';
 import { usePipelinePlayer } from './usePipelinePlayer';
 import { SCENARIOS } from './scenarios';
@@ -690,14 +689,6 @@ export function PipelineDemo({
       </div>
 
       {isStorageTour && <StorageGraph stageIndex={player.stageIndex} stage={player.stage} />}
-
-      {mode === 'full' && !isMobileViewport && player.scenario && !isStorageTour && (
-        <PipelineGuideAvatar
-          scenario={player.scenario}
-          stage={player.stage}
-          stageIndex={player.stageIndex}
-        />
-      )}
 
       {showPhoneResolved && !isStorageTour && (
         <div

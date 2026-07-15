@@ -10,7 +10,9 @@ export const POSE_S: Record<CameraPose, number> = {
   closed: 1.0,
 };
 
-export const LIFT_HEIGHT = 0.9;
+// Stack renders at compact scale (0.20). Three local units produce a clear
+// visible lift without changing the established splayed layout.
+export const LIFT_HEIGHT = 3.0;
 
 // World pan per layer offset: (layer - 2.5) * 6.5 * 0.20 (group scale 0.20).
 // FOCUS_PAN_PER_LAYER is the constant multiplier tuned visually against that formula.

@@ -1,7 +1,7 @@
 import type { RefObject } from 'react';
 import type { ChatSummary } from '../../phone/SmartphoneWidget';
 
-export type TierId = 'IO' | 'T0' | 'T1' | 'T2' | 'T3'; // IO = bookends (wake/STT/translate/TTS/device)
+export type TierId = 'IO' | 'T0' | 'T1' | 'T2' | 'T3'; // IO = device/sensor bookends
 
 export type CameraPose =
   | 'assembled'   // robot closed                       (s = 0)
@@ -55,7 +55,7 @@ export interface Stage {
 }
 
 export interface Scenario {
-  id: 'lights-t1' | 'khata-t0' | 'hue-t3' | 'routine-t0' | 'storage-tour';
+  id: 'living-room-auto-off-t0' | 'khata-t0' | 'hue-t3' | 'storage-tour';
   label: string;
   utterance: string;
   language: 'en' | 'hinglish';

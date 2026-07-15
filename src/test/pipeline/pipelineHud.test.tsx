@@ -26,8 +26,8 @@ interface MockPlayer extends PipelinePlayer {
   emit(f: DerivedFrame): void;
 }
 
-// DerivedFrame-shaped object built from SCENARIOS[0] stage 5 ('actuate').
-function buildFrame(stageIndex = 5): DerivedFrame {
+// DerivedFrame-shaped object built from SCENARIOS[0] actuation stage.
+function buildFrame(stageIndex = 2): DerivedFrame {
   const scenario = SCENARIOS[0];
   const stage = scenario.stages[stageIndex];
   return {
@@ -129,7 +129,7 @@ describe('PromptPicker', () => {
   it('renders one card per scenario when scenario is null', () => {
     render(makePlayer());
     const cards = container.querySelectorAll('[data-picker-card]');
-    expect(cards.length).toBe(5);
+    expect(cards.length).toBe(4);
     expect(container.textContent).toContain(SCENARIOS[0].utterance);
     expect(container.textContent).toContain(SCENARIOS[2].utterance);
   });
@@ -146,8 +146,8 @@ describe('PromptPicker', () => {
 
 describe('NarrationCard', () => {
   it('shows title, body and tech line for the active stage', () => {
-    const player = makeActivePlayer(5);
-    const stage = SCENARIOS[0].stages[5];
+    const player = makeActivePlayer(2);
+    const stage = SCENARIOS[0].stages[2];
     render(player);
     expect(container.querySelector('[data-hud-title]')?.textContent).toBe(stage.title);
     expect(container.querySelector('[data-hud-body]')?.textContent).toBe(stage.body);
@@ -157,7 +157,7 @@ describe('NarrationCard', () => {
 
 describe('Transport', () => {
   it('wires prev / pause / next / end to the player methods', () => {
-    const player = makeActivePlayer(5, { playing: true });
+    const player = makeActivePlayer(2, { playing: true });
     render(player);
     click(container.querySelector('[aria-label="Previous stage"]')!);
     expect(player.prev).toHaveBeenCalledTimes(1);
@@ -170,7 +170,7 @@ describe('Transport', () => {
   });
 
   it('shows Play and calls play() when paused', () => {
-    const player = makeActivePlayer(5, { playing: false });
+    const player = makeActivePlayer(2, { playing: false });
     render(player);
     expect(container.querySelector('[aria-label="Pause"]')).toBeNull();
     click(container.querySelector('[aria-label="Play"]')!);
@@ -181,7 +181,7 @@ describe('Transport', () => {
 
 describe('TimelineScrubber', () => {
   it('pointerdown at 50% of the track width calls seekGlobal(~0.5)', () => {
-    const player = makeActivePlayer(5);
+    const player = makeActivePlayer(2);
     render(player);
     const track = container.querySelector<HTMLDivElement>('[data-hud-scrubber]')!;
     track.getBoundingClientRect = () =>
@@ -207,7 +207,7 @@ describe('TimelineScrubber', () => {
 
 describe('StageRail', () => {
   it('renders one dot per stage and clicking a dot calls seekStage', () => {
-    const player = makeActivePlayer(5);
+    const player = makeActivePlayer(2);
     render(player);
     const dots = container.querySelectorAll('[data-stage-dot]');
     expect(dots.length).toBe(SCENARIOS[0].stages.length);
@@ -220,14 +220,14 @@ describe('StageRail', () => {
 describe('card swap on rapid stage change', () => {
   it('3 rapid stage changes leave exactly one live card (and at most one ghost)', async () => {
     const scenario = SCENARIOS[0];
+    render(makeActivePlayer(0));
+    render(makeActivePlayer(1));
+    render(makeActivePlayer(2));
     render(makeActivePlayer(3));
-    render(makeActivePlayer(4));
-    render(makeActivePlayer(5));
-    render(makeActivePlayer(6));
 
     const active = container.querySelectorAll('[data-hud-card="active"]');
     expect(active.length).toBe(1);
-    expect(active[0].querySelector('[data-hud-title]')?.textContent).toBe(scenario.stages[6].title);
+    expect(active[0].querySelector('[data-hud-title]')?.textContent).toBe(scenario.stages[3].title);
     expect(container.querySelectorAll('[data-hud-card="ghost"]').length).toBeLessThanOrEqual(1);
 
     // Let any in-flight exit animation settle inside act (avoids act warnings).
@@ -240,11 +240,11 @@ describe('card swap on rapid stage change', () => {
 
 describe('HUD tickers', () => {
   it('updates latency and cost when subscribe pushes a frame', () => {
-    const player = makeActivePlayer(5);
+    const player = makeActivePlayer(2);
     render(player);
     expect(() => {
       act(() => {
-        player.emit(buildFrame(5));
+        player.emit(buildFrame(2));
       });
     }).not.toThrow();
     expect(container.querySelector('[data-hud-latency]')?.textContent).toBe('68ms');
@@ -254,7 +254,7 @@ describe('HUD tickers', () => {
 
 describe('compact mode', () => {
   it('renders the narration card as a full-width bottom sheet capped at 40vh', () => {
-    render(makeActivePlayer(5), { compact: true });
+    render(makeActivePlayer(2), { compact: true });
     const card = container.querySelector<HTMLElement>('[data-hud-chrome="card"]')!;
     expect(card.className).toContain('max-h-[40vh]');
     expect(card.className).toContain('w-full');

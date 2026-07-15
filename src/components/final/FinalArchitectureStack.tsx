@@ -123,8 +123,8 @@ export function FinalArchitectureStack({
       currentLookAt.current.set(0, 0, 0);
     }
 
-    // 2. CPU stack position and scale
-    // CPU starts nested in bottom shell at scale 0.20 and grows to full size (1.0) during float sweep
+    // 2. CPU stack position and compact display scale. Layer coordinates are
+    // authored for this scale; changing it would push the splayed row offscreen.
     let scaleVal = 0.20;
     let targetY = 0;
 
