@@ -166,7 +166,7 @@ export function Act0_Resting() {
         </button>
         <Link
           data-anime
-          to="/showcase"
+          to="/live-showcase"
           style={{
             marginTop: 'var(--space-6)',
             marginLeft: 'var(--space-3)',

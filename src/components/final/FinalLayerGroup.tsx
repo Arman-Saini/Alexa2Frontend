@@ -703,7 +703,7 @@ export function LayerGroup({
       {dimmed && (
         <mesh position={[0, 0.24, 0]} rotation={[-Math.PI / 2, 0, 0]}>
           <planeGeometry args={[5.25, 5.25]} />
-          <meshBasicMaterial color="#090807" transparent opacity={0.42} depthWrite={false} />
+          <meshBasicMaterial color="#2a211c" transparent opacity={0.12} depthWrite={false} />
         </mesh>
       )}
       {/* Highlight plate — flat glow under the layer while lifted during a

@@ -107,6 +107,13 @@ export function HeartFlow({ heart, s, accent, quality }: HeartFlowProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [heart.flowPath, sBucket]);
 
+  // Keep route legible before cells arrive. The tube stays subtle; bright cells
+  // still communicate direction and make the active decision feel alive.
+  const flowTubeGeometry = useMemo(
+    () => curve ? new THREE.TubeGeometry(curve, 48, 0.075, 8, closed) : null,
+    [curve, closed],
+  );
+
   // Radial-gradient back-glow texture (high quality tier only).
   const glowTexture = useMemo(() => {
     if (!preset.coreGlowSprite || typeof document === 'undefined') return null;
@@ -154,7 +161,7 @@ export function HeartFlow({ heart, s, accent, quality }: HeartFlowProps) {
     if (mesh && curve) {
       const { params, phases } = cellParams;
       for (let i = 0; i < cellCount; i++) {
-        const speed = 0.05 + 0.45 * strength * heartWave(elapsed + phases[i], bpm);
+        const speed = 0.12 + 0.72 * strength * heartWave(elapsed + phases[i], bpm);
         let t = params[i] + delta * speed;
         t = t - Math.floor(t); // mod 1
         params[i] = t;
@@ -201,12 +208,17 @@ export function HeartFlow({ heart, s, accent, quality }: HeartFlowProps) {
       )}
 
       {/* Blood cells — one InstancedMesh riding the flow spline */}
+      {flowTubeGeometry && (
+        <mesh geometry={flowTubeGeometry}>
+          <meshBasicMaterial color={accent} transparent opacity={0.32} toneMapped={false} depthWrite={false} />
+        </mesh>
+      )}
       <instancedMesh
         ref={cellsRef}
         args={[undefined, undefined, cellCount]}
         frustumCulled={false}
       >
-        <sphereGeometry args={[0.07, preset.cellSegments, preset.cellSegments]} />
+        <sphereGeometry args={[0.15, preset.cellSegments, preset.cellSegments]} />
         <meshBasicMaterial color={accent} toneMapped={false} />
       </instancedMesh>
     </group>

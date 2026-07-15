@@ -60,8 +60,10 @@ export default function App() {
         <Route path="/companion" element={<CompanionPage />} />
         <Route path="/smartphone" element={<SmartphoneOnlyPage />} />
         <Route path="/final" element={<FinalPage />} />
-        <Route path="/showcase" element={<FinalShowcasePage />} />
-        <Route path="/showcase-live" element={<ShowcaseLivePage />} />
+        <Route path="/showcase" element={<Navigate to="/live-showcase" replace />} />
+        <Route path="/showcase-live" element={<Navigate to="/live-showcase" replace />} />
+        <Route path="/live-showcase" element={<ShowcaseLivePage />} />
+        <Route path="/showcase-classic" element={<FinalShowcasePage />} />
         <Route path="/main-v2" element={<HomeV2Page />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

@@ -592,7 +592,7 @@ export function PipelineDemo({
               </span>
             </div>
             <Link
-              to="/showcase"
+              to="/live-showcase"
               className="md:hidden flex items-center space-x-2 px-3 py-1 text-[10px] font-mono tracking-wider transition-all duration-200 border bg-black/30 hover:bg-[#C08662]/10 hover:border-[#C08662]"
               style={{ borderColor: themeVars.border, color: themeVars.text }}
             >
@@ -605,7 +605,7 @@ export function PipelineDemo({
               className="hidden md:flex items-center space-x-2 px-4 py-1.5 text-xs font-mono tracking-wider transition-all duration-200 border bg-black/30 hover:bg-[#C08662]/10 hover:border-[#C08662] hover:text-[#C08662]"
               style={{ borderColor: themeVars.border, color: themeVars.text }}
             >
-              ← BACK TO SHOWCASE
+              ← RESTART SHOWCASE
             </Link>
           </div>
         </header>

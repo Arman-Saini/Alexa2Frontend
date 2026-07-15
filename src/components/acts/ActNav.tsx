@@ -140,7 +140,7 @@ export function ActNav() {
       <div style={{ width: 1, height: 16, backgroundColor: 'var(--void-border)' }} />
 
       <Link
-        to="/showcase"
+        to="/live-showcase"
         style={{
           fontFamily: 'var(--font-body)',
           fontSize: 11,
