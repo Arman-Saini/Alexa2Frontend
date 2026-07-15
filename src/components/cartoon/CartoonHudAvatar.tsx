@@ -36,6 +36,7 @@ export function CartoonHudAvatar() {
   const lastReply = useTourStore((s) => s.lastReply);
   const lastReplyAt = useTourStore((s) => s.lastReplyAt);
   const lastReplySource = useTourStore((s) => s.lastReplySource);
+  const avatarOverride = useTourStore((s) => s.avatarOverride);
   const { isConnected } = useWebSocket();
 
   // A real reply sticks around for a bit, then the bubble reverts to
@@ -89,8 +90,13 @@ export function CartoonHudAvatar() {
     return () => clearInterval(id);
   }, []);
 
-  const expression = isSpeaking ? 'happy' : isListening ? 'curious' : isSinging ? 'happy' : 'resting';
-  const ledMode = isSpeaking ? 'wave' : isListening ? 'pulse' : isSinging ? 'wave' : 'solid';
+  const expression = avatarOverride
+    ? avatarOverride.expression
+    : isSpeaking ? 'happy' : isListening ? 'curious' : isSinging ? 'happy' : 'resting';
+  const ledMode = avatarOverride
+    ? avatarOverride.ledMode
+    : isSpeaking ? 'wave' : isListening ? 'pulse' : isSinging ? 'wave' : 'solid';
+  const ledColor = avatarOverride ? avatarOverride.ledColor : '#00f3ff';
 
   const hasRealReply = lastReplySource === 'phone' && !!lastReply && !replyExpired;
   const bubbleText = !isConnected
@@ -204,7 +210,7 @@ export function CartoonHudAvatar() {
           <CuteAlexaModel
             expression={expression}
             bodyColor="#2e323b"
-            ledColor="#00f3ff"
+            ledColor={ledColor}
             ledMode={ledMode}
             outlineThickness={1.3}
             explodedProgress={0}

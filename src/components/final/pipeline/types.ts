@@ -16,7 +16,8 @@ export type PathNodeId = 'mic' | 'device' | 'cloud' | 0 | 1 | 2 | 3 | 4 | 5;
 
 export type EffectKind =
   | 'vault-write' | 'cache-set' | 'cache-hit' | 'rule-forge'
-  | 'rule-promote' | 'event-log' | 'device-actuate';
+  | 'rule-promote' | 'event-log' | 'device-actuate'
+  | 'session-buffer' | 'cloud-history-write';
 
 export interface SideEffect {
   at: number;            // stageT ∈ [0,1] when it starts
@@ -54,7 +55,7 @@ export interface Stage {
 }
 
 export interface Scenario {
-  id: 'lights-t1' | 'khata-t0' | 'hue-t3' | 'routine-t0';
+  id: 'lights-t1' | 'khata-t0' | 'hue-t3' | 'routine-t0' | 'storage-tour';
   label: string;
   utterance: string;
   language: 'en' | 'hinglish';
@@ -86,6 +87,8 @@ export interface DerivedFrame {
   explodedProgress: number;       // robot shell, same piecewise map as today
   layerLifts: [number,number,number,number,number,number];
   activeLayer: number | null;
+  /** Medium-strength presentation focus. Other stack parts recede. */
+  focusStrength: number;
   labelVisibility: [number,number,number,number,number,number];
   cameraFocus: { panX: number; zoomMul: number } | null; // → debugCamPanX / debugCamZoom
   heart: { bpm: number; strength: number; flowPath: PathNodeId[] };
@@ -108,7 +111,7 @@ export interface PipelinePlayer {
   stage: Stage | null;
   // ── Imperative channel: updated every rAF tick, NO re-renders.
   frameRef: RefObject<DerivedFrame | null>;   // 3D reads this inside useFrame
-  subscribe(cb: (f: DerivedFrame) => void): () => void; // HUD widgets (ECG, tickers,
+  subscribe(cb: (f: DerivedFrame) => void): () => void; // HUD widgets (tickers,
                                   // scrubber thumb, stage arc) write DOM directly from here
   // ── Controls (stable identities via useCallback):
   load(id: Scenario['id'], autoplay?: boolean): void;

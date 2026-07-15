@@ -17,7 +17,7 @@ function themeTarget(stage: Stage): number {
  * set when they actually change. Every 60fps update flows through frameRef /
  * subscribe — never through setState.
  */
-export function usePipelinePlayer(scenarios: Scenario[]): PipelinePlayer {
+export function usePipelinePlayer(scenarios: Scenario[], playbackRate = 1): PipelinePlayer {
   // ── Authoritative playback state (refs only) ──────────────────────────
   const scenarioRef = useRef<Scenario | null>(null);
   const stageIndexRef = useRef<number>(-1);
@@ -25,6 +25,9 @@ export function usePipelinePlayer(scenarios: Scenario[]): PipelinePlayer {
   const playingRef = useRef<boolean>(false);
   const endedRef = useRef<boolean>(false);
   const themeTRef = useRef<number>(0);
+  // Page mode never changes for a mounted demo. Ref keeps tick self-scheduling
+  // callback stable while still documenting speed as runtime playback input.
+  const playbackRateRef = useRef(playbackRate);
 
   const frameRef = useRef<DerivedFrame | null>(null);
   const subscribersRef = useRef<Set<(f: DerivedFrame) => void>>(new Set());
@@ -96,7 +99,9 @@ export function usePipelinePlayer(scenarios: Scenario[]): PipelinePlayer {
     if (lastTimeRef.current == null) lastTimeRef.current = timestamp;
     const rawDt = timestamp - lastTimeRef.current;
     lastTimeRef.current = timestamp;
-    const dt = Math.min(rawDt, 100); // clamp: a hitch/tab-stall slows the demo, never skips stages
+    // Keep the hitch clamp in real time, then apply intentional demo speed.
+    // This preserves stage order while making the live walkthrough concise.
+    const dt = Math.min(rawDt, 100) * playbackRateRef.current;
 
     const sc = scenarioRef.current;
     if (!sc) return;

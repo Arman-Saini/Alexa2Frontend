@@ -1,6 +1,6 @@
 /**
  * Two-Gaussian "lub-dub" heartbeat waveform, shared by heart core scale,
- * highlight glow, blood-cell speed, and the HUD ECG ticker.
+ * highlight glow and blood-cell speed.
  */
 export function heartWave(tSec: number, bpm: number): number {
   let phase = ((tSec * bpm) / 60) % 1;

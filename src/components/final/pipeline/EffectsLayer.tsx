@@ -42,6 +42,8 @@ export function EffectsLayer({ effects, s, quality }: EffectsLayerProps) {
             {effect.kind === 'rule-promote' && <PromoteMoment {...common} s={s} />}
             {effect.kind === 'device-actuate' && <ActuateMoment {...common} />}
             {effect.kind === 'event-log' && <EventLogMoment {...common} />}
+            {effect.kind === 'session-buffer' && <SessionBufferMoment {...common} />}
+            {effect.kind === 'cloud-history-write' && <CloudHistoryMoment {...common} />}
           </group>
         );
       })}
@@ -295,6 +297,48 @@ function EventLogMoment({ effect, showLabel }: MomentProps) {
         </mesh>
       )}
       {showLabel && rowGrow > 0.2 && p < 0.9 && <EffectLabel text={effect.label} y={0.55} color="#3bf574" />}
+    </group>
+  );
+}
+
+/** Volatile local RAM: packets fill a small buffer, then deliberately fade. */
+function SessionBufferMoment({ effect, showLabel }: MomentProps) {
+  const p = effect.progress;
+  const fill = window01(p, 0.08, 0.58);
+  const fade = 1 - window01(p, 0.78, 1);
+  return (
+    <group position={[0, 0.42, 0]}>
+      <mesh>
+        <boxGeometry args={[1.45, 0.52, 0.72]} />
+        <meshStandardMaterial color="#183142" emissive="#00c8ff" emissiveIntensity={0.35} transparent opacity={0.72 * fade} />
+      </mesh>
+      {[0, 1, 2, 3].map((slot) => (
+        <mesh key={slot} position={[-0.48 + slot * 0.32, 0, 0.38]} scale={[fill > slot / 4 ? 1 : 0.001, 1, 1]}>
+          <boxGeometry args={[0.22, 0.22, 0.04]} />
+          <meshBasicMaterial color="#62dcff" toneMapped={false} transparent opacity={fade} />
+        </mesh>
+      ))}
+      {showLabel && fill > 0.2 && <EffectLabel text={effect.label} y={0.78} color="#62dcff" />}
+    </group>
+  );
+}
+
+/** Durable cloud history: encrypted event packet rises into a cloud archive. */
+function CloudHistoryMoment({ effect, seg, showLabel }: MomentProps) {
+  const p = effect.progress;
+  const rise = window01(p, 0.12, 0.68);
+  const fade = 1 - window01(p, 0.85, 1);
+  return (
+    <group>
+      <mesh position={[0, 0.64, 0]}>
+        <sphereGeometry args={[0.52, Math.min(seg, 20), Math.min(seg, 20)]} />
+        <meshBasicMaterial color="#6479ff" toneMapped={false} transparent opacity={0.22 * fade} />
+      </mesh>
+      <mesh position={[0, THREE.MathUtils.lerp(-0.42, 0.64, rise), 0]} rotation={[0.25, p * 5, 0]}>
+        <boxGeometry args={[0.28, 0.12, 0.28]} />
+        <meshBasicMaterial color="#b9c5ff" toneMapped={false} transparent opacity={fade} />
+      </mesh>
+      {showLabel && rise > 0.15 && <EffectLabel text={effect.label} y={1.28} color="#b9c5ff" />}
     </group>
   );
 }

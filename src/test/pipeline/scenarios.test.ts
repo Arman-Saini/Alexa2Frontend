@@ -12,8 +12,8 @@ function isValidPathNode(n: unknown): n is PathNodeId {
 }
 
 describe('SCENARIOS data invariants', () => {
-  it('has exactly 4 scenarios', () => {
-    expect(SCENARIOS.length).toBe(4);
+  it('has exactly 5 scenarios', () => {
+    expect(SCENARIOS.length).toBe(5);
   });
 
   for (const scenario of SCENARIOS) {
@@ -71,6 +71,31 @@ describe('SCENARIOS data invariants', () => {
       });
     });
   }
+});
+
+describe('storage tour', () => {
+  it('tells one complete, ordered V3 memory lifecycle', () => {
+    const tour = SCENARIOS.find((scenario) => scenario.id === 'storage-tour');
+    expect(tour).toBeDefined();
+    expect(tour!.stages.map((stage) => stage.id)).toEqual([
+      'session-ram',
+      'novel-reason',
+      'cloud-history',
+      'local-cache',
+      'rule-candidate',
+      'promote-local',
+      'local-replay',
+      'storage-close',
+    ]);
+    expect(tour!.stages.map((stage) => stage.effects?.[0]?.kind).filter(Boolean)).toEqual([
+      'session-buffer',
+      'cloud-history-write',
+      'cache-set',
+      'rule-forge',
+      'rule-promote',
+      'device-actuate',
+    ]);
+  });
 });
 
 describe('heartWave', () => {

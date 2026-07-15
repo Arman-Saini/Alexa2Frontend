@@ -20,6 +20,8 @@ import { FinalAlexaCanvas } from '../FinalAlexaCanvas';
 import { SmartphoneWidget, type ChatSummary } from '../../phone/SmartphoneWidget';
 import { useIsMobileViewport } from '../../../hooks/useIsMobileViewport';
 import { PipelineHud } from './PipelineHud';
+import { PipelineGuideAvatar } from './PipelineGuideAvatar';
+import { StorageGraph } from './StorageGraph';
 import { usePipelinePlayer } from './usePipelinePlayer';
 import { SCENARIOS } from './scenarios';
 import { BASE_CAM_ZOOM } from './poses';
@@ -40,6 +42,7 @@ import type {
   Stage,
   TierId,
 } from './types';
+import { TIER_TO_SCENARIO } from '../../../store/pipelineBridge';
 
 export interface PipelineDemoProps {
   mode?: 'full' | 'embedded';
@@ -52,6 +55,9 @@ export interface PipelineDemoProps {
   onScenarioEnd?(scenarioId: string): void;
   onExit?(): void;
   className?: string;
+  /** External play command (e.g. from a bridge store): bump `token` to force
+   * (re)loading `scenarioId`, including replaying the currently loaded one. */
+  playRequest?: { scenarioId: Scenario['id']; token: number };
 }
 
 // ── Layer → tier mapping (plan's "Layer → tier mapping" table) ─────────────
@@ -64,12 +70,6 @@ const LABEL_OVERRIDES: ({ title: string; desc: string } | null)[] = [
   { title: 'T3 · REASON', desc: 'Nova Micro triage → Claude Haiku specialist' },
 ];
 
-const TIER_TO_SCENARIO: Record<NonNullable<ChatSummary['tier']>, Scenario['id']> = {
-  'T0·local': 'khata-t0',
-  'T1·local': 'lights-t1',
-  'T3·cloud': 'hue-t3',
-};
-
 function tierAccent(tier: TierId): string {
   return tier === 'IO' ? IO_COLOR : TIER_META[tier].color;
 }
@@ -81,6 +81,7 @@ interface CanvasBridge {
   dismantleMode: boolean;
   layerLifts: number[];
   labelVisibility: number[];
+  activeLayer: number | null;
   heart: { bpm: number; strength: number; flowPath: PathNodeId[] } | null;
   effects: ActiveEffect[];
   debugCamPanX: number;
@@ -96,6 +97,7 @@ const IDLE_BRIDGE: CanvasBridge = {
   dismantleMode: false,
   layerLifts: [0, 0, 0, 0, 0, 0],
   labelVisibility: [0, 0, 0, 0, 0, 0],
+  activeLayer: null,
   heart: null,
   effects: [],
   debugCamPanX: 0,
@@ -113,6 +115,7 @@ function frameToBridge(frame: DerivedFrame): CanvasBridge {
     dismantleMode: frame.dismantleActive,
     layerLifts: frame.layerLifts,
     labelVisibility: frame.labelVisibility,
+    activeLayer: frame.activeLayer,
     heart: frame.heart,
     effects: frame.effects,
     debugCamPanX: frame.cameraFocus?.panX ?? 0,
@@ -159,6 +162,23 @@ function fmtTime(): string {
   return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
+function formatPulseRoute(stage: Stage): string {
+  const names: Record<PathNodeId, string> = {
+    mic: 'microphone', device: 'device', cloud: 'cloud',
+    0: 'T0 Reflex', 1: 'T1 Perception', 2: 'Actuate',
+    3: 'T2 Recall', 4: 'Guard', 5: 'T3 Reason',
+  };
+  return stage.flowPath.map((node) => names[node]).join(' → ') || 'response channel';
+}
+
+function finalResponseDetail(scenario: Scenario): string {
+  const route = scenario.stages
+    .map((stage) => stage.tier)
+    .filter((tier, index, all) => index === 0 || tier !== all[index - 1])
+    .join(' → ');
+  return `Route: ${route}. ${TIER_META[scenario.finalTier].blurb}`;
+}
+
 export function PipelineDemo({
   mode = 'full',
   initialScenarioId,
@@ -170,8 +190,11 @@ export function PipelineDemo({
   onScenarioEnd,
   onExit,
   className,
+  playRequest,
 }: PipelineDemoProps) {
-  const player = usePipelinePlayer(SCENARIOS);
+  // Full-screen demo must finish before attention drops; embedded usage keeps
+  // the original pace for pages that need more time beside it.
+  const player = usePipelinePlayer(SCENARIOS, mode === 'full' ? 2.2 : 1);
   const isMobileViewport = useIsMobileViewport();
   const compact = mode === 'embedded' || isMobileViewport;
   const showPhoneResolved = showPhone ?? (mode === 'full' ? !isMobileViewport : false);
@@ -189,6 +212,24 @@ export function PipelineDemo({
     () => getMotionScale() * (quality === 'low' ? 0.5 : 1),
     [quality]
   );
+
+  // The dismantled stages need an HDR environment. Preload local asset while
+  // picker is visible, so later stage transitions never wait on remote CDN I/O.
+  useEffect(() => {
+    if (mode !== 'full') return;
+    const existing = document.querySelector<HTMLLinkElement>('link[data-pipeline-hdri]');
+    if (existing) return;
+    const preload = document.createElement('link');
+    preload.rel = 'preload';
+    // Environment loader fetches HDR bytes, so preload with same destination
+    // and CORS mode. This lets browser reuse response instead of double-fetch.
+    preload.as = 'fetch';
+    preload.href = '/hdri/interior_2k.hdr';
+    preload.crossOrigin = 'anonymous';
+    preload.dataset.pipelineHdri = 'true';
+    document.head.appendChild(preload);
+    return () => preload.remove();
+  }, [mode]);
 
   // ── Refs for the imperative bits ──────────────────────────────────────────
   const pageRootRef = useRef<HTMLDivElement | null>(null);
@@ -286,7 +327,8 @@ export function PipelineDemo({
             id: summaryId,
             timestamp: fmtTime(),
             utterance: scenario.utterance,
-            response: '',
+            response: 'I’m tracing this request through every decision now.',
+            detail: 'Watch guide and colored pulse. Each stop explains what changed, why it ran, and whether data stayed local.',
             status: 'info',
             latency: 0,
             cost: 0,
@@ -314,6 +356,25 @@ export function PipelineDemo({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [player.scenario]);
+
+  // Phone mirrors active stage. This makes the response useful during the
+  // animation instead of leaving user with an empty placeholder until finish.
+  useEffect(() => {
+    const summaryId = loadedSummaryIdRef.current;
+    const stage = player.stage;
+    if (!summaryId || !stage || player.ended) return;
+    setPhoneSummaries((prev) =>
+      prev.map((summary) =>
+        summary.id === summaryId
+          ? {
+              ...summary,
+              response: `Following pulse: ${stage.title.replace(/^.*?—\s*/, '')}`,
+              detail: `${stage.body} Route: ${formatPulseRoute(stage)}.`,
+            }
+          : summary
+      )
+    );
+  }, [player.ended, player.stage, player.stageIndex]);
 
   // ── onStageChange ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -408,7 +469,8 @@ export function PipelineDemo({
           s.id === summaryId
             ? {
                 ...s,
-                response: scenario.summary.response,
+                response: `${scenario.summary.response} I completed this through ${scenario.summary.tierTag.replace('·', ' ')}.`,
+                detail: finalResponseDetail(scenario),
                 status: 'success',
                 latency: scenario.summary.latencyMs,
                 cost: scenario.summary.costUsd,
@@ -459,6 +521,14 @@ export function PipelineDemo({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ── External play command (e.g. pipelineBridge): bumping `token` (re)loads
+  //    `scenarioId`, including replaying the one already playing — player.load
+  //    fully resets, so re-invoking mid-idle or mid-play is safe. ────────────
+  useEffect(() => {
+    if (playRequest) loadScenario(playRequest.scenarioId, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playRequest?.token]);
+
   // ── Phone wiring: live typed/spoken commands resolving → "Watch how that
   //    worked" chip (never auto-hijacks the canvas). ────────────────────────
   const handleSummariesChange = useCallback((next: ChatSummary[]) => {
@@ -478,6 +548,7 @@ export function PipelineDemo({
   }, []);
 
   const expression: ExpressionType = player.stage ? player.stage.expression ?? 'resting' : 'happy';
+  const isStorageTour = player.scenario?.id === 'storage-tour';
   const themeVars = THEME_TEXT[themeBucket];
 
   const containerCls =
@@ -563,6 +634,7 @@ export function PipelineDemo({
             alexaOpacityOverride={alexaOpacityOverride}
             layerLifts={bridge.layerLifts}
             labelVisibility={bridge.labelVisibility}
+            focusLayer={bridge.activeLayer}
             labelOverrides={LABEL_OVERRIDES}
             labelTheme={themeBucket}
             pulseBpm={bridge.pulseBpm}
@@ -617,12 +689,22 @@ export function PipelineDemo({
         />
       </div>
 
-      {showPhoneResolved && (
+      {isStorageTour && <StorageGraph stageIndex={player.stageIndex} stage={player.stage} />}
+
+      {mode === 'full' && !isMobileViewport && player.scenario && !isStorageTour && (
+        <PipelineGuideAvatar
+          scenario={player.scenario}
+          stage={player.stage}
+          stageIndex={player.stageIndex}
+        />
+      )}
+
+      {showPhoneResolved && !isStorageTour && (
         <div
           style={{
             position: 'fixed',
             bottom: 'var(--space-6, 24px)',
-            left: 'var(--space-6, 24px)',
+            right: 'var(--space-6, 24px)',
             zIndex: 50,
             pointerEvents: 'auto',
           }}

@@ -1,7 +1,7 @@
 // Narration HUD for the pipeline demo — presentational only, anime.js + direct
 // DOM (no 3D or legacy motion library imports, no playback logic). React
 // re-renders happen ONLY on the player's reactive state (scenario / playing /
-// ended / stageIndex / stage); every continuous value (ECG, tickers, scrubber
+// ended / stageIndex / stage); every continuous value (tickers, scrubber
 // thumb, stage arc) arrives via player.subscribe() and is written to the DOM
 // directly.
 import { useEffect, useRef, useState } from 'react';
@@ -10,7 +10,6 @@ import type { JSAnimation } from 'animejs';
 import type { PipelinePlayer, Stage, TierId, DerivedFrame } from './types';
 import { TIER_META, IO_COLOR } from './types';
 import type { MotionScale } from './quality';
-import { heartWave } from './heartWave';
 import { cardEnter, cardExit, badgesIn, pickerIn, tickerPop } from './hudAnimations';
 
 export interface PipelineHudProps {
@@ -46,74 +45,6 @@ function hudVars(themeBucket: 'dark' | 'light', accent: string): CSSProperties {
     '--hud-fg-dim': dark ? 'rgba(236, 230, 223, 0.62)' : 'rgba(28, 23, 18, 0.62)',
     '--hud-chip-bg': dark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.05)',
   } as CSSProperties;
-}
-
-// ── EcgTicker ────────────────────────────────────────────────────────────────
-// Scrolling heartWave trace on a 2D canvas. Ring buffer of samples, redrawn
-// directly from the subscribe callback (timestamp-gated: redraws <33ms apart
-// are skipped — no timers, no own frame loop, no React state).
-
-const ECG_W = 220;
-const ECG_H = 36;
-const ECG_SAMPLES = 110;
-const ECG_PEAK = 1.6; // heartWave max ≈ 1.0 lub + 0.55 dub overlap headroom
-
-function EcgTicker({ player }: { player: PipelinePlayer }) {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const subscribe = player.subscribe;
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const dpr = Math.min(typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1, 1.5);
-    const w = Math.round(ECG_W * dpr);
-    const h = Math.round(ECG_H * dpr);
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext('2d'); // null in jsdom — guarded below
-    const buf = new Float32Array(ECG_SAMPLES);
-    let head = 0;
-    let filled = 0;
-    let lastDraw = 0;
-
-    const unsub = subscribe((f: DerivedFrame) => {
-      const now = performance.now();
-      if (now - lastDraw < 33) return; // ~30fps is plenty for an ECG
-      lastDraw = now;
-      buf[head] = heartWave(now / 1000, f.heart.bpm);
-      head = (head + 1) % ECG_SAMPLES;
-      if (filled < ECG_SAMPLES) filled += 1;
-      if (!ctx) return;
-      ctx.clearRect(0, 0, w, h);
-      ctx.lineWidth = 1.5 * dpr;
-      ctx.lineJoin = 'round';
-      ctx.strokeStyle =
-        (TIER_META as Partial<Record<TierId, { color: string }>>)[f.stage.tier]?.color ?? IO_COLOR;
-      ctx.beginPath();
-      const pad = 2 * dpr;
-      for (let i = 0; i < filled; i++) {
-        const v = Math.min(buf[(head - filled + i + ECG_SAMPLES) % ECG_SAMPLES], ECG_PEAK);
-        const x = (i / (ECG_SAMPLES - 1)) * w;
-        const y = h - pad - (v / ECG_PEAK) * (h - pad * 2);
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      }
-      ctx.stroke();
-    });
-    return unsub;
-  }, [subscribe]);
-
-  return (
-    <canvas
-      ref={canvasRef}
-      data-hud-ecg
-      aria-hidden="true"
-      className="shrink-0 opacity-90"
-      width={ECG_W}
-      height={ECG_H}
-      style={{ width: ECG_W, height: ECG_H }}
-    />
-  );
 }
 
 // ── Card content (shared by the live card and the exiting ghost) ─────────────
@@ -320,7 +251,6 @@ function NarrationCard({
         className="flex items-center gap-3 border-t px-4 py-2.5"
         style={{ borderColor: 'var(--hud-border)' }}
       >
-        <EcgTicker player={player} />
         <div className="ml-auto text-right">
           <div
             className="font-mono text-[8px] uppercase tracking-[0.2em]"

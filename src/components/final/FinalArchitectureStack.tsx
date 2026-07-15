@@ -25,6 +25,8 @@ interface ArchitectureStackProps {
   layerLifts?: number[];
   /** Per-layer label opacity floor 0..1, fanned out to `labelVisibility`. */
   labelVisibility?: number[];
+  /** Current presentation focus. All other layers receive a soft dark veil. */
+  focusLayer?: number | null;
   /** Per-layer label text overrides (null = keep the built-in text). */
   labelOverrides?: ({ title: string; desc: string } | null)[];
   /** Forces label light/dark styling on all layers. */
@@ -58,6 +60,7 @@ export function FinalArchitectureStack({
   debugCamPitch = 0.0,
   layerLifts,
   labelVisibility,
+  focusLayer,
   labelOverrides,
   labelTheme,
   pulseBpm,
@@ -385,6 +388,7 @@ export function FinalArchitectureStack({
           lift={layerLifts?.[idx]}
           microAnimBoost={layerLifts?.[idx]}
           labelVisibility={labelVisibility?.[idx]}
+          dimmed={focusLayer != null && focusLayer !== idx}
           labelOverride={labelOverrides?.[idx] ?? undefined}
           labelTheme={labelTheme}
           pulseBpm={pulseBpm}

@@ -350,4 +350,81 @@ const routineT0: Scenario = {
   summary: { response: '(silent routine) Water motor off — tank full.', latencyMs: 6, costUsd: 0, tierTag: 'T0·local' },
 };
 
-export const SCENARIOS: Scenario[] = [lightsT1, khataT0, hueT3, routineT0];
+// E — storage-tour: one factual end-to-end learning loop. Fast paths above do
+// not pretend to write every store; this dedicated tour makes each boundary
+// explicit without weakening their accuracy.
+const storageTour: Scenario = {
+  id: 'storage-tour',
+  label: 'How memory becomes a local rule',
+  utterance: 'Remember my bedtime lighting preference',
+  language: 'en',
+  finalTier: 'T0',
+  accent: TIER_META.T2.color,
+  icon: '🧠',
+  stages: [
+    {
+      id: 'session-ram', tier: 'IO', title: 'IO · SESSION RAM: Short-lived request buffer',
+      body: 'Request enters volatile device RAM for this conversation. It is overwritten when session ends.',
+      tech: 'device RAM · volatile · raw audio not retained',
+      badges: ['LOCAL · VOLATILE'], activeLayer: 1, cameraPose: 'shell-open', flowPath: ['mic', 1],
+      pulse: PULSE_IO, durationMs: 4600,
+      effects: [{ at: 0.18, durationMs: 2700, kind: 'session-buffer', anchor: 1, label: 'DEVICE RAM · session only' }],
+    },
+    {
+      id: 'novel-reason', tier: 'T3', title: 'T3 · REASON: Novel preference needs planning',
+      body: 'No local rule matches. Stateless cloud reasoning receives only required context, not a permanent session.',
+      tech: 'Bedrock specialist · minimum context bundle',
+      badges: ['ESCALATE · MINIMUM CONTEXT'], activeLayer: 5, cameraPose: 'splay-flat', flowPath: [1, 5, 'cloud'],
+      pulse: PULSE_T3, durationMs: 5200, costUsd: 0.0012,
+    },
+    {
+      id: 'cloud-history', tier: 'IO', title: 'IO · HISTORY: Durable event record',
+      body: 'A minimal event record enters cloud history for off-peak learning. Raw audio stays out.',
+      tech: 'Timestream · aged retention · event metadata only',
+      badges: ['CLOUD · DURABLE EVENT'], activeLayer: 3, cameraPose: 'splay-flat', flowPath: [5, 3, 'cloud'],
+      pulse: PULSE_IO, durationMs: 4600,
+      effects: [{ at: 0.2, durationMs: 2700, kind: 'cloud-history-write', anchor: 'cloud', label: 'TIMESTREAM · event metadata' }],
+    },
+    {
+      id: 'local-cache', tier: 'T2', title: 'T2 · RECALL: Local semantic cache',
+      body: 'Resolved preference becomes a local semantic-cache entry. Similar future requests can skip cloud reasoning.',
+      tech: 'on-device embedder · ANN rule index · principal guards',
+      badges: ['LOCAL · CACHE SET'], activeLayer: 3, cameraPose: 'splay-flat', flowPath: ['cloud', 3],
+      pulse: PULSE_T2, durationMs: 5000,
+      effects: [{ at: 0.22, durationMs: 2900, kind: 'cache-set', anchor: 3, label: 'LOCAL T2 · semantic cache' }],
+    },
+    {
+      id: 'rule-candidate', tier: 'T3', title: 'T3 · LEARNING: Rule candidate is authored',
+      body: 'Nightly miner combines history into guarded candidate rule. It carries explanation, regime, and principal scope.',
+      tech: 'off-peak miner · support + confidence + safeguards',
+      badges: ['CLOUD · CANDIDATE RULE'], activeLayer: 5, cameraPose: 'splay-flat', flowPath: [3, 5],
+      pulse: PULSE_T3, durationMs: 5000,
+      effects: [{ at: 0.2, durationMs: 3000, kind: 'rule-forge', anchor: 5, label: 'candidate: bedtime_lighting' }],
+    },
+    {
+      id: 'promote-local', tier: 'T0', title: 'T0 · REFLEX: Compiled rule promoted locally',
+      body: 'Approved rule moves into local T0. Future matching requests run predictably, free of cloud calls.',
+      tech: 'compiled rule · on-device · guard checked',
+      badges: ['LOCAL · T0 PROMOTED'], activeLayer: 0, cameraPose: 'splay-flat', flowPath: [5, 0],
+      pulse: PULSE_T0, durationMs: 5000,
+      effects: [{ at: 0.16, durationMs: 3100, kind: 'rule-promote', anchor: 0, label: 'promoted → LOCAL T0' }],
+    },
+    {
+      id: 'local-replay', tier: 'T0', title: 'T0 · REPLAY: Future request stays local',
+      body: 'Same preference now resolves at T0. This is how cloud reasoning becomes a cheaper local habit.',
+      tech: 'rule match · <10ms · $0 cloud cost',
+      badges: ['LOCAL REPLAY · $0'], activeLayer: 0, cameraPose: 'splay-flat', flowPath: [1, 0, 2, 'device'],
+      pulse: PULSE_T0, durationMs: 4400, latencyMs: 8,
+      effects: [{ at: 0.3, durationMs: 2200, kind: 'device-actuate', anchor: 'device', label: 'local rule replay' }],
+    },
+    {
+      id: 'storage-close', tier: 'IO', title: 'IO · TRACE: Memory lifecycle complete',
+      body: 'Session RAM clears. Durable event history supports learning. Local cache and T0 rule make next response cheaper.',
+      tech: 'RAM clears · history ages · cache/rule remain scoped',
+      activeLayer: null, cameraPose: 'closed', flowPath: [], pulse: PULSE_IO, durationMs: 6200, expression: 'happy',
+    },
+  ],
+  summary: { response: 'Memory tour complete. Next matching request can run locally.', latencyMs: 8, costUsd: 0, tierTag: 'T0·local' },
+};
+
+export const SCENARIOS: Scenario[] = [lightsT1, khataT0, hueT3, routineT0, storageTour];

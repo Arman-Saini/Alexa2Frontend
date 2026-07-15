@@ -24,6 +24,8 @@ interface LayerGroupProps {
   plateBreathes?: boolean;
   /** 0..1 — forces the blueprint label visible outside the trace window. Default 0 = today's behavior. */
   labelVisibility?: number;
+  /** True when another layer owns the current narration beat. */
+  dimmed?: boolean;
   /** Overrides the label's title/desc text (the built-in details array is never edited). */
   labelOverride?: { title: string; desc: string };
   /** Forces the label's light/dark styling; omitted = existing scrollProgress-window logic. */
@@ -40,6 +42,7 @@ export function LayerGroup({
   pulseBpm = 60,
   plateBreathes = true,
   labelVisibility = 0,
+  dimmed = false,
   labelOverride,
   labelTheme,
 }: LayerGroupProps) {
@@ -692,6 +695,12 @@ export function LayerGroup({
 
   return (
     <group ref={groupRef}>
+      {dimmed && (
+        <mesh position={[0, 0.24, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[5.25, 5.25]} />
+          <meshBasicMaterial color="#090807" transparent opacity={0.42} depthWrite={false} />
+        </mesh>
+      )}
       {/* Highlight plate — flat glow under the layer while lifted during a
           pipeline narration beat. Only mounts when lift > 0.001, so it costs
           nothing for /showcase (lift defaults to 0). Opacity is mutated per

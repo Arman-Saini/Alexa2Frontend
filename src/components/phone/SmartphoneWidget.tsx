@@ -9,6 +9,7 @@ import { useTourStore } from '../../store/tourStore';
 import { useAppStore } from '../../store/store';
 import { useBookkeeper } from '../../hooks/useBookkeeper';
 import { useEcosystemStore } from '../../store/ecosystemStore';
+import { usePipelineBridge } from '../../store/pipelineBridge';
 
 export interface ChatSummary {
   id: string;
@@ -18,6 +19,8 @@ export interface ChatSummary {
   status: 'success' | 'warning' | 'info' | 'error';
   latency: number;
   cost: number;
+  /** Optional richer explanation shown under Alexa's reply. */
+  detail?: string;
   /** Which processing tier handled this command */
   tier?: 'T0·local' | 'T1·local' | 'T3·cloud';
 }
@@ -212,6 +215,7 @@ export function SmartphoneWidget({
             ];
           }
         });
+        usePipelineBridge.getState().requestByTier('T3·cloud');
 
         setStatus('done');
         setTimeout(() => setStatus('idle'), 1500);
@@ -427,6 +431,7 @@ export function SmartphoneWidget({
             : s
         )
       );
+      if (tierLabel) usePipelineBridge.getState().requestByTier(tierLabel);
       setStatus('done');
       setTypedInput('');
       setTimeout(() => setStatus('idle'), 1200);
@@ -485,6 +490,7 @@ export function SmartphoneWidget({
             : s
         )
       );
+      usePipelineBridge.getState().requestByTier('T3·cloud');
       setStatus('done');
       fallbackSpeak(explanation, () => {});
     } catch (err) {
@@ -809,7 +815,7 @@ export function SmartphoneWidget({
                                       <motion.div
                                         initial={{ opacity: 0, scale: 0.95, x: 20 }}
                                         animate={{ opacity: 1, scale: 1, x: 0 }}
-                                        className="flex flex-col items-end max-w-[85%] self-end"
+                                        className="flex flex-col items-end max-w-[92%] self-end"
                                       >
                                         <div className="bg-[#007aff] text-white px-4 py-2 rounded-2xl rounded-tr-sm text-xs font-sans leading-relaxed shadow-sm">
                                           {item.utterance}
@@ -819,9 +825,9 @@ export function SmartphoneWidget({
                                       <motion.div
                                         initial={{ opacity: 0, scale: 0.95, x: -20 }}
                                         animate={{ opacity: 1, scale: 1, x: 0 }}
-                                        className="flex flex-col items-start max-w-[85%] self-start"
+                                        className="flex flex-col items-start max-w-[92%] self-start"
                                       >
-                                        <div className="bg-[#24252a] text-white px-4 py-2 rounded-2xl rounded-tl-sm text-xs font-sans leading-relaxed border border-white/[0.02] shadow-sm">
+                                        <div className="bg-[#24252a] text-white px-4 py-3 rounded-2xl rounded-tl-sm text-[13px] font-sans leading-relaxed border border-white/[0.02] shadow-sm">
                                           {item.response === 'Analyzing command...' ? (
                                             <span className="flex items-center gap-1.5 text-white/50 italic">
                                               <span className="animate-spin h-3.5 w-3.5 border-2 border-white/30 border-t-transparent rounded-full" />
@@ -831,6 +837,14 @@ export function SmartphoneWidget({
                                             item.response
                                           )}
                                         </div>
+                                        {item.detail && item.response !== 'Analyzing command...' && (
+                                          <div className="mt-1.5 rounded-xl border border-cyan-300/10 bg-cyan-300/[0.04] px-3 py-2 text-[10px] leading-relaxed text-white/65">
+                                            <span className="mr-1 font-mono text-[8px] font-bold tracking-[0.12em] text-cyan-200/70">
+                                              HOW ALEXA HANDLED IT
+                                            </span>
+                                            {item.detail}
+                                          </div>
+                                        )}
                                         {item.response !== 'Analyzing command...' && (
                                           <div className="flex items-center gap-2 text-[8px] font-mono text-white/30 mt-0.5 ml-1">
                                             <span className={
@@ -1488,6 +1502,7 @@ export function SmartphoneWidget({
                   <div className="w-[110px] h-[4px] bg-white/20 rounded-full mt-1.5" />
                 </div>
               </div>
+
             </div>
           </motion.div>
         )}

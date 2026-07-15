@@ -11,6 +11,19 @@ import type {
 } from './types';
 import { FOCUS_PAN_PER_LAYER, POSE_S } from './poses';
 
+/** IO stages get a physical cue from their pulse route, not a line alone. */
+export function visualLayerForStage(stage: Stage): number | null {
+  if (stage.activeLayer !== null) return stage.activeLayer;
+  for (let i = stage.flowPath.length - 1; i >= 0; i--) {
+    const node = stage.flowPath[i];
+    if (typeof node === 'number') return node;
+  }
+  if (stage.flowPath.includes('device')) return 2;
+  if (stage.flowPath.includes('mic')) return 1;
+  if (stage.flowPath.includes('cloud')) return 5;
+  return null;
+}
+
 function clamp01(x: number): number {
   return x < 0 ? 0 : x > 1 ? 1 : x;
 }
@@ -94,13 +107,14 @@ export function deriveFrame(
 
   const explodedProgress = explodedProgressFromS(cpuScrollProgress);
 
-  // layerLifts: only the active layer ever lifts. Ramp in over [tf, tf+0.2], ramp
-  // out over the last 10% of the stage. Pure fn of stageT → scrub-safe.
+  // Route-selected part lifts. IO pulse stages now get a clear physical cue.
   const layerLifts: [number, number, number, number, number, number] = [0, 0, 0, 0, 0, 0];
-  if (stage.activeLayer !== null) {
+  const visualLayer = visualLayerForStage(stage);
+  const focusStrength = visualLayer === null ? 0 : 0.55;
+  if (visualLayer !== null) {
     const liftIn = smoothstep(stageT, tf, tf + 0.2);
     const liftOut = 1 - smoothstep(stageT, 0.9, 1);
-    layerLifts[stage.activeLayer] = liftIn * liftOut;
+    layerLifts[visualLayer] = focusStrength * liftIn * liftOut;
   }
 
   const labelVisibility: [number, number, number, number, number, number] =
@@ -108,7 +122,8 @@ export function deriveFrame(
 
   let cameraFocus: { panX: number; zoomMul: number } | null = null;
   if (stage.cameraFocus && stage.cameraPose === 'splay-flat') {
-    const envelope = stage.activeLayer !== null ? layerLifts[stage.activeLayer] : 0;
+    // Camera focus remains full-strength even though physical lift is medium.
+    const envelope = focusStrength > 0 ? layerLifts[stage.cameraFocus.layer] / focusStrength : 0;
     if (envelope > 0) {
       const panXFull = (stage.cameraFocus.layer - 2.5) * FOCUS_PAN_PER_LAYER;
       cameraFocus = {
@@ -150,7 +165,8 @@ export function deriveFrame(
     dismantleActive,
     explodedProgress,
     layerLifts,
-    activeLayer: stage.activeLayer,
+    activeLayer: visualLayer,
+    focusStrength,
     labelVisibility,
     cameraFocus,
     heart: { bpm: stage.pulse.bpm, strength: stage.pulse.strength, flowPath: stage.flowPath },

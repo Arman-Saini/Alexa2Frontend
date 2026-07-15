@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { FinalAlexaModel } from './FinalAlexaModel';
 import { FinalArchitectureStack } from './FinalArchitectureStack';
 import type { Quality } from './pipeline/quality';
+import { QUALITY_PRESETS } from './pipeline/quality';
 import type { ActiveEffect, PathNodeId } from './pipeline/types';
 
 interface FinalAlexaCanvasProps {
@@ -38,6 +39,8 @@ interface FinalAlexaCanvasProps {
   //    undefined = /showcase renders exactly as before) ──
   layerLifts?: number[];
   labelVisibility?: number[];
+  /** Current presentation focus. All nonmatching layers recede. */
+  focusLayer?: number | null;
   labelOverrides?: ({ title: string; desc: string } | null)[];
   labelTheme?: 'dark' | 'light';
   pulseBpm?: number;
@@ -142,6 +145,7 @@ export function FinalAlexaCanvas({
   alexaOpacityOverride,
   layerLifts,
   labelVisibility,
+  focusLayer,
   labelOverrides,
   labelTheme,
   pulseBpm,
@@ -166,7 +170,11 @@ export function FinalAlexaCanvas({
       shadows
       camera={{ position: [0, 1.8, 5.0], fov: 45 }}
       style={{ background: 'transparent' }}
-      gl={{ powerPreference: 'high-performance', antialias: true }}
+      dpr={QUALITY_PRESETS[quality ?? 'high'].dpr}
+      gl={{
+        powerPreference: 'high-performance',
+        antialias: quality !== 'low',
+      }}
     >
       {dismantleMode ? (
         <>
@@ -185,7 +193,7 @@ export function FinalAlexaCanvas({
             color="#fffdfa"
           />
           <directionalLight position={[-6, -4, 4]} intensity={0.5} color="#cbdff0" />
-          <Environment preset="city" />
+          <Environment files="/hdri/interior_2k.hdr" />
         </>
       ) : (
         <>
@@ -252,6 +260,7 @@ export function FinalAlexaCanvas({
           debugCamPitch={debugCamPitch}
           layerLifts={layerLifts}
           labelVisibility={labelVisibility}
+          focusLayer={focusLayer}
           labelOverrides={labelOverrides}
           labelTheme={labelTheme}
           pulseBpm={pulseBpm}

@@ -12,6 +12,9 @@ import { CompanionPage } from './components/phone/CompanionPage';
 import { SmartphoneOnlyPage } from './components/phone/SmartphoneOnlyPage';
 import { SmartphoneWidget } from './components/phone/SmartphoneWidget';
 import { AmbientBackdrop } from './components/shared/AmbientBackdrop';
+import { HomeV2Page } from './components/homev2/HomeV2Page';
+import { LaundryDoorbellDemo } from './components/hud/LaundryDoorbellDemo';
+import { FinanceReminderDemo } from './components/hud/FinanceReminderDemo';
 import { useInteractionEffects } from './hooks/useInteractionEffects';
 import { useIsMobileViewport } from './hooks/useIsMobileViewport';
 
@@ -38,6 +41,8 @@ function Home() {
         <DigitalTwinCanvas />
       </div>
       <ActShell />
+      <LaundryDoorbellDemo />
+      <FinanceReminderDemo />
     </div>
   );
 }
@@ -57,6 +62,7 @@ export default function App() {
         <Route path="/final" element={<FinalPage />} />
         <Route path="/showcase" element={<FinalShowcasePage />} />
         <Route path="/showcase-live" element={<ShowcaseLivePage />} />
+        <Route path="/main-v2" element={<HomeV2Page />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

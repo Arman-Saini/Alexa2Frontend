@@ -38,6 +38,7 @@ function buildFrame(stageIndex = 5): DerivedFrame {
     activeLayer: stage.activeLayer,
     labelVisibility: [0, 0, 0, 0, 0, 0],
     cameraFocus: null,
+    focusStrength: 0,
     heart: { bpm: stage.pulse.bpm, strength: stage.pulse.strength, flowPath: stage.flowPath },
     effects: [],
     themeT: 1,
@@ -128,7 +129,7 @@ describe('PromptPicker', () => {
   it('renders one card per scenario when scenario is null', () => {
     render(makePlayer());
     const cards = container.querySelectorAll('[data-picker-card]');
-    expect(cards.length).toBe(4);
+    expect(cards.length).toBe(5);
     expect(container.textContent).toContain(SCENARIOS[0].utterance);
     expect(container.textContent).toContain(SCENARIOS[2].utterance);
   });
@@ -237,11 +238,10 @@ describe('card swap on rapid stage change', () => {
   });
 });
 
-describe('EcgTicker', () => {
-  it('mounts without throwing when subscribe pushes a frame, and tickers update', () => {
+describe('HUD tickers', () => {
+  it('updates latency and cost when subscribe pushes a frame', () => {
     const player = makeActivePlayer(5);
     render(player);
-    expect(container.querySelector('[data-hud-ecg]')).toBeTruthy();
     expect(() => {
       act(() => {
         player.emit(buildFrame(5));

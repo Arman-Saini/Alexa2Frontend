@@ -5,6 +5,7 @@ import {
   smoothstep,
   stageBoundsMs,
   globalTToStage,
+  visualLayerForStage,
 } from '../../components/final/pipeline/deriveFrame';
 import { SCENARIOS } from '../../components/final/pipeline/scenarios';
 import { PULSE_IO } from '../../components/final/pipeline/poses';
@@ -232,6 +233,14 @@ describe('effect windows', () => {
 });
 
 describe('frame field passthroughs', () => {
+  it('uses medium-strength physical focus for every resolved layer', () => {
+    const scenario = SCENARIOS.find((entry) => entry.id === 'lights-t1')!;
+    const stageIndex = scenario.stages.findIndex((stage) => stage.id === 't1-nlu');
+    const frame = deriveFrame(scenario, stageIndex, 0.7, 0);
+    expect(frame.focusStrength).toBe(0.55);
+    expect(frame.layerLifts[1]).toBeCloseTo(0.55, 12);
+  });
+
   it('heart carries the stage pulse and flowPath; expression defaults to resting', () => {
     for (const scenario of SCENARIOS) {
       for (let i = 0; i < scenario.stages.length; i++) {
@@ -245,7 +254,7 @@ describe('frame field passthroughs', () => {
         expect(frame.stageIndex).toBe(i);
         expect(frame.stageT).toBe(0.5);
         expect(frame.themeT).toBe(0.25);
-        expect(frame.activeLayer).toBe(stage.activeLayer);
+        expect(frame.activeLayer).toBe(visualLayerForStage(stage));
       }
     }
   });
@@ -268,9 +277,10 @@ describe('frame field passthroughs', () => {
       for (let i = 0; i < scenario.stages.length; i++) {
         const stage = scenario.stages[i];
         const frame = deriveFrame(scenario, i, 0.7, 0); // mid-stage: lift fully in
-        if (stage.cameraPose === 'splay-flat' && stage.activeLayer !== null) {
-          expect(frame.labelVisibility[stage.activeLayer]).toBeCloseTo(
-            frame.layerLifts[stage.activeLayer], 12
+        const visualLayer = visualLayerForStage(stage);
+        if (stage.cameraPose === 'splay-flat' && visualLayer !== null) {
+          expect(frame.labelVisibility[visualLayer]).toBeCloseTo(
+            frame.layerLifts[visualLayer], 12
           );
         } else {
           expect(frame.labelVisibility).toEqual([0, 0, 0, 0, 0, 0]);
