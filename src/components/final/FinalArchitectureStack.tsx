@@ -2,6 +2,10 @@ import { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { LayerGroup } from './FinalLayerGroup';
+import { HeartFlow } from './pipeline/HeartFlow';
+import { EffectsLayer } from './pipeline/EffectsLayer';
+import { QUALITY_PRESETS, type Quality } from './pipeline/quality';
+import type { ActiveEffect, PathNodeId } from './pipeline/types';
 
 interface ArchitectureStackProps {
   ledColor: string;
@@ -16,6 +20,27 @@ interface ArchitectureStackProps {
   debugCamZoom?: number;
   debugCamYaw?: number;
   debugCamPitch?: number;
+  // ── Pipeline-demo props (all optional; defaults preserve /showcase exactly) ──
+  /** Per-layer lift 0..1, fanned out to each LayerGroup's `lift`. */
+  layerLifts?: number[];
+  /** Per-layer label opacity floor 0..1, fanned out to `labelVisibility`. */
+  labelVisibility?: number[];
+  /** Per-layer label text overrides (null = keep the built-in text). */
+  labelOverrides?: ({ title: string; desc: string } | null)[];
+  /** Forces label light/dark styling on all layers. */
+  labelTheme?: 'dark' | 'light';
+  /** Heartbeat rate for the highlight plates' breathing glow. */
+  pulseBpm?: number;
+  /** Per-layer highlight plate tints (undefined entry = layer's ledColor). */
+  highlightColors?: string[];
+  /** Heart pump state — when provided, <HeartFlow/> renders inside the stack group. */
+  heart?: { bpm: number; strength: number; flowPath: PathNodeId[] } | null;
+  /** Active side-effect moments — when provided, <EffectsLayer/> renders inside the stack group. */
+  effects?: ActiveEffect[];
+  /** Render-quality tier for HeartFlow/EffectsLayer/highlight plates. */
+  quality?: Quality;
+  /** Accent color for the heart core + blood cells (default ledColor). */
+  heartAccent?: string;
 }
 
 export function FinalArchitectureStack({
@@ -31,6 +56,16 @@ export function FinalArchitectureStack({
   debugCamZoom = 90,
   debugCamYaw = 0.0,
   debugCamPitch = 0.0,
+  layerLifts,
+  labelVisibility,
+  labelOverrides,
+  labelTheme,
+  pulseBpm,
+  highlightColors,
+  heart,
+  effects,
+  quality = 'high',
+  heartAccent,
 }: ArchitectureStackProps) {
   const groupRef = useRef<THREE.Group>(null);
   const gridRef = useRef<THREE.GridHelper>(null);
@@ -347,8 +382,31 @@ export function FinalArchitectureStack({
           index={idx}
           ledColor={ledColor}
           scrollProgress={scrollProgress}
+          lift={layerLifts?.[idx]}
+          microAnimBoost={layerLifts?.[idx]}
+          labelVisibility={labelVisibility?.[idx]}
+          labelOverride={labelOverrides?.[idx] ?? undefined}
+          labelTheme={labelTheme}
+          pulseBpm={pulseBpm}
+          highlightColor={highlightColors?.[idx]}
+          plateBreathes={QUALITY_PRESETS[quality].plateBreathes}
         />
       ))}
+
+      {/* Pipeline-demo overlays — mounted inside this same group so they
+          inherit the stack's scale/rotation. Absent on /showcase (props
+          undefined) so nothing new renders there. */}
+      {heart && (
+        <HeartFlow
+          heart={heart}
+          s={scrollProgress}
+          accent={heartAccent ?? ledColor}
+          quality={quality}
+        />
+      )}
+      {effects && effects.length > 0 && (
+        <EffectsLayer effects={effects} s={scrollProgress} quality={quality} />
+      )}
     </group>
   );
 }

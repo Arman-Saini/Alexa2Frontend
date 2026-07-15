@@ -2,6 +2,9 @@ import { useMemo, useRef, useState, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { MeshTransmissionMaterial, Edges, Html } from '@react-three/drei';
+import { layerTargetXY } from './pipeline/layerLayout';
+import { LIFT_HEIGHT } from './pipeline/poses';
+import { heartWave } from './pipeline/heartWave';
 
 
 
@@ -9,9 +12,37 @@ interface LayerGroupProps {
   index: number;
   ledColor: string;
   scrollProgress: number; // Prop passed from parent to calculate tracing progress
+  /** 0..1 — raises the layer by lift * LIFT_HEIGHT above its layout position. Default 0 = today's behavior. */
+  lift?: number;
+  /** 0..1 — floor for the micro-animation gate so a lifted layer can animate outside the trace window. Default 0 = today's behavior. */
+  microAnimBoost?: number;
+  /** Highlight plate tint. Defaults to the layer's ledColor. */
+  highlightColor?: string;
+  /** Heartbeat rate driving the highlight plate's breathing glow. Default 60. */
+  pulseBpm?: number;
+  /** false = static plate opacity (quality-low path). Default true. */
+  plateBreathes?: boolean;
+  /** 0..1 — forces the blueprint label visible outside the trace window. Default 0 = today's behavior. */
+  labelVisibility?: number;
+  /** Overrides the label's title/desc text (the built-in details array is never edited). */
+  labelOverride?: { title: string; desc: string };
+  /** Forces the label's light/dark styling; omitted = existing scrollProgress-window logic. */
+  labelTheme?: 'dark' | 'light';
 }
 
-export function LayerGroup({ index, ledColor, scrollProgress }: LayerGroupProps) {
+export function LayerGroup({
+  index,
+  ledColor,
+  scrollProgress,
+  lift = 0,
+  microAnimBoost = 0,
+  highlightColor,
+  pulseBpm = 60,
+  plateBreathes = true,
+  labelVisibility = 0,
+  labelOverride,
+  labelTheme,
+}: LayerGroupProps) {
   const groupRef = useRef<THREE.Group>(null);
   const fanRef = useRef<THREE.Mesh>(null);
   const ringRef = useRef<THREE.Mesh>(null);
@@ -72,6 +103,9 @@ export function LayerGroup({ index, ledColor, scrollProgress }: LayerGroupProps)
   // Layer 3 terminal-ticker refs
   const tickerTextRef = useRef<HTMLSpanElement>(null);
   const tickerCursorRef = useRef<HTMLSpanElement>(null);
+
+  // Highlight plate material (opacity mutated per frame, never via setState)
+  const highlightPlateMatRef = useRef<THREE.MeshBasicMaterial>(null);
 
 
 
@@ -173,51 +207,22 @@ export function LayerGroup({ index, ledColor, scrollProgress }: LayerGroupProps)
   useFrame((state, delta) => {
     const s = scrollProgress;
     const elapsed = state.clock.elapsedTime;
-    const gate = THREE.MathUtils.smoothstep(traceProgress, 0, 0.15);
-    let targetX = 0;
-    let targetY = 0;
+    const gate = Math.max(THREE.MathUtils.smoothstep(traceProgress, 0, 0.15), microAnimBoost);
 
-    if (s < 0.20) {
-      // Phase 1: Rise stacked together (0.0 -> 0.20)
-      targetX = 0;
-      targetY = 0;
-    } else if (s < 0.40) {
-      // Phase 2: Separate vertically (0.20 -> 0.40) - separate downwards under base plate
-      const t = (s - 0.20) / 0.20;
-      targetX = 0;
-      targetY = -index * 1.2 * t; 
-    } else if (s < 0.60) {
-      // Phase 3-6: Horizontal Splay (0.40 -> 0.60)
-      // Splay completes at scroll 0.50 and remains splayed.
-      const splayT = s < 0.50 ? (s - 0.40) / 0.10 : 1.0;
-      const splayX = (index - 2.5) * 6.5;
-      
-      targetX = THREE.MathUtils.lerp(0, splayX, splayT);
-      targetY = THREE.MathUtils.lerp(-index * 1.2, 0, splayT);
-    } else {
-      // Phase 7: Sequential Joining (0.60 -> 1.00) - stack downwards under base plate
-      const splayX = (index - 2.5) * 6.5;
-      
-      if (index === 0) {
-        targetX = 0;
-        targetY = 0;
-      } else {
-        const start = 0.60 + (index - 1) * 0.08;
-        const end = start + 0.08;
-        
-        if (s < start) {
-          targetX = splayX;
-          targetY = 0;
-        } else if (s < end) {
-          const t = (s - start) / 0.08;
-          const eased = THREE.MathUtils.smoothstep(t, 0, 1);
-          targetX = THREE.MathUtils.lerp(splayX, 0, eased);
-          targetY = THREE.MathUtils.lerp(0, -index * 0.22, eased);
-        } else {
-          targetX = 0;
-          targetY = -index * 0.22;
-        }
-      }
+    // Target layout position — formula extracted verbatim into
+    // pipeline/layerLayout.ts (freeze-tested); `lift` (default 0) raises the
+    // layer above its layout position during narration beats.
+    const layout = layerTargetXY(index, s);
+    let targetX = layout.x;
+    let targetY = layout.y;
+    targetY += lift * LIFT_HEIGHT;
+
+    // Highlight plate: glow breathes with the heart while lifted. Written via
+    // ref mutation (mesh only mounts when lift > 0.001, see JSX below).
+    if (highlightPlateMatRef.current) {
+      highlightPlateMatRef.current.opacity = plateBreathes
+        ? lift * (0.25 + 0.15 * heartWave(elapsed, pulseBpm))
+        : lift * 0.3;
     }
 
     const lambda = s >= 0.60 ? 4.0 : 8;
@@ -687,6 +692,24 @@ export function LayerGroup({ index, ledColor, scrollProgress }: LayerGroupProps)
 
   return (
     <group ref={groupRef}>
+      {/* Highlight plate — flat glow under the layer while lifted during a
+          pipeline narration beat. Only mounts when lift > 0.001, so it costs
+          nothing for /showcase (lift defaults to 0). Opacity is mutated per
+          frame via highlightPlateMatRef inside the existing useFrame. */}
+      {lift > 0.001 && (
+        <mesh position={[0, -0.05, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[4.6, 4.6]} />
+          <meshBasicMaterial
+            ref={highlightPlateMatRef}
+            color={highlightColor ?? ledColor}
+            transparent
+            toneMapped={false}
+            opacity={0}
+            depthWrite={false}
+          />
+        </mesh>
+      )}
+
       {/* LAYER 0: BASE PLATE (Socket Base) */}
       {index === 0 && (
         <group>
@@ -1377,8 +1400,10 @@ export function LayerGroup({ index, ledColor, scrollProgress }: LayerGroupProps)
         </group>
       )}
 
-      {/* 3D Pointer Schematic Line & Responsive HTML Label (Blueprint style) */}
-      {traceProgress > 0.0 && (
+      {/* 3D Pointer Schematic Line & Responsive HTML Label (Blueprint style).
+          labelVisibility (default 0) additionally forces the label on outside
+          the trace window during pipeline narration beats. */}
+      {(traceProgress > 0.0 || labelVisibility > 0.0) && (
         <group>
           {/* 3D pointer line */}
           <line>
@@ -1417,25 +1442,29 @@ export function LayerGroup({ index, ledColor, scrollProgress }: LayerGroupProps)
             }
             center
             style={{
-              opacity: traceProgress,
+              opacity: Math.max(traceProgress, labelVisibility),
               transition: 'opacity 150ms ease-out',
               pointerEvents: 'none',
             }}
           >
-            <div 
+            <div
               className="flex flex-col p-3 rounded-[var(--r-md)] border backdrop-blur-md transition-colors duration-150 shadow-md"
               style={{
                 width: '210px',
                 borderColor: 'rgba(74, 65, 55, 0.2)',
-                backgroundColor: (scrollProgress >= 0.52 && scrollProgress < 0.60) ? 'rgba(255, 255, 255, 0.78)' : 'rgba(15,15,17,0.85)',
-                color: (scrollProgress >= 0.52 && scrollProgress < 0.60) ? '#1a1816' : '#e0dbd5',
+                backgroundColor: labelTheme
+                  ? (labelTheme === 'light' ? 'rgba(255, 255, 255, 0.78)' : 'rgba(15,15,17,0.85)')
+                  : ((scrollProgress >= 0.52 && scrollProgress < 0.60) ? 'rgba(255, 255, 255, 0.78)' : 'rgba(15,15,17,0.85)'),
+                color: labelTheme
+                  ? (labelTheme === 'light' ? '#1a1816' : '#e0dbd5')
+                  : ((scrollProgress >= 0.52 && scrollProgress < 0.60) ? '#1a1816' : '#e0dbd5'),
                 textAlign: index < 3 ? 'right' : 'left',
                 alignItems: index < 3 ? 'flex-end' : 'flex-start',
               }}
             >
               <span className="text-[7px] font-mono tracking-widest font-bold opacity-60">LAYER {index}</span>
-              <span className="text-[9px] font-mono font-bold tracking-wider mt-0.5" style={{ color: ledColor }}>{currentDetails.title}</span>
-              <p className="text-[8px] font-mono leading-normal mt-1 opacity-80" style={{ margin: 0 }}>{currentDetails.desc}</p>
+              <span className="text-[9px] font-mono font-bold tracking-wider mt-0.5" style={{ color: ledColor }}>{(labelOverride ?? currentDetails).title}</span>
+              <p className="text-[8px] font-mono leading-normal mt-1 opacity-80" style={{ margin: 0 }}>{(labelOverride ?? currentDetails).desc}</p>
             </div>
           </Html>
         </group>

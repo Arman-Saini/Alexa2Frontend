@@ -5,6 +5,8 @@ import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import * as THREE from 'three';
 import { FinalAlexaModel } from './FinalAlexaModel';
 import { FinalArchitectureStack } from './FinalArchitectureStack';
+import type { Quality } from './pipeline/quality';
+import type { ActiveEffect, PathNodeId } from './pipeline/types';
 
 interface FinalAlexaCanvasProps {
   expression: 'resting' | 'happy' | 'curious' | 'wink' | 'sleepy' | 'dizzy' | 'excited' | 'sad' | 'yawning';
@@ -32,6 +34,18 @@ interface FinalAlexaCanvasProps {
   debugCamYaw?: number;
   debugCamPitch?: number;
   alexaOpacityOverride?: number;
+  // ── Pipeline-demo props (all optional; passed through to FinalArchitectureStack;
+  //    undefined = /showcase renders exactly as before) ──
+  layerLifts?: number[];
+  labelVisibility?: number[];
+  labelOverrides?: ({ title: string; desc: string } | null)[];
+  labelTheme?: 'dark' | 'light';
+  pulseBpm?: number;
+  highlightColors?: string[];
+  heart?: { bpm: number; strength: number; flowPath: PathNodeId[] } | null;
+  effects?: ActiveEffect[];
+  quality?: Quality;
+  heartAccent?: string;
 }
 
 // Grid Platform/Pedestal for the mecha robot
@@ -126,6 +140,16 @@ export function FinalAlexaCanvas({
   debugCamYaw = 0.0,
   debugCamPitch = 0.0,
   alexaOpacityOverride,
+  layerLifts,
+  labelVisibility,
+  labelOverrides,
+  labelTheme,
+  pulseBpm,
+  highlightColors,
+  heart,
+  effects,
+  quality,
+  heartAccent,
 }: FinalAlexaCanvasProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [isClicked, setIsClicked] = useState(false);
@@ -226,6 +250,16 @@ export function FinalAlexaCanvas({
           debugCamZoom={debugCamZoom}
           debugCamYaw={debugCamYaw}
           debugCamPitch={debugCamPitch}
+          layerLifts={layerLifts}
+          labelVisibility={labelVisibility}
+          labelOverrides={labelOverrides}
+          labelTheme={labelTheme}
+          pulseBpm={pulseBpm}
+          highlightColors={highlightColors}
+          heart={heart}
+          effects={effects}
+          quality={quality}
+          heartAccent={heartAccent}
         />
 
         <Pedestal 
