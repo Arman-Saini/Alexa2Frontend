@@ -104,9 +104,53 @@ function merge(results: CommandResult[]): CommandResult {
   return { matched, response: responses.join(' '), tier, updates: [...byId.values()], roomFocus, vacuumAction, feedDogAction, musicAction, partyAction };
 }
 
+// ── Arithmetic condition evaluator ────────────────────────────────────────────
+
+function evalArith(expr: string): number | null {
+  if (!/^[\d\s+\-*/().]+$/.test(expr.trim())) return null;
+  try {
+    // eslint-disable-next-line no-new-func
+    const result = Function(`"use strict"; return (${expr.trim()})`)();
+    return typeof result === 'number' && isFinite(result) ? result : null;
+  } catch {
+    return null;
+  }
+}
+
 // ── Main processor ────────────────────────────────────────────────────────────
 
 export function processCommand(raw: string, objects: PlacedObject[]): CommandResult {
+  // ── CONDITIONAL COMMANDS — "if [expr] is [odd|even|N] then [command]" ──────
+  const condMatch = raw.match(/^if\s+(.+?)\s+is\s+(odd|even|[\d.]+)\s+then\s+(.+)$/i);
+  if (condMatch) {
+    const [, exprStr, condType, thenCommand] = condMatch;
+    const result = evalArith(exprStr);
+    if (result === null) {
+      return {
+        matched: true,
+        response: `I couldn't evaluate "${exprStr}" as a math expression.`,
+        tier: 'T0_LOCAL',
+        updates: [],
+      };
+    }
+    let condMet = false;
+    const lowerCond = condType.toLowerCase();
+    if (lowerCond === 'odd')  condMet = Math.round(result) % 2 !== 0;
+    else if (lowerCond === 'even') condMet = Math.round(result) % 2 === 0;
+    else condMet = result === parseFloat(condType);
+
+    if (!condMet) {
+      const parity = Math.round(result) % 2 === 0 ? 'even' : 'odd';
+      return {
+        matched: true,
+        response: `Condition not met: ${exprStr.trim()} = ${result} (${parity}), not ${condType}. No action taken.`,
+        tier: 'T0_LOCAL',
+        updates: [],
+      };
+    }
+    return processCommand(thenCommand.trim(), objects);
+  }
+
   // Handle compound commands ("turn off lights and turn on the fan")
   const parts = splitCompound(raw);
   if (parts.length > 1) {
@@ -337,7 +381,7 @@ export function processCommand(raw: string, objects: PlacedObject[]): CommandRes
 
   // ─── EVERYTHING ON / OFF (T0) ─────────────────────────────────────────────
 
-  if (/\b(everything|all)\s+off\b|\bturn\s+off\s+(everything|all)\b|\bshut\s+(everything|all)\s+off\b|\ball\s+off\b/.test(q)) {
+  if (/\b(everything|all)\s+off\b|\bturn\s+off\s+(everything|all)(?!\s+(?:light|lights|fan|fans|lamp|bulb|tv|television|plug|thermostat|purifier|device|devices|appliance))\b|\bshut\s+(everything|all)\s+off\b|\ball\s+off\b/.test(q)) {
     const controllable = objects.filter(o =>
       o.isAlexaDevice && !['camera', 'smoke-detector', 'motion-sensor', 'doorbell', 'smart-lock'].includes(o.type)
     );
@@ -349,7 +393,7 @@ export function processCommand(raw: string, objects: PlacedObject[]): CommandRes
     };
   }
 
-  if (/\b(everything|all)\s+on\b|\bturn\s+on\s+(everything|all)\b/.test(q)) {
+  if (/\b(everything|all)\s+on\b|\bturn\s+on\s+(everything|all)(?!\s+(?:light|lights|fan|fans|lamp|bulb|tv|television|plug|thermostat|purifier|device|devices|appliance))\b/.test(q)) {
     return {
       matched: true, tier: 'T0_LOCAL',
       response: 'All lights and fans on.',

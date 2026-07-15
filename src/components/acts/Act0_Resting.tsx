@@ -58,6 +58,7 @@ export function Act0_Resting() {
       <div
         ref={glassRef}
         style={{
+          position: 'relative',
           textAlign: 'center',
           maxWidth: 720,
           pointerEvents: 'auto',
@@ -69,6 +70,39 @@ export function Act0_Resting() {
             '0 8px 32px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.3)',
         }}
       >
+        <button
+          type="button"
+          onClick={() => goToAct('freeplay')}
+          aria-label="Dismiss tour"
+          style={{
+            position: 'absolute',
+            top: 14,
+            right: 14,
+            width: 28,
+            height: 28,
+            borderRadius: '50%',
+            border: '1px solid rgba(255,255,255,0.15)',
+            backgroundColor: 'rgba(255,255,255,0.06)',
+            color: 'var(--text-tertiary)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 14,
+            lineHeight: 1,
+            transition: 'background-color 0.15s, color 0.15s',
+          }}
+          onMouseEnter={e => {
+            (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'rgba(255,255,255,0.14)';
+            (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-primary)';
+          }}
+          onMouseLeave={e => {
+            (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'rgba(255,255,255,0.06)';
+            (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-tertiary)';
+          }}
+        >
+          ×
+        </button>
         <h1
           data-anime
           style={{

@@ -161,6 +161,7 @@ export function SmartphoneWidget({
   };
 
   const activityEndRef = useRef<HTMLDivElement>(null);
+  const chatScrollRef = useRef<HTMLDivElement>(null);
 
   // Hook up WebSocket
   const { send: wsSend, subscribe: wsSubscribe, isConnected: wsIsConnected } = useWebSocket();
@@ -261,9 +262,11 @@ export function SmartphoneWidget({
     };
   }, [wsSubscribe]);
 
-  // Scroll chat to bottom on new message
+  // Scroll only the chat box to its bottom on new messages — never moves the phone container
   useEffect(() => {
-    activityEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (chatScrollRef.current) {
+      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+    }
   }, [summaries]);
 
   // Sync clock time
@@ -788,12 +791,80 @@ export function SmartphoneWidget({
 
                         {/* Echo-inspired Alexa Voice Controller */}
                         <div className="p-5 rounded-2xl bg-[#121316] border border-[#232730] shadow-2xl flex flex-col items-center w-full">
-                          
+
+                          {/* Conversation — appears above the mic, only when there are messages */}
+                          {summaries.length > 0 && (
+                            <div className="w-full mb-4">
+                              <div className="mb-2 flex items-center gap-2">
+                                <span className="text-[10px] font-mono font-bold text-white/30 tracking-widest uppercase">Conversation</span>
+                                <div className="flex-1 h-px bg-white/[0.04]" />
+                              </div>
+                              <div
+                                ref={chatScrollRef}
+                                className="overflow-y-auto max-h-[220px] flex flex-col gap-3 scrollbar-thin scrollbar-thumb-white/10"
+                              >
+                                <AnimatePresence initial={false}>
+                                  {[...summaries].reverse().map((item) => (
+                                    <div key={item.id} className="flex flex-col gap-1.5 w-full">
+                                      <motion.div
+                                        initial={{ opacity: 0, scale: 0.95, x: 20 }}
+                                        animate={{ opacity: 1, scale: 1, x: 0 }}
+                                        className="flex flex-col items-end max-w-[85%] self-end"
+                                      >
+                                        <div className="bg-[#007aff] text-white px-4 py-2 rounded-2xl rounded-tr-sm text-xs font-sans leading-relaxed shadow-sm">
+                                          {item.utterance}
+                                        </div>
+                                        <span className="text-[8px] font-mono text-white/30 mt-0.5 mr-1">{item.timestamp}</span>
+                                      </motion.div>
+                                      <motion.div
+                                        initial={{ opacity: 0, scale: 0.95, x: -20 }}
+                                        animate={{ opacity: 1, scale: 1, x: 0 }}
+                                        className="flex flex-col items-start max-w-[85%] self-start"
+                                      >
+                                        <div className="bg-[#24252a] text-white px-4 py-2 rounded-2xl rounded-tl-sm text-xs font-sans leading-relaxed border border-white/[0.02] shadow-sm">
+                                          {item.response === 'Analyzing command...' ? (
+                                            <span className="flex items-center gap-1.5 text-white/50 italic">
+                                              <span className="animate-spin h-3.5 w-3.5 border-2 border-white/30 border-t-transparent rounded-full" />
+                                              Analyzing...
+                                            </span>
+                                          ) : (
+                                            item.response
+                                          )}
+                                        </div>
+                                        {item.response !== 'Analyzing command...' && (
+                                          <div className="flex items-center gap-2 text-[8px] font-mono text-white/30 mt-0.5 ml-1">
+                                            <span className={
+                                              item.tier === 'T0·local' || item.tier === 'T1·local'
+                                                ? 'text-emerald-400/60'
+                                                : item.tier === 'T3·cloud'
+                                                ? 'text-sky-400/50'
+                                                : 'text-white/30'
+                                            }>
+                                              {item.tier ?? 'Alexa'}
+                                            </span>
+                                            {item.latency > 0 && <span>• {item.latency}ms</span>}
+                                            {item.cost > 0
+                                              ? <span>• ${item.cost.toFixed(4)}</span>
+                                              : item.tier && (item.tier === 'T0·local' || item.tier === 'T1·local')
+                                              ? <span className="text-emerald-400/40">• $0.00</span>
+                                              : null
+                                            }
+                                          </div>
+                                        )}
+                                      </motion.div>
+                                    </div>
+                                  ))}
+                                </AnimatePresence>
+                                <div ref={activityEndRef} />
+                              </div>
+                            </div>
+                          )}
+
                           {/* Echo Bezel */}
                           <div className="relative my-3 flex items-center justify-center w-[96px] h-[96px] rounded-full bg-[#1b1c21] shadow-[inset_0_2px_4px_rgba(0,0,0,0.6),0_4px_12px_rgba(0,0,0,0.4)] border border-[#2c303b] group">
-                            
+
                             {/* Alexa Light Ring */}
-                            <div 
+                            <div
                               className={`absolute inset-1.5 rounded-full border-[3px] transition-all duration-300 ${
                                 status === 'listening'
                                   ? 'border-[#00e5ff] shadow-[0_0_15px_rgba(0,229,255,0.5),inset_0_0_10px_rgba(0,229,255,0.2)] animate-pulse'
@@ -842,7 +913,7 @@ export function SmartphoneWidget({
                             <span className="text-xs font-semibold text-white/90 tracking-wide uppercase">
                               {status === 'listening' ? 'Alexa is Listening...' : status === 'processing' ? 'Thinking...' : 'Tap to Speak'}
                             </span>
-                            
+
                             {status === 'listening' && (
                               <p className="text-[11px] text-[#00e5ff] italic px-2 mt-1.5 leading-tight font-mono max-w-[200px] truncate">
                                 "{liveText || 'Speak now...'}"
@@ -886,6 +957,7 @@ export function SmartphoneWidget({
                               )}
                             </div>
                           </form>
+
                         </div>
 
                         {/* SUGGESTIONS Section */}
@@ -910,82 +982,6 @@ export function SmartphoneWidget({
                                 <span>{sugg}</span>
                               </button>
                             ))}
-                          </div>
-                        </div>
-
-                        {/* CHAT INTERFACE (iMessage style) — lives right under the voice
-                            controller now, not buried below Scenes/Rooms/Energy. */}
-                        <div className="space-y-3 flex flex-col">
-                          <span className="text-[10px] font-mono font-bold text-white/40 tracking-widest uppercase">Conversation</span>
-
-                          <div className="overflow-y-auto max-h-[220px] rounded-2xl bg-[#0b0c0f] border border-white/[0.03] p-4 flex flex-col gap-3 scrollbar-thin scrollbar-thumb-white/10">
-                            <AnimatePresence initial={false}>
-                              {[...summaries].reverse().map((item) => (
-                                <div key={item.id} className="flex flex-col gap-1.5 w-full">
-
-                                  {/* User Bubble (Right-aligned, Blue) */}
-                                  <motion.div
-                                    initial={{ opacity: 0, scale: 0.95, x: 20 }}
-                                    animate={{ opacity: 1, scale: 1, x: 0 }}
-                                    className="flex flex-col items-end max-w-[85%] self-end"
-                                  >
-                                    <div className="bg-[#007aff] text-white px-4 py-2 rounded-2xl rounded-tr-sm text-xs font-sans leading-relaxed shadow-sm">
-                                      {item.utterance}
-                                    </div>
-                                    <span className="text-[8px] font-mono text-white/30 mt-0.5 mr-1">{item.timestamp}</span>
-                                  </motion.div>
-
-                                  {/* Alexa Bubble (Left-aligned, Gray) */}
-                                  <motion.div
-                                    initial={{ opacity: 0, scale: 0.95, x: -20 }}
-                                    animate={{ opacity: 1, scale: 1, x: 0 }}
-                                    className="flex flex-col items-start max-w-[85%] self-start"
-                                  >
-                                    <div className="bg-[#24252a] text-white px-4 py-2 rounded-2xl rounded-tl-sm text-xs font-sans leading-relaxed border border-white/[0.02] shadow-sm">
-                                      {item.response === 'Analyzing command...' ? (
-                                        <span className="flex items-center gap-1.5 text-white/50 italic">
-                                          <span className="animate-spin h-3.5 w-3.5 border-2 border-white/30 border-t-transparent rounded-full" />
-                                          Analyzing...
-                                        </span>
-                                      ) : (
-                                        item.response
-                                      )}
-                                    </div>
-
-                                    {/* Stats (Latency / Cost / Tier) */}
-                                    {item.response !== 'Analyzing command...' && (
-                                      <div className="flex items-center gap-2 text-[8px] font-mono text-white/30 mt-0.5 ml-1">
-                                        <span className={
-                                          item.tier === 'T0·local' || item.tier === 'T1·local'
-                                            ? 'text-emerald-400/60'
-                                            : item.tier === 'T3·cloud'
-                                            ? 'text-sky-400/50'
-                                            : 'text-white/30'
-                                        }>
-                                          {item.tier ?? 'Alexa'}
-                                        </span>
-                                        {item.latency > 0 && <span>• {item.latency}ms</span>}
-                                        {item.cost > 0
-                                          ? <span>• ${item.cost.toFixed(4)}</span>
-                                          : item.tier && (item.tier === 'T0·local' || item.tier === 'T1·local')
-                                          ? <span className="text-emerald-400/40">• $0.00</span>
-                                          : null
-                                        }
-                                      </div>
-                                    )}
-                                  </motion.div>
-
-                                </div>
-                              ))}
-                            </AnimatePresence>
-
-                            {summaries.length === 0 && (
-                              <div className="flex items-center justify-center text-center p-6">
-                                <span className="text-[10px] text-white/30 font-mono">No messages yet. Try saying "turn on living room light"</span>
-                              </div>
-                            )}
-
-                            <div ref={activityEndRef} />
                           </div>
                         </div>
 

@@ -7,6 +7,7 @@ import { CpuAnimationPage } from './components/animation/CpuAnimationPage';
 import { CuteAlexaPage } from './components/cartoon/CuteAlexaPage';
 import { FinalPage } from './components/final/FinalPage';
 import { FinalShowcasePage } from './components/final/FinalShowcasePage';
+import { ShowcaseLivePage } from './components/final/ShowcaseLivePage';
 import { CompanionPage } from './components/phone/CompanionPage';
 import { SmartphoneOnlyPage } from './components/phone/SmartphoneOnlyPage';
 import { SmartphoneWidget } from './components/phone/SmartphoneWidget';
@@ -55,6 +56,7 @@ export default function App() {
         <Route path="/smartphone" element={<SmartphoneOnlyPage />} />
         <Route path="/final" element={<FinalPage />} />
         <Route path="/showcase" element={<FinalShowcasePage />} />
+        <Route path="/showcase-live" element={<ShowcaseLivePage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
